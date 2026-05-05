@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('assignment_audit_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('assignment_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('event');
             $table->json('payload')->nullable();
             $table->timestamp('created_at')->useCurrent();
