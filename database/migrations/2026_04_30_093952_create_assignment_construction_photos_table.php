@@ -10,8 +10,10 @@ return new class extends Migration
     {
         Schema::create('assignment_construction_photos', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('assignment_construction_data_id')
-                ->constrained('assignment_construction_data')
+            $table->foreignId('assignment_construction_data_id');
+            $table->foreign('assignment_construction_data_id', 'acp_construction_data_id_foreign')
+                ->references('id')
+                ->on('assignment_construction_data')
                 ->cascadeOnDelete();
             $table->string('path');
             $table->timestamps();
