@@ -1,0 +1,26 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('assignment_bast_data', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('assignment_id')->unique()->constrained()->cascadeOnDelete();
+            $table->string('nomor_simcard')->nullable();
+            $table->date('go_live_date_pln_pass')->nullable();
+            $table->date('go_live_date_pln')->nullable();
+            $table->text('catatan_progres')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('assignment_bast_data');
+    }
+};
