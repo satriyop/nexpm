@@ -45,17 +45,35 @@ const tabs: Tab[] = [
 
 const activeTab = ref<ReportType>('SSR');
 
+// ── Site type filter (BAST tab only) ──────────────────────────────────────────
+type SiteTypeFilter = 'ALL' | 'EVCS' | 'BSS';
+const siteTypeFilter = ref<SiteTypeFilter>('ALL');
+
 const activeAssignments = computed<Assignment[]>(() => {
+    let list: Assignment[];
     switch (activeTab.value) {
-        case 'SSR':   return props.ssrAssignments;
-        case 'BAST':  return props.bastAssignments;
-        case 'DAILY': return [...props.ssrAssignments, ...props.bastAssignments];
+        case 'SSR':   list = props.ssrAssignments; break;
+        case 'BAST':  list = props.bastAssignments; break;
+        case 'DAILY': list = [...props.ssrAssignments, ...props.bastAssignments]; break;
     }
+    if (activeTab.value === 'BAST' && siteTypeFilter.value !== 'ALL') {
+        list = list.filter((a) => a.site?.site_type?.name === siteTypeFilter.value);
+    }
+    return list;
 });
 
 function switchTab(tab: ReportType): void {
     activeTab.value = tab;
     selectedIds.value = [];
+}
+
+function setSiteTypeFilter(f: SiteTypeFilter): void {
+    siteTypeFilter.value = f;
+    selectedIds.value = [];
+}
+
+function siteTypeName(assignment: Assignment): string {
+    return assignment.site?.site_type?.name ?? '';
 }
 
 // ── Selection ─────────────────────────────────────────────────────────────────
@@ -165,9 +183,26 @@ function formatDate(iso: string): string {
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div class="flex items-center justify-between border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
-                <div>
+                <div class="flex flex-col gap-1.5">
                     <p class="text-sm font-medium">{{ tabs.find((t) => t.key === activeTab)?.description }}</p>
                     <p class="text-xs text-muted-foreground">{{ activeAssignments.length }} available · {{ selectedIds.length }} selected</p>
+                    <!-- Site type filter (BAST tab only) -->
+                    <div v-if="activeTab === 'BAST'" class="flex gap-1">
+                        <button
+                            v-for="f in (['ALL', 'EVCS', 'BSS'] as const)"
+                            :key="f"
+                            type="button"
+                            class="rounded px-2 py-0.5 text-[11px] font-medium transition-colors"
+                            :class="
+                                siteTypeFilter === f
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'border border-sidebar-border/70 text-muted-foreground hover:bg-muted hover:text-foreground dark:border-sidebar-border'
+                            "
+                            @click="setSiteTypeFilter(f)"
+                        >
+                            {{ f === 'ALL' ? 'All Types' : f }}
+                        </button>
+                    </div>
                 </div>
                 <Button
                     :disabled="selectedIds.length === 0 || form.processing"
@@ -219,7 +254,20 @@ function formatDate(iso: string): string {
                                 </div>
                             </td>
                             <td class="px-4 py-3">
-                                <ActivityTypeBadge :activity-type="assignment.activity_type" />
+                                <div class="flex flex-col gap-1">
+                                    <ActivityTypeBadge :activity-type="assignment.activity_type" />
+                                    <span
+                                        v-if="activeTab === 'BAST' && siteTypeName(assignment)"
+                                        class="inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                        :class="
+                                            siteTypeName(assignment) === 'BSS'
+                                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                                : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300'
+                                        "
+                                    >
+                                        {{ siteTypeName(assignment) }}
+                                    </span>
+                                </div>
                             </td>
                             <td class="px-4 py-3 text-xs text-muted-foreground">
                                 {{ assignment.subcontractor?.name ?? '—' }}
