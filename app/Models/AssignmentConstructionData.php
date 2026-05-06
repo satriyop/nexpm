@@ -29,7 +29,10 @@ class AssignmentConstructionData extends Model
         'cons_actual_start_date',
         'cons_actual_done_date',
         'machine_serial_number',
+        'foto_machine_sn',
         'catatan_progres',
+        'go_live_date_pln',
+        'go_live_date_pln_pass',
     ];
 
     /**
@@ -41,6 +44,8 @@ class AssignmentConstructionData extends Model
             'setup_approval_date' => 'date',
             'cons_actual_start_date' => 'date',
             'cons_actual_done_date' => 'date',
+            'go_live_date_pln' => 'date',
+            'go_live_date_pln_pass' => 'date',
         ];
     }
 
@@ -80,6 +85,10 @@ class AssignmentConstructionData extends Model
         }
 
         if ($this->machine_serial_number === null || $this->machine_serial_number === '') {
+            return false;
+        }
+
+        if ($this->foto_machine_sn === null || $this->foto_machine_sn === '') {
             return false;
         }
 

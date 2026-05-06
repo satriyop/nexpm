@@ -3,11 +3,27 @@ import type { User } from './auth';
 export type ActivityType = 'SURVEY' | 'PLN_CONNECTION' | 'CONSTRUCTION' | 'BAST';
 
 export type AssignmentStatus =
+    // Shared
     | 'PENDING'
-    | 'COMPLETED'
-    | 'REVISION'
+    | 'DROP'
     | 'VERIFIED'
-    | 'REPORTED';
+    | 'REPORTED'
+    // Survey
+    | 'SURVEY'
+    | 'DOCUMENT'
+    // Construction
+    | 'CONSTRUCTION'
+    | 'MACHINE_ONSITE'
+    | 'DONE'
+    | 'LIVE'
+    // PLN
+    | 'REGISTRATION'
+    | 'BILLING'
+    | 'CONNECTION'
+    | 'KWH_DONE'
+    // BAST
+    | 'COMPLETED'
+    | 'REVISION';
 
 export interface SiteType {
     id: number;
@@ -35,6 +51,7 @@ export interface AssignmentSurveyData {
     id: number;
     assignment_id: number;
     updated_at: string | null;
+    ss_wo_number: string | null;
     surveyor_name: string | null;
     pic_location_name: string | null;
     pic_location_phone: string | null;
@@ -67,6 +84,9 @@ export interface AssignmentPlnData {
     kwh_meter_installation_date: string | null;
     id_pelanggan: string | null;
     catatan_progres: string | null;
+    email_bpujl_req_date: string | null;
+    bpujl_acquired_date: string | null;
+    foto_kwh: string | null;
 }
 
 export interface AssignmentConstructionPhoto {
@@ -84,7 +104,10 @@ export interface AssignmentConstructionData {
     cons_actual_start_date: string | null;
     cons_actual_done_date: string | null;
     machine_serial_number: string | null;
+    foto_machine_sn: string | null;
     catatan_progres: string | null;
+    go_live_date_pln: string | null;
+    go_live_date_pln_pass: string | null;
     construction_photos: AssignmentConstructionPhoto[];
 }
 

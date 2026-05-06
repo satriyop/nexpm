@@ -10,8 +10,24 @@ import { dashboard } from '@/routes';
 
 interface StatusCounts {
     PENDING?: number;
+    DROP?: number;
+    // Survey
+    SURVEY?: number;
+    DOCUMENT?: number;
+    // Construction
+    CONSTRUCTION?: number;
+    MACHINE_ONSITE?: number;
+    DONE?: number;
+    LIVE?: number;
+    // PLN
+    REGISTRATION?: number;
+    BILLING?: number;
+    CONNECTION?: number;
+    KWH_DONE?: number;
+    // BAST
     COMPLETED?: number;
     REVISION?: number;
+    // Shared final
     VERIFIED?: number;
     REPORTED?: number;
 }
@@ -94,11 +110,22 @@ function applyProjectFilter(value: string): void {
 }
 
 const statuses: { key: keyof StatusCounts; label: string; borderClass: string; textClass: string; dotClass: string; bgClass: string }[] = [
-    { key: 'PENDING',   label: 'Pending',   borderClass: 'border-l-gray-400',    textClass: 'text-gray-600 dark:text-gray-400',       dotClass: 'bg-gray-400',    bgClass: 'bg-gray-50 dark:bg-gray-900/20' },
-    { key: 'COMPLETED', label: 'Completed', borderClass: 'border-l-blue-500',    textClass: 'text-blue-600 dark:text-blue-400',       dotClass: 'bg-blue-500',    bgClass: 'bg-blue-50 dark:bg-blue-900/20' },
-    { key: 'REVISION',  label: 'Revision',  borderClass: 'border-l-amber-500',   textClass: 'text-amber-600 dark:text-amber-400',     dotClass: 'bg-amber-500',   bgClass: 'bg-amber-50 dark:bg-amber-900/20' },
-    { key: 'VERIFIED',  label: 'Verified',  borderClass: 'border-l-emerald-500', textClass: 'text-emerald-600 dark:text-emerald-400', dotClass: 'bg-emerald-500', bgClass: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { key: 'REPORTED',  label: 'Reported',  borderClass: 'border-l-purple-500',  textClass: 'text-purple-600 dark:text-purple-400',   dotClass: 'bg-purple-500',  bgClass: 'bg-purple-50 dark:bg-purple-900/20' },
+    { key: 'PENDING',        label: 'Pending',        borderClass: 'border-l-gray-400',    textClass: 'text-gray-600 dark:text-gray-400',       dotClass: 'bg-gray-400',    bgClass: 'bg-gray-50 dark:bg-gray-900/20' },
+    { key: 'SURVEY',         label: 'Survey',         borderClass: 'border-l-sky-500',     textClass: 'text-sky-600 dark:text-sky-400',         dotClass: 'bg-sky-500',     bgClass: 'bg-sky-50 dark:bg-sky-900/20' },
+    { key: 'DOCUMENT',       label: 'Document',       borderClass: 'border-l-indigo-500',  textClass: 'text-indigo-600 dark:text-indigo-400',   dotClass: 'bg-indigo-500',  bgClass: 'bg-indigo-50 dark:bg-indigo-900/20' },
+    { key: 'CONSTRUCTION',   label: 'Construction',   borderClass: 'border-l-orange-500',  textClass: 'text-orange-600 dark:text-orange-400',   dotClass: 'bg-orange-500',  bgClass: 'bg-orange-50 dark:bg-orange-900/20' },
+    { key: 'MACHINE_ONSITE', label: 'Machine Onsite', borderClass: 'border-l-amber-500',   textClass: 'text-amber-600 dark:text-amber-400',     dotClass: 'bg-amber-500',   bgClass: 'bg-amber-50 dark:bg-amber-900/20' },
+    { key: 'DONE',           label: 'Done',           borderClass: 'border-l-lime-500',    textClass: 'text-lime-600 dark:text-lime-400',       dotClass: 'bg-lime-500',    bgClass: 'bg-lime-50 dark:bg-lime-900/20' },
+    { key: 'LIVE',           label: 'Live',           borderClass: 'border-l-green-500',   textClass: 'text-green-600 dark:text-green-400',     dotClass: 'bg-green-500',   bgClass: 'bg-green-50 dark:bg-green-900/20' },
+    { key: 'REGISTRATION',   label: 'Registration',   borderClass: 'border-l-teal-500',    textClass: 'text-teal-600 dark:text-teal-400',       dotClass: 'bg-teal-500',    bgClass: 'bg-teal-50 dark:bg-teal-900/20' },
+    { key: 'BILLING',        label: 'Billing',        borderClass: 'border-l-cyan-500',    textClass: 'text-cyan-600 dark:text-cyan-400',       dotClass: 'bg-cyan-500',    bgClass: 'bg-cyan-50 dark:bg-cyan-900/20' },
+    { key: 'CONNECTION',     label: 'Connection',     borderClass: 'border-l-blue-500',    textClass: 'text-blue-600 dark:text-blue-400',       dotClass: 'bg-blue-500',    bgClass: 'bg-blue-50 dark:bg-blue-900/20' },
+    { key: 'KWH_DONE',       label: 'KWH Done',       borderClass: 'border-l-violet-500',  textClass: 'text-violet-600 dark:text-violet-400',   dotClass: 'bg-violet-500',  bgClass: 'bg-violet-50 dark:bg-violet-900/20' },
+    { key: 'COMPLETED',      label: 'Completed',      borderClass: 'border-l-blue-500',    textClass: 'text-blue-600 dark:text-blue-400',       dotClass: 'bg-blue-500',    bgClass: 'bg-blue-50 dark:bg-blue-900/20' },
+    { key: 'REVISION',       label: 'Revision',       borderClass: 'border-l-amber-500',   textClass: 'text-amber-600 dark:text-amber-400',     dotClass: 'bg-amber-500',   bgClass: 'bg-amber-50 dark:bg-amber-900/20' },
+    { key: 'VERIFIED',       label: 'Verified',       borderClass: 'border-l-emerald-500', textClass: 'text-emerald-600 dark:text-emerald-400', dotClass: 'bg-emerald-500', bgClass: 'bg-emerald-50 dark:bg-emerald-900/20' },
+    { key: 'REPORTED',       label: 'Reported',       borderClass: 'border-l-purple-500',  textClass: 'text-purple-600 dark:text-purple-400',   dotClass: 'bg-purple-500',  bgClass: 'bg-purple-50 dark:bg-purple-900/20' },
+    { key: 'DROP',           label: 'Drop',           borderClass: 'border-l-red-500',     textClass: 'text-red-600 dark:text-red-400',         dotClass: 'bg-red-500',     bgClass: 'bg-red-50 dark:bg-red-900/20' },
 ];
 
 const activityRows: { key: string; label: string }[] = [
@@ -117,7 +144,7 @@ function getCount(counts: StatusCounts | Record<string, number>, key: string): n
 }
 
 function projectTotal(counts: StatusCounts): number {
-    return (counts.PENDING ?? 0) + (counts.COMPLETED ?? 0) + (counts.REVISION ?? 0) + (counts.VERIFIED ?? 0) + (counts.REPORTED ?? 0);
+    return Object.values(counts as Record<string, number>).reduce((sum, v) => sum + v, 0);
 }
 
 function projectCompletion(counts: StatusCounts): number {
@@ -146,9 +173,15 @@ function assignmentFilterUrl(params: Record<string, string>): string {
 
 function cellHighlight(statusKey: string, count: number): string {
     if (count === 0) { return ''; }
-    if (statusKey === 'REVISION') { return 'bg-amber-50 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'; }
-    if (statusKey === 'COMPLETED') { return 'bg-blue-50 font-semibold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'; }
-    return '';
+    const highlights: Record<string, string> = {
+        REVISION:       'bg-amber-50 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+        COMPLETED:      'bg-blue-50 font-semibold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+        LIVE:           'bg-green-50 font-semibold text-green-700 dark:bg-green-900/20 dark:text-green-400',
+        KWH_DONE:       'bg-violet-50 font-semibold text-violet-700 dark:bg-violet-900/20 dark:text-violet-400',
+        DOCUMENT:       'bg-indigo-50 font-semibold text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400',
+        DROP:           'bg-red-50 font-semibold text-red-700 dark:bg-red-900/20 dark:text-red-400',
+    };
+    return highlights[statusKey] ?? '';
 }
 
 function timeAgo(isoString: string): string {

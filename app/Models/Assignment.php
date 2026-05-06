@@ -98,7 +98,7 @@ class Assignment extends Model
 
     /**
      * Alias for constructionData to match frontend snake_case expectations.
-     * 
+     *
      * @return HasOne<AssignmentConstructionData, $this>
      */
     public function construction_data(): HasOne
@@ -194,6 +194,12 @@ class Assignment extends Model
     {
         $this->status = AssignmentStatus::Reported;
         $this->reported_at = now();
+        $this->save();
+    }
+
+    public function markDropped(): void
+    {
+        $this->status = AssignmentStatus::Drop;
         $this->save();
     }
 }

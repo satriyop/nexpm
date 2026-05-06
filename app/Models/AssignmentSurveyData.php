@@ -22,6 +22,7 @@ class AssignmentSurveyData extends Model
      */
     protected $fillable = [
         'assignment_id',
+        'ss_wo_number',
         'surveyor_name',
         'pic_location_name',
         'pic_location_phone',

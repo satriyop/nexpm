@@ -50,16 +50,18 @@ class AssignmentController extends Controller
             });
         }
 
-        if ($request->filled('status') || $request->filled('activity_type')) {
-            $query->whereHas('assignments', function ($q) use ($request): void {
-                if ($request->filled('status')) {
-                    $q->where('status', $request->string('status'));
-                }
-                if ($request->filled('activity_type')) {
-                    $q->where('activity_type', $request->string('activity_type'));
-                }
-            });
-        }
+        $filteringByDrop = $request->input('status') === 'DROP';
+
+        $query->whereHas('assignments', function ($q) use ($request, $filteringByDrop): void {
+            if ($request->filled('status')) {
+                $q->where('status', $request->string('status'));
+            } elseif (! $filteringByDrop) {
+                $q->where('status', '!=', 'DROP');
+            }
+            if ($request->filled('activity_type')) {
+                $q->where('activity_type', $request->string('activity_type'));
+            }
+        });
 
         if ($request->filled('subcontractor_id')) {
             $query->whereHas('assignments', fn ($q) => $q->where('subcontractor_id', $request->integer('subcontractor_id')));
@@ -157,8 +159,11 @@ class AssignmentController extends Controller
 
     public function verify(Assignment $assignment): RedirectResponse
     {
-        abort_unless($assignment->status === AssignmentStatus::Completed, 422, 'Assignment must be completed before verifying.');
-        abort_unless($assignment->isCompletedBySubcon(), 422, 'Assignment data is incomplete.');
+        abort_unless(
+            in_array($assignment->status, AssignmentStatus::verifiableStatuses(), true),
+            422,
+            'Assignment must be in Document or Completed state before verifying.',
+        );
 
         $assignment->markVerified($this->currentUser());
 
@@ -174,6 +179,13 @@ class AssignmentController extends Controller
 
     public function revise(Request $request, Assignment $assignment): RedirectResponse
     {
+        abort_unless(
+            $assignment->activity_type === ActivityType::Bast
+            && $assignment->status === AssignmentStatus::Completed,
+            422,
+            'Only BAST assignments in Completed state can be sent for revision.',
+        );
+
         $validated = $request->validate([
             'revision_comment' => ['required', 'string', 'min:1'],
         ]);
@@ -188,6 +200,43 @@ class AssignmentController extends Controller
         ]);
 
         return back()->with('success', 'Revision request sent.');
+    }
+
+    public function drop(Assignment $assignment): RedirectResponse
+    {
+        abort_unless(
+            ! in_array($assignment->status, [AssignmentStatus::Drop, AssignmentStatus::Reported], true),
+            422,
+            'Assignment cannot be dropped in its current state.',
+        );
+
+        $assignment->markDropped();
+
+        AssignmentAuditLog::create([
+            'assignment_id' => $assignment->id,
+            'user_id' => $this->currentUser()->id,
+            'event' => 'dropped',
+            'payload' => null,
+        ]);
+
+        return back()->with('success', 'Assignment dropped.');
+    }
+
+    public function restore(Assignment $assignment): RedirectResponse
+    {
+        abort_unless($assignment->status === AssignmentStatus::Drop, 422, 'Only dropped assignments can be restored.');
+
+        $assignment->status = AssignmentStatus::Pending;
+        $assignment->save();
+
+        AssignmentAuditLog::create([
+            'assignment_id' => $assignment->id,
+            'user_id' => $this->currentUser()->id,
+            'event' => 'restored',
+            'payload' => null,
+        ]);
+
+        return back()->with('success', 'Assignment restored.');
     }
 
     public function updateSurveyParkingSlot(Request $request, Assignment $assignment): RedirectResponse
@@ -278,6 +327,9 @@ class AssignmentController extends Controller
             'file_slo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'file_nidi' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'file_reg' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'email_bpujl_req_date' => ['nullable', 'date'],
+            'bpujl_acquired_date' => ['nullable', 'date'],
+            'foto_kwh' => ['nullable', 'file', 'image', 'max:10240'],
         ]);
 
         $pln = $assignment->plnData()->firstOrNew([]);
@@ -309,11 +361,22 @@ class AssignmentController extends Controller
             'cons_actual_start_date' => ['nullable', 'date'],
             'cons_actual_done_date' => ['nullable', 'date'],
             'machine_serial_number' => ['nullable', 'string', 'max:255'],
+            'foto_machine_sn' => ['nullable', 'file', 'image', 'max:10240'],
             'catatan_progres' => ['nullable', 'string'],
+            'go_live_date_pln' => ['nullable', 'date'],
+            'go_live_date_pln_pass' => ['nullable', 'date'],
         ]);
 
         $construction = $assignment->constructionData()->firstOrCreate(['assignment_id' => $assignment->id]);
-        $construction->fill($validated);
+
+        foreach ($validated as $key => $value) {
+            if ($request->hasFile($key)) {
+                $construction->{$key} = $request->file($key)->store('construction', 'public');
+            } else {
+                $construction->{$key} = $value;
+            }
+        }
+
         $construction->saveQuietly();
 
         AssignmentAuditLog::create([

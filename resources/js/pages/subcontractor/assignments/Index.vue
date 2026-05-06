@@ -53,10 +53,21 @@ watch(
 
 const statusOptions: { value: AssignmentStatus; label: string }[] = [
     { value: 'PENDING', label: 'Pending' },
+    { value: 'SURVEY', label: 'Survey' },
+    { value: 'DOCUMENT', label: 'Document' },
+    { value: 'CONSTRUCTION', label: 'Construction' },
+    { value: 'MACHINE_ONSITE', label: 'Machine Onsite' },
+    { value: 'DONE', label: 'Done' },
+    { value: 'LIVE', label: 'Live' },
+    { value: 'REGISTRATION', label: 'Registration' },
+    { value: 'BILLING', label: 'Billing' },
+    { value: 'CONNECTION', label: 'Connection' },
+    { value: 'KWH_DONE', label: 'KWH Done' },
     { value: 'COMPLETED', label: 'Completed' },
     { value: 'REVISION', label: 'Revision' },
     { value: 'VERIFIED', label: 'Verified' },
     { value: 'REPORTED', label: 'Reported' },
+    { value: 'DROP', label: 'Drop' },
 ];
 
 const hasActiveFilters = computed(() => search.value !== '' || status.value !== ALL);
@@ -93,7 +104,7 @@ function onSearchInput() {
 }
 
 function isFillable(s: AssignmentStatus): boolean {
-    return s === 'PENDING' || s === 'REVISION' || s === 'COMPLETED';
+    return !['VERIFIED', 'REPORTED', 'DROP'].includes(s);
 }
 
 function formatDate(value: string | null | undefined): string {

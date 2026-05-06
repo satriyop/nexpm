@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\DashboardController;
 // Admin sub-controllers referenced via Admin\ControllerName syntax
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Subcontractor;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -16,8 +17,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::patch('notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllRead'])->name('notifications.read-all');
-    Route::patch('notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::patch('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::patch('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 });
 
 Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -44,6 +45,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::get('assignments/{assignment}', [Admin\AssignmentController::class, 'show'])->name('assignments.show');
     Route::post('assignments/{assignment}/verify', [Admin\AssignmentController::class, 'verify'])->name('assignments.verify');
     Route::post('assignments/{assignment}/revise', [Admin\AssignmentController::class, 'revise'])->name('assignments.revise');
+    Route::patch('assignments/{assignment}/drop', [Admin\AssignmentController::class, 'drop'])->name('assignments.drop');
+    Route::patch('assignments/{assignment}/restore', [Admin\AssignmentController::class, 'restore'])->name('assignments.restore');
     Route::patch('assignments/{assignment}/survey-parking-slot', [Admin\AssignmentController::class, 'updateSurveyParkingSlot'])->name('assignments.survey-parking-slot');
     Route::patch('assignments/{assignment}/construction-prerequisite', [Admin\AssignmentController::class, 'updateConstructionPrerequisite'])->name('assignments.construction-prerequisite');
     Route::get('assignments/{assignment}/bast-report', [Admin\AssignmentController::class, 'downloadBastReport'])->name('assignments.bast-report');

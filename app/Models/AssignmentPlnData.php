@@ -31,20 +31,24 @@ class AssignmentPlnData extends Model
         'kwh_meter_installation_date',
         'id_pelanggan',
         'catatan_progres',
+        'email_bpujl_req_date',
+        'bpujl_acquired_date',
+        'foto_kwh',
     ];
 
     /**
      * @var list<string>
      */
     public const REQUIRED_SUBCON_FIELDS = [
-        'pln_status',
-        'nidi_slo_date_acquired',
-        'type_rate',
         'file_slo',
         'file_nidi',
         'file_reg',
-        'kwh_meter_installation_date',
+        'email_bpujl_req_date',
+        'bpujl_acquired_date',
+        'type_rate',
         'id_pelanggan',
+        'kwh_meter_installation_date',
+        'foto_kwh',
     ];
 
     /**
@@ -55,6 +59,8 @@ class AssignmentPlnData extends Model
         return [
             'nidi_slo_date_acquired' => 'date',
             'kwh_meter_installation_date' => 'date',
+            'email_bpujl_req_date' => 'date',
+            'bpujl_acquired_date' => 'date',
         ];
     }
 

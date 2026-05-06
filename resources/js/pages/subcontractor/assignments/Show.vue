@@ -27,7 +27,7 @@ defineOptions({
 });
 
 const isReadOnly = computed(() =>
-    props.assignment.status === 'VERIFIED' || props.assignment.status === 'REPORTED',
+    ['VERIFIED', 'REPORTED', 'DROP'].includes(props.assignment.status),
 );
 </script>
 
@@ -64,11 +64,13 @@ const isReadOnly = computed(() =>
             </AlertDescription>
         </Alert>
 
-        <!-- Verified / Reported state -->
+        <!-- Verified / Reported / Dropped state -->
         <Alert v-else-if="isReadOnly" class="border-green-300 bg-green-50 text-green-800">
             <CheckCircle class="h-4 w-4 !text-green-600" />
             <AlertDescription>
-                This assignment has been <strong>{{ assignment.status === 'VERIFIED' ? 'verified' : 'reported' }}</strong>. No further changes can be made.
+                This assignment has been
+                <strong>{{ assignment.status === 'VERIFIED' ? 'verified' : assignment.status === 'REPORTED' ? 'reported' : 'dropped' }}</strong>.
+                No further changes can be made.
             </AlertDescription>
         </Alert>
 

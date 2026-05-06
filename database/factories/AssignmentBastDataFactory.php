@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
+use App\Models\AssignmentBastPhoto;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -24,10 +25,18 @@ class AssignmentBastDataFactory extends Factory
     public function complete(): self
     {
         return $this->state(fn () => [
-            'nomor_simcard' => fake()->numerify('SIM##########'),
-            'go_live_date_pln_pass' => fake()->date(),
-            'go_live_date_pln' => fake()->date(),
-            'catatan_progres' => fake()->sentence(),
-        ]);
+            'plant_name' => fake()->company(),
+            'installation_date' => fake()->date(),
+            'commissioning_date' => fake()->date(),
+        ])->afterCreating(function (AssignmentBastData $bast) {
+            foreach (AssignmentBastData::REQUIRED_CHECKPOINTS as $key) {
+                AssignmentBastPhoto::create([
+                    'assignment_bast_data_id' => $bast->id,
+                    'section' => 'required',
+                    'checkpoint_key' => $key,
+                    'photo_path' => 'bast/test/'.$key.'.jpg',
+                ]);
+            }
+        });
     }
 }

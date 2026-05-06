@@ -101,8 +101,24 @@ watch(
 
 const statusOptions: { value: AssignmentStatus; label: string }[] = [
     { value: 'PENDING', label: 'Pending' },
+    { value: 'DROP', label: 'Drop' },
+    // Survey
+    { value: 'SURVEY', label: 'Survey' },
+    { value: 'DOCUMENT', label: 'Document' },
+    // Construction
+    { value: 'CONSTRUCTION', label: 'Construction' },
+    { value: 'MACHINE_ONSITE', label: 'Machine Onsite' },
+    { value: 'DONE', label: 'Done' },
+    { value: 'LIVE', label: 'Live' },
+    // PLN
+    { value: 'REGISTRATION', label: 'Registration' },
+    { value: 'BILLING', label: 'Billing' },
+    { value: 'CONNECTION', label: 'Connection' },
+    { value: 'KWH_DONE', label: 'KWH Done' },
+    // BAST
     { value: 'COMPLETED', label: 'Completed' },
     { value: 'REVISION', label: 'Revision' },
+    // Shared final
     { value: 'VERIFIED', label: 'Verified' },
     { value: 'REPORTED', label: 'Reported' },
 ];
@@ -179,19 +195,41 @@ function getAssignment(assignments: any, activityType: string): any | null {
 }
 
 const statusDotMap: Record<string, string> = {
-    PENDING: 'bg-gray-400',
-    COMPLETED: 'bg-blue-500',
-    REVISION: 'bg-amber-500',
-    VERIFIED: 'bg-emerald-500',
-    REPORTED: 'bg-purple-500',
+    PENDING:        'bg-gray-400',
+    DROP:           'bg-red-500',
+    SURVEY:         'bg-sky-500',
+    DOCUMENT:       'bg-indigo-500',
+    CONSTRUCTION:   'bg-orange-500',
+    MACHINE_ONSITE: 'bg-amber-500',
+    DONE:           'bg-lime-500',
+    LIVE:           'bg-green-500',
+    REGISTRATION:   'bg-teal-500',
+    BILLING:        'bg-cyan-500',
+    CONNECTION:     'bg-blue-500',
+    KWH_DONE:       'bg-violet-500',
+    COMPLETED:      'bg-blue-500',
+    REVISION:       'bg-amber-500',
+    VERIFIED:       'bg-emerald-500',
+    REPORTED:       'bg-purple-500',
 };
 
 const statusLabelMap: Record<string, string> = {
-    PENDING: 'Pending',
-    COMPLETED: 'Completed',
-    REVISION: 'Revision',
-    VERIFIED: 'Verified',
-    REPORTED: 'Reported',
+    PENDING:        'Pending',
+    DROP:           'Drop',
+    SURVEY:         'Survey',
+    DOCUMENT:       'Document',
+    CONSTRUCTION:   'Construction',
+    MACHINE_ONSITE: 'Machine Onsite',
+    DONE:           'Done',
+    LIVE:           'Live',
+    REGISTRATION:   'Registration',
+    BILLING:        'Billing',
+    CONNECTION:     'Connection',
+    KWH_DONE:       'KWH Done',
+    COMPLETED:      'Completed',
+    REVISION:       'Revision',
+    VERIFIED:       'Verified',
+    REPORTED:       'Reported',
 };
 
 const activityColumns: { type: ActivityType; label: string }[] = [

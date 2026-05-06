@@ -140,11 +140,14 @@ class TestDataSeeder extends Seeder
         //
         // Each scenario maps a site to a target status per activity type.
         //
-        // Status legend:
+        // Status legend (per-activity system):
         //   REPORTED  – full lifecycle done; linked to a Report record
         //   VERIFIED  – admin verified; awaiting report export
-        //   COMPLETED – subcon submitted; awaiting admin verification
-        //   REVISION  – admin sent back with comment; subcon must re-submit
+        //   DOCUMENT  – survey subcon fully submitted; awaiting admin verification
+        //   KWH_DONE  – PLN subcon fully submitted; awaiting admin verification
+        //   LIVE      – construction subcon fully submitted; awaiting admin verification
+        //   COMPLETED – BAST subcon fully submitted; awaiting admin verification
+        //   REVISION  – admin sent BAST back with comment (BAST only); subcon must re-submit
         //   PENDING   – assigned but subcon hasn't submitted yet
         //              (two sub-variants: "WO set" for construction, "no data" otherwise)
         //
@@ -188,6 +191,8 @@ class TestDataSeeder extends Seeder
                 ],
             ],
             [
+                // "Fully submitted — awaiting admin verification" scenario.
+                // Each activity uses its own terminal subcon status.
                 'site_code' => 'TEST-BSS-001',
                 'site_type_id' => $bssTypeId,
                 'location' => 'SPBU Fatmawati',
@@ -198,13 +203,14 @@ class TestDataSeeder extends Seeder
                 'pln_subcon' => $scPln,
                 'create_report' => false,
                 'statuses' => [
-                    ActivityType::Survey->value => AssignmentStatus::Completed,
-                    ActivityType::PlnConnection->value => AssignmentStatus::Completed,
-                    ActivityType::Construction->value => AssignmentStatus::Completed,
+                    ActivityType::Survey->value => AssignmentStatus::Document,
+                    ActivityType::PlnConnection->value => AssignmentStatus::KwhDone,
+                    ActivityType::Construction->value => AssignmentStatus::Live,
                     ActivityType::Bast->value => AssignmentStatus::Completed,
                 ],
             ],
             [
+                // "BAST in revision, other activities at their subcon terminal status" scenario.
                 'site_code' => 'TEST-BSS-002',
                 'site_type_id' => $bssTypeId,
                 'location' => 'SPBU Kelapa Gading',
@@ -215,9 +221,9 @@ class TestDataSeeder extends Seeder
                 'pln_subcon' => $scPln,
                 'create_report' => false,
                 'statuses' => [
-                    ActivityType::Survey->value => AssignmentStatus::Revision,
-                    ActivityType::PlnConnection->value => AssignmentStatus::Revision,
-                    ActivityType::Construction->value => AssignmentStatus::Revision,
+                    ActivityType::Survey->value => AssignmentStatus::Document,
+                    ActivityType::PlnConnection->value => AssignmentStatus::KwhDone,
+                    ActivityType::Construction->value => AssignmentStatus::Live,
                     ActivityType::Bast->value => AssignmentStatus::Revision,
                 ],
             ],
@@ -258,10 +264,8 @@ class TestDataSeeder extends Seeder
             ],
         ];
 
+        // REVISION is BAST-only in the new per-activity status system.
         $revisionComments = [
-            ActivityType::Survey->value => 'Foto keseluruhan lokasi kurang jelas. Mohon diulang dengan pencahayaan yang lebih baik.',
-            ActivityType::PlnConnection->value => 'Dokumen SLO belum sesuai. Harap upload ulang dokumen yang telah dilegalisir.',
-            ActivityType::Construction->value => 'Serial number mesin tidak sesuai PO. Mohon dicek kembali sebelum re-submit.',
             ActivityType::Bast->value => 'Foto grounding cable route tidak terlihat jelas. Harap ambil ulang dari sudut berbeda.',
         ];
 
@@ -304,20 +308,7 @@ class TestDataSeeder extends Seeder
                     match ($activityType) {
                         ActivityType::Survey => $this->seedSurveyData($assignment, $n, $scenario),
 
-                        ActivityType::PlnConnection => AssignmentPlnData::firstOrCreate(
-                            ['assignment_id' => $assignment->id],
-                            [
-                                'pln_status' => 'DONE KWH',
-                                'nidi_slo_date_acquired' => now()->subDays(5)->format('Y-m-d'),
-                                'type_rate' => '22 kVA',
-                                'file_slo' => 'https://placehold.co/600x800/png?text=SLO-'.$n,
-                                'file_nidi' => 'https://placehold.co/600x800/png?text=NIDI-'.$n,
-                                'file_reg' => 'https://placehold.co/600x800/png?text=REG-'.$n,
-                                'kwh_meter_installation_date' => now()->subDays(3)->format('Y-m-d'),
-                                'id_pelanggan' => 'PLN-'.str_pad($n * 100000, 6, '0', STR_PAD_LEFT),
-                                'catatan_progres' => 'Proses sambungan PLN berjalan sesuai rencana.',
-                            ],
-                        ),
+                        ActivityType::PlnConnection => $this->seedPlnData($assignment, $n),
 
                         ActivityType::Construction => $this->seedConstructionData($assignment, $n, $isWoOnly),
 
@@ -499,9 +490,12 @@ class TestDataSeeder extends Seeder
             ActivityType::Bast->value => 'B',
         ];
 
+        // Representative status set for combo generation (keeps site count manageable).
+        // These 5 cover: not started, activity-specific completion trigger (Document for survey),
+        // BAST revision, admin verified, and final reported state.
         $statusChar = [
             AssignmentStatus::Pending->value => 'P',
-            AssignmentStatus::Completed->value => 'D',
+            AssignmentStatus::Document->value => 'D',
             AssignmentStatus::Revision->value => 'X',
             AssignmentStatus::Verified->value => 'V',
             AssignmentStatus::Reported->value => 'R',
@@ -600,7 +594,8 @@ class TestDataSeeder extends Seeder
     }
 
     /**
-     * Returns every k-tuple of the 5 statuses (5^k tuples total).
+     * Returns every k-tuple of the representative statuses (5^k tuples total).
+     * Uses Document as the "subcon fully submitted" marker to keep site count identical.
      *
      * @return AssignmentStatus[][]
      */
@@ -608,7 +603,7 @@ class TestDataSeeder extends Seeder
     {
         $statuses = [
             AssignmentStatus::Pending,
-            AssignmentStatus::Completed,
+            AssignmentStatus::Document,
             AssignmentStatus::Revision,
             AssignmentStatus::Verified,
             AssignmentStatus::Reported,
@@ -648,11 +643,12 @@ class TestDataSeeder extends Seeder
             ActivityType::Survey => AssignmentSurveyData::firstOrCreate(
                 ['assignment_id' => $assignment->id],
                 [
+                    'ss_wo_number' => 'SS-WO-'.str_pad($n, 6, '0', STR_PAD_LEFT),
                     'surveyor_name' => 'Surveyor CMB-'.$n,
                     'pic_location_name' => 'PIC Lokasi '.$n,
                     'pic_location_phone' => '+628'.str_pad($n, 9, '0', STR_PAD_LEFT),
                     'charger_type' => $isEvcs ? 'EVCS 22kW' : 'BSS-500',
-                    'ss_schedule_date' => now()->addDays(7)->format('Y-m-d'),
+                    'ss_schedule_date' => now()->subDays(5)->format('Y-m-d'),
                     'cable_pulling_type' => 'New Power',
                     'power_kva' => '22kVA',
                     'pln_network_type' => '3 Phase',
@@ -665,19 +661,7 @@ class TestDataSeeder extends Seeder
                 ],
             ),
 
-            ActivityType::PlnConnection => AssignmentPlnData::firstOrCreate(
-                ['assignment_id' => $assignment->id],
-                [
-                    'pln_status' => 'DONE KWH',
-                    'nidi_slo_date_acquired' => now()->subDays(5)->format('Y-m-d'),
-                    'type_rate' => '22 kVA',
-                    'file_slo' => 'https://placehold.co/600x800/png?text=SLO-'.$n,
-                    'file_nidi' => 'https://placehold.co/600x800/png?text=NIDI-'.$n,
-                    'file_reg' => 'https://placehold.co/600x800/png?text=REG-'.$n,
-                    'kwh_meter_installation_date' => now()->subDays(3)->format('Y-m-d'),
-                    'id_pelanggan' => 'PLN-'.str_pad($n, 8, '0', STR_PAD_LEFT),
-                ],
-            ),
+            ActivityType::PlnConnection => $this->seedPlnData($assignment, $n),
 
             ActivityType::Construction => $this->seedConstructionData($assignment, $n, false),
 
@@ -766,11 +750,12 @@ class TestDataSeeder extends Seeder
         AssignmentSurveyData::firstOrCreate(
             ['assignment_id' => $assignment->id],
             [
+                'ss_wo_number' => 'SS-WO-2026-'.str_pad($n, 4, '0', STR_PAD_LEFT),
                 'surveyor_name' => 'Budi Prasetyo '.$n,
                 'pic_location_name' => 'Manager '.$scenario['location'],
                 'pic_location_phone' => '+6281'.str_pad($n * 11_111_111, 8, '0', STR_PAD_LEFT),
                 'charger_type' => $isEvcs ? 'EVCS 22kW' : 'BSS-500',
-                'ss_schedule_date' => now()->addDays(7)->format('Y-m-d'),
+                'ss_schedule_date' => now()->subDays(5)->format('Y-m-d'),
                 'cable_pulling_type' => 'New Power',
                 'power_kva' => '22kVA',
                 'pln_network_type' => '3 Phase',
@@ -811,6 +796,9 @@ class TestDataSeeder extends Seeder
                 'cons_actual_start_date' => now()->subDays(7)->format('Y-m-d'),
                 'cons_actual_done_date' => now()->subDays(2)->format('Y-m-d'),
                 'machine_serial_number' => 'EVCS-SN-'.str_pad($n * 1000, 6, '0', STR_PAD_LEFT),
+                'foto_machine_sn' => $this->generatePlaceholderImage('Machine SN Photo', 'construction'),
+                'go_live_date_pln' => now()->subDays(1)->format('Y-m-d'),
+                'go_live_date_pln_pass' => now()->format('Y-m-d'),
                 'catatan_progres' => 'Instalasi selesai. Unit berfungsi normal. Telah dilakukan pengujian awal.',
             ],
         );
@@ -824,6 +812,27 @@ class TestDataSeeder extends Seeder
                 ]);
             }
         }
+    }
+
+    private function seedPlnData(Assignment $assignment, int $n): void
+    {
+        AssignmentPlnData::firstOrCreate(
+            ['assignment_id' => $assignment->id],
+            [
+                'pln_status' => 'DONE KWH',
+                'nidi_slo_date_acquired' => now()->subDays(5)->format('Y-m-d'),
+                'type_rate' => '22 kVA',
+                'file_slo' => 'https://placehold.co/600x800/png?text=SLO-'.$n,
+                'file_nidi' => 'https://placehold.co/600x800/png?text=NIDI-'.$n,
+                'file_reg' => 'https://placehold.co/600x800/png?text=REG-'.$n,
+                'email_bpujl_req_date' => now()->subDays(15)->format('Y-m-d'),
+                'bpujl_acquired_date' => now()->subDays(10)->format('Y-m-d'),
+                'kwh_meter_installation_date' => now()->subDays(3)->format('Y-m-d'),
+                'id_pelanggan' => 'PLN-'.str_pad($n * 100000, 6, '0', STR_PAD_LEFT),
+                'foto_kwh' => $this->generatePlaceholderImage('Foto KWH Meter', 'pln'),
+                'catatan_progres' => 'Proses sambungan PLN berjalan sesuai rencana.',
+            ],
+        );
     }
 
     /**

@@ -83,6 +83,18 @@ const isWoMissing = computed(
 const verifyOpen = ref(false);
 const verifyForm = useForm({});
 
+const canVerify = computed(() =>
+    props.assignment.status === 'DOCUMENT' ||
+    props.assignment.status === 'COMPLETED',
+);
+
+const canRevise = computed(() =>
+    props.assignment.activity_type === 'BAST' &&
+    props.assignment.status === 'COMPLETED',
+);
+
+const isDropped = computed(() => props.assignment.status === 'DROP');
+
 function openVerifyDialog(): void {
     verifyOpen.value = true;
 }
@@ -122,6 +134,25 @@ function submitRevise(): void {
             },
         },
     );
+}
+
+// --- Drop / Restore ---
+const dropForm = useForm({});
+const restoreForm = useForm({});
+
+function submitDrop(): void {
+    if (!confirm('Archive this assignment? It will be hidden from the main list.')) {
+        return;
+    }
+    dropForm.patch(AdminAssignmentActions.drop(props.assignment.id).url, {
+        preserveScroll: true,
+    });
+}
+
+function submitRestore(): void {
+    restoreForm.patch(AdminAssignmentActions.restore(props.assignment.id).url, {
+        preserveScroll: true,
+    });
 }
 
 // --- Survey parking slot form (admin-only field) ---
@@ -1361,16 +1392,13 @@ function storageUrl(path: string | null | undefined): string {
                     </CardHeader>
                     <CardContent class="flex flex-col gap-4">
                         <div
-                            v-if="
-                                assignment.status === 'COMPLETED' ||
-                                assignment.status === 'REVISION'
-                            "
+                            v-if="canVerify || assignment.status === 'REVISION'"
                             class="flex flex-col gap-2"
                         >
                             <Button
                                 type="button"
                                 class="w-full"
-                                :disabled="assignment.status !== 'COMPLETED'"
+                                :disabled="!canVerify"
                                 @click="openVerifyDialog"
                             >
                                 <CheckCircle2 class="size-4" />
@@ -1384,10 +1412,10 @@ function storageUrl(path: string | null | undefined): string {
                                 sub-contractor resubmits.
                             </p>
                             <Button
+                                v-if="canRevise"
                                 type="button"
                                 variant="outline"
                                 class="w-full"
-                                :disabled="assignment.status !== 'COMPLETED'"
                                 @click="openReviseDialog"
                             >
                                 <RotateCw class="size-4" />
@@ -1435,12 +1463,53 @@ function storageUrl(path: string | null | undefined): string {
                             </p>
                         </div>
 
+                        <div
+                            v-else-if="isDropped"
+                            class="rounded-md border border-red-200 bg-red-50 p-3 text-sm dark:border-red-800 dark:bg-red-900/20"
+                        >
+                            <div
+                                class="flex items-center gap-2 font-medium text-red-800 dark:text-red-200"
+                            >
+                                <AlertTriangle class="size-4" />
+                                Dropped
+                            </div>
+                            <p class="mt-1 text-xs text-red-800/90 dark:text-red-200/90">
+                                This assignment has been archived.
+                            </p>
+                        </div>
+
                         <p
                             v-else
                             class="text-sm text-muted-foreground"
                         >
                             Awaiting submission from the sub-contractor.
                         </p>
+
+                        <Separator />
+
+                        <div class="flex flex-col gap-2">
+                            <Button
+                                v-if="!isDropped"
+                                type="button"
+                                variant="destructive"
+                                class="w-full"
+                                :disabled="dropForm.processing"
+                                @click="submitDrop"
+                            >
+                                Archive (Drop) Assignment
+                            </Button>
+                            <Button
+                                v-if="isDropped"
+                                type="button"
+                                variant="outline"
+                                class="w-full"
+                                :disabled="restoreForm.processing"
+                                @click="submitRestore"
+                            >
+                                <RefreshCw class="size-4" />
+                                Restore Assignment
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
 
