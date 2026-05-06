@@ -16,9 +16,9 @@ test('admin can view reports index', function () {
         ->assertSuccessful()
         ->assertInertia(fn ($page) => $page
             ->component('admin/reports/Index')
-            ->has('assignments')
-            ->has('reports')
-            ->has('filters')
+            ->has('ssrAssignments')
+            ->has('bastAssignments')
+            ->has('recentReports')
         );
 });
 
@@ -29,7 +29,10 @@ test('admin can generate a report from verified assignments', function () {
     $ids = $assignments->pluck('id')->toArray();
 
     $this->actingAs($admin)
-        ->post(route('admin.reports.store'), ['assignment_ids' => $ids])
+        ->post(route('admin.reports.store'), [
+            'report_type' => 'DAILY',
+            'assignment_ids' => $ids,
+        ])
         ->assertRedirect(route('admin.reports.index'));
 
     expect(Report::count())->toBe(1);
@@ -48,7 +51,10 @@ test('store rejects non-verified assignments', function () {
     $pending = Assignment::factory()->create(['status' => AssignmentStatus::Pending]);
 
     $this->actingAs($admin)
-        ->post(route('admin.reports.store'), ['assignment_ids' => [$pending->id]])
+        ->post(route('admin.reports.store'), [
+            'report_type' => 'DAILY',
+            'assignment_ids' => [$pending->id],
+        ])
         ->assertStatus(422);
 });
 
