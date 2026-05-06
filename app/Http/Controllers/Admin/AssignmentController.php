@@ -98,13 +98,13 @@ class AssignmentController extends Controller
             ->get(['id', 'name']);
 
         return Inertia::render('admin/assignments/Index', [
-            'sites'            => $sites,
-            'subcontractors'   => $subcontractors,
-            'projects'         => $projects,
-            'mainContractors'  => $user->isSuperAdmin()
+            'sites' => $sites,
+            'subcontractors' => $subcontractors,
+            'projects' => $projects,
+            'mainContractors' => $user->isSuperAdmin()
                 ? MainContractor::query()->orderBy('name')->get(['id', 'name'])
                 : null,
-            'filters'          => (object) $request->only(['search', 'status', 'activity_type', 'subcontractor_id', 'main_contractor_id', 'project_id']),
+            'filters' => (object) $request->only(['search', 'status', 'activity_type', 'subcontractor_id', 'main_contractor_id', 'project_id']),
         ]);
     }
 
@@ -124,8 +124,8 @@ class AssignmentController extends Controller
             ->get();
 
         return Inertia::render('admin/assignments/SiteShow', [
-            'site'           => $site,
-            'assignments'    => $assignments,
+            'site' => $site,
+            'assignments' => $assignments,
             'subcontractors' => Subcontractor::query()
                 ->whereScopedToMainContractor()
                 ->with('subcontractorType')
@@ -234,11 +234,26 @@ class AssignmentController extends Controller
             'pln_network_type' => ['nullable', 'string', 'max:255'],
             'parking_slot' => ['nullable', 'string', 'max:255'],
             'additional_info' => ['nullable', 'string'],
+            'photo_overall_site' => ['nullable', 'file', 'image', 'max:10240'],
+            'photo_parking_evcs' => ['nullable', 'file', 'image', 'max:10240'],
+            'photo_other_angle' => ['nullable', 'file', 'image', 'max:10240'],
+            'photo_pln_network' => ['nullable', 'file', 'image', 'max:10240'],
+            'photo_satellite_gmaps' => ['nullable', 'file', 'image', 'max:10240'],
+            'file_mockup_3d' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,dwg', 'max:20480'],
+            'file_ba_survey' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
 
         $survey = $assignment->surveyData()->firstOrNew([]);
         $survey->assignment_id = $assignment->id;
-        $survey->fill($validated);
+
+        foreach ($validated as $key => $value) {
+            if ($request->hasFile($key)) {
+                $survey->{$key} = $request->file($key)->store('survey', 'public');
+            } else {
+                $survey->{$key} = $value;
+            }
+        }
+
         $survey->saveQuietly();
 
         AssignmentAuditLog::create([
@@ -260,11 +275,22 @@ class AssignmentController extends Controller
             'kwh_meter_installation_date' => ['nullable', 'date'],
             'id_pelanggan' => ['nullable', 'string', 'max:255'],
             'catatan_progres' => ['nullable', 'string'],
+            'file_slo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'file_nidi' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'file_reg' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
         ]);
 
         $pln = $assignment->plnData()->firstOrNew([]);
         $pln->assignment_id = $assignment->id;
-        $pln->fill($validated);
+
+        foreach ($validated as $key => $value) {
+            if ($request->hasFile($key)) {
+                $pln->{$key} = $request->file($key)->store('pln', 'public');
+            } else {
+                $pln->{$key} = $value;
+            }
+        }
+
         $pln->saveQuietly();
 
         AssignmentAuditLog::create([
@@ -411,7 +437,7 @@ class AssignmentController extends Controller
     public function storeForSite(Request $request, Site $site): RedirectResponse
     {
         $validated = $request->validate([
-            'activity_type'    => ['required', Rule::enum(ActivityType::class)],
+            'activity_type' => ['required', Rule::enum(ActivityType::class)],
             'subcontractor_id' => [
                 'required',
                 Rule::exists('subcontractors', 'id')
@@ -438,24 +464,24 @@ class AssignmentController extends Controller
         );
 
         $assignment = Assignment::query()->create([
-            'site_id'          => $site->id,
+            'site_id' => $site->id,
             'subcontractor_id' => $subcon->id,
-            'activity_type'    => $activityType,
-            'status'           => AssignmentStatus::Pending,
+            'activity_type' => $activityType,
+            'status' => AssignmentStatus::Pending,
         ]);
 
         match ($activityType) {
-            ActivityType::Survey        => AssignmentSurveyData::query()->firstOrCreate(['assignment_id' => $assignment->id]),
+            ActivityType::Survey => AssignmentSurveyData::query()->firstOrCreate(['assignment_id' => $assignment->id]),
             ActivityType::PlnConnection => AssignmentPlnData::query()->firstOrCreate(['assignment_id' => $assignment->id]),
-            ActivityType::Construction  => AssignmentConstructionData::query()->firstOrCreate(['assignment_id' => $assignment->id]),
-            ActivityType::Bast          => AssignmentBastData::query()->firstOrCreate(['assignment_id' => $assignment->id]),
+            ActivityType::Construction => AssignmentConstructionData::query()->firstOrCreate(['assignment_id' => $assignment->id]),
+            ActivityType::Bast => AssignmentBastData::query()->firstOrCreate(['assignment_id' => $assignment->id]),
         };
 
         AssignmentAuditLog::create([
             'assignment_id' => $assignment->id,
-            'user_id'       => $this->currentUser()->id,
-            'event'         => 'created',
-            'payload'       => ['subcontractor_id' => $subcon->id],
+            'user_id' => $this->currentUser()->id,
+            'event' => 'created',
+            'payload' => ['subcontractor_id' => $subcon->id],
         ]);
 
         return back()->with('success', 'Assignment created.');
@@ -477,9 +503,9 @@ class AssignmentController extends Controller
 
         AssignmentAuditLog::create([
             'assignment_id' => $assignment->id,
-            'user_id'       => $this->currentUser()->id,
-            'event'         => 'deleted',
-            'payload'       => null,
+            'user_id' => $this->currentUser()->id,
+            'event' => 'deleted',
+            'payload' => null,
         ]);
 
         return back()->with('success', 'Assignment removed.');

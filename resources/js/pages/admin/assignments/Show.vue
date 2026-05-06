@@ -192,16 +192,18 @@ const adminSurveyForm = useForm({
     pln_network_type: survey.value?.pln_network_type ?? '',
     parking_slot: survey.value?.parking_slot ?? '',
     additional_info: survey.value?.additional_info ?? '',
+    photo_overall_site: null as File | null,
+    photo_parking_evcs: null as File | null,
+    photo_other_angle: null as File | null,
+    photo_pln_network: null as File | null,
+    photo_satellite_gmaps: null as File | null,
+    file_mockup_3d: null as File | null,
+    file_ba_survey: null as File | null,
 });
 
 function submitAdminSurvey(): void {
-    router.visit(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
-        method: 'patch',
-        data: { ...adminSurveyForm.data() },
+    adminSurveyForm.patch(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
         preserveScroll: true,
-        onError: (errors) => { adminSurveyForm.setError(errors); },
-        onStart: () => { adminSurveyForm.processing = true; adminSurveyForm.clearErrors(); },
-        onFinish: () => { adminSurveyForm.processing = false; },
         onSuccess: () => { showSurveyEdit.value = false; },
     });
 }
@@ -214,16 +216,14 @@ const adminPlnForm = useForm({
     kwh_meter_installation_date: pln.value?.kwh_meter_installation_date ?? '',
     id_pelanggan: pln.value?.id_pelanggan ?? '',
     catatan_progres: pln.value?.catatan_progres ?? '',
+    file_slo: null as File | null,
+    file_nidi: null as File | null,
+    file_reg: null as File | null,
 });
 
 function submitAdminPln(): void {
-    router.visit(AdminAssignmentActions.updatePlnData(props.assignment).url, {
-        method: 'patch',
-        data: { ...adminPlnForm.data() },
+    adminPlnForm.patch(AdminAssignmentActions.updatePlnData(props.assignment).url, {
         preserveScroll: true,
-        onError: (errors) => { adminPlnForm.setError(errors); },
-        onStart: () => { adminPlnForm.processing = true; adminPlnForm.clearErrors(); },
-        onFinish: () => { adminPlnForm.processing = false; },
         onSuccess: () => { showPlnEdit.value = false; },
     });
 }
@@ -740,6 +740,63 @@ function storageUrl(path: string | null | undefined): string {
                                     class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
                                 <InputError :message="adminSurveyForm.errors.additional_info" />
                             </div>
+                            <!-- Survey photos -->
+                            <div class="grid gap-1.5 sm:col-span-2">
+                                <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Photos</Label>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div v-for="([key, label]) in ([
+                                        ['photo_overall_site', 'Tampak Keseluruhan Site'],
+                                        ['photo_parking_evcs', 'Lahan Parkir EVCS/BSS'],
+                                        ['photo_other_angle', 'Sudut Pandang Lain'],
+                                        ['photo_pln_network', 'Jaringan PLN Terdekat'],
+                                        ['photo_satellite_gmaps', 'Satelit GMaps'],
+                                    ] as const)" :key="key" class="grid gap-1">
+                                        <span class="text-xs font-medium">{{ label }}</span>
+                                        <a
+                                            v-if="survey?.[key]"
+                                            :href="storageUrl(survey[key]!)"
+                                            target="_blank"
+                                            class="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                                        >
+                                            Current photo
+                                        </a>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            class="text-xs"
+                                            @change="(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) adminSurveyForm[key] = f; }"
+                                        />
+                                        <InputError :message="adminSurveyForm.errors[key]" />
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Survey files -->
+                            <div class="grid gap-1.5 sm:col-span-2">
+                                <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</Label>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div v-for="([key, label]) in ([
+                                        ['file_mockup_3d', '3D Mockup'],
+                                        ['file_ba_survey', 'BA Survey'],
+                                    ] as const)" :key="key" class="grid gap-1">
+                                        <span class="text-xs font-medium">{{ label }}</span>
+                                        <a
+                                            v-if="survey?.[key]"
+                                            :href="storageUrl(survey[key]!)"
+                                            target="_blank"
+                                            class="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                                        >
+                                            Current file
+                                        </a>
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.jpg,.jpeg,.png,.dwg"
+                                            class="text-xs"
+                                            @change="(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) adminSurveyForm[key] = f; }"
+                                        />
+                                        <InputError :message="adminSurveyForm.errors[key]" />
+                                    </div>
+                                </div>
+                            </div>
                             <div class="flex justify-end sm:col-span-2">
                                 <Button type="submit" :disabled="adminSurveyForm.processing">
                                     {{ adminSurveyForm.processing ? 'Saving…' : 'Save Changes' }}
@@ -908,6 +965,29 @@ function storageUrl(path: string | null | undefined): string {
                                 <textarea v-model="adminPlnForm.catatan_progres" rows="3"
                                     class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
                                 <InputError :message="adminPlnForm.errors.catatan_progres" />
+                            </div>
+                            <div class="grid gap-1.5 sm:col-span-2">
+                                <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</Label>
+                                <div class="grid gap-3 sm:grid-cols-3">
+                                    <div v-for="([key, label]) in ([['file_slo', 'SLO'], ['file_nidi', 'NIDI'], ['file_reg', 'Registration']] as const)" :key="key" class="grid gap-1">
+                                        <span class="text-xs font-medium">{{ label }}</span>
+                                        <a
+                                            v-if="pln?.[key]"
+                                            :href="storageUrl(pln[key]!)"
+                                            target="_blank"
+                                            class="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                                        >
+                                            Current file
+                                        </a>
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            class="text-xs"
+                                            @change="(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) adminPlnForm[key] = f; }"
+                                        />
+                                        <InputError :message="adminPlnForm.errors[key]" />
+                                    </div>
+                                </div>
                             </div>
                             <div class="flex justify-end sm:col-span-2">
                                 <Button type="submit" :disabled="adminPlnForm.processing">
