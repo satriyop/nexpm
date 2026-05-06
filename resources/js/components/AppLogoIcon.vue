@@ -15,15 +15,37 @@ defineProps<Props>();
 <template>
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 40 42"
+        viewBox="0 0 100 100"
+        fill="none"
         :class="className"
         v-bind="$attrs"
     >
-        <path
-            fill="currentColor"
-            fill-rule="evenodd"
-            clip-rule="evenodd"
-            d="M17.2 5.633 8.6.855 0 5.633v26.51l16.2 9 16.2-9v-8.442l7.6-4.223V9.856l-8.6-4.777-8.6 4.777V18.3l-5.6 3.111V5.633ZM38 18.301l-5.6 3.11v-6.157l5.6-3.11V18.3Zm-1.06-7.856-5.54 3.078-5.54-3.079 5.54-3.078 5.54 3.079ZM24.8 18.3v-6.157l5.6 3.111v6.158L24.8 18.3Zm-1 1.732 5.54 3.078-13.14 7.302-5.54-3.078 13.14-7.3v-.002Zm-16.2 7.89 7.6 4.222V38.3L2 30.966V7.92l5.6 3.111v16.892ZM8.6 9.3 3.06 6.222 8.6 3.143l5.54 3.08L8.6 9.3Zm21.8 15.51-13.2 7.334V38.3l13.2-7.334v-6.156ZM9.6 11.034l5.6-3.11v14.6l-5.6 3.11v-14.6Z"
+        <defs>
+            <linearGradient id="logo-gradient" x1="20" y1="80" x2="80" y2="20" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#A2D149" />
+                <stop offset="50%" stop-color="#7CB342" />
+                <stop offset="100%" stop-color="#558B2F" />
+            </linearGradient>
+        </defs>
+        
+        <!-- Main Leaf/V Shape -->
+        <path 
+            d="M15,48 C15,48 8,62 38,82 C68,102 92,60 92,35 C92,10 80,5 65,30 C50,55 45,65 38,65 C31,65 15,48 15,48 Z" 
+            fill="url(#logo-gradient)" 
+        />
+        
+        <!-- Lightning Bolt Cutout (Simplified shape for robustness) -->
+        <path 
+            d="M60,35 L75,52 L62,52 L70,72 L52,52 L65,52 Z" 
+            fill="white" 
+            style="mix-blend-mode: soft-light; opacity: 0.9;"
+        />
+        
+        <!-- Shadow/Detail for the fold -->
+        <path 
+            d="M38,82 C38,82 45,75 38,65 L30,58 Z" 
+            fill="#33691E" 
+            fill-opacity="0.2"
         />
     </svg>
 </template>
