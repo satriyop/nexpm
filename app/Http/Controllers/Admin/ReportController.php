@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\ActivityFields\BastFields;
+use App\ActivityFields\ConstructionFields;
+use App\ActivityFields\PlnFields;
+use App\ActivityFields\SurveyFields;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Http\Controllers\Controller;
@@ -165,12 +169,13 @@ class ReportController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Site Survey Report');
 
-        $headers = [
-            'Site Code', 'Location', 'City', 'Province',
-            'Subcontractor', 'Surveyor', 'PIC Location', 'PIC Phone',
-            'Charger Type', 'SS Schedule Date', 'Cable Pulling Type',
-            'Power (kVA)', 'PLN Network Type', 'Parking Slot', 'Verified At',
-        ];
+        $registryFields = SurveyFields::forReport('ssr');
+
+        $headers = array_merge(
+            ['Site Code', 'Location', 'City', 'Province', 'Subcontractor'],
+            array_map(fn (array $f) => $f['report_label'] ?? $f['label'], $registryFields),
+            ['Verified At'],
+        );
 
         foreach ($headers as $col => $header) {
             $cell = $sheet->getCellByColumnAndRow($col + 1, 1);
@@ -185,23 +190,18 @@ class ReportController extends Controller
         foreach ($assignments as $row => $a) {
             $s = $a->surveyData;
             $rowNum = $row + 2;
-            $values = [
-                $a->site?->site_code,
-                $a->site?->location_name,
-                $a->site?->city,
-                $a->site?->province,
-                $a->subcontractor?->name,
-                $s?->surveyor_name,
-                $s?->pic_location_name,
-                $s?->pic_location_phone,
-                $s?->charger_type,
-                $s?->ss_schedule_date,
-                $s?->cable_pulling_type,
-                $s?->power_kva,
-                $s?->pln_network_type,
-                $s?->parking_slot,
-                $a->verified_at?->format('Y-m-d H:i'),
-            ];
+
+            $values = array_merge(
+                [
+                    $a->site?->site_code,
+                    $a->site?->location_name,
+                    $a->site?->city,
+                    $a->site?->province,
+                    $a->subcontractor?->name,
+                ],
+                array_map(fn (array $f) => $s?->{$f['key']}, $registryFields),
+                [$a->verified_at?->format('Y-m-d H:i')],
+            );
 
             foreach ($values as $col => $value) {
                 $sheet->getCellByColumnAndRow($col + 1, $rowNum)->setValue($value);
@@ -269,7 +269,15 @@ class ReportController extends Controller
     {
         $sheet->setTitle($title);
 
-        $headers = [
+        // Extra columns auto-appended from the field registry for any new fields.
+        // Existing daily fields are tagged 'daily' (already hardcoded below);
+        // only 'daily_extra' fields are auto-appended here to avoid duplication.
+        $extraSurveyFields = SurveyFields::forReport('daily_extra');
+        $extraPlnFields = PlnFields::forReport('daily_extra');
+        $extraConstructionFields = ConstructionFields::forReport('daily_extra');
+        $extraBastFields = BastFields::forReport('daily_extra');
+
+        $hardcodedHeaders = [
             'No', 'EPC Name', 'Charging Type', 'Project Status', 'PLN Status',
             'Project / Location Name', 'Address', 'Google Map URL', 'Province', 'City',
             'BD PIC', 'SS WO Number', 'SS Date (Schedule w/ Landlord)', 'SS Report Submission Date',
@@ -285,6 +293,15 @@ class ReportController extends Controller
             'Tanggal Pengajuan Invoice (60%)', '60% Payment Date',
             'Tanggal Pengajuan Invoice (5%)', '5% Payment Date', 'Invoice URL',
         ];
+
+        $extraHeaders = array_merge(
+            array_map(fn (array $f) => $f['report_label'] ?? $f['label'], $extraSurveyFields),
+            array_map(fn (array $f) => $f['report_label'] ?? $f['label'], $extraPlnFields),
+            array_map(fn (array $f) => $f['report_label'] ?? $f['label'], $extraConstructionFields),
+            array_map(fn (array $f) => $f['report_label'] ?? $f['label'], $extraBastFields),
+        );
+
+        $headers = array_merge($hardcodedHeaders, $extraHeaders);
 
         foreach ($headers as $col => $header) {
             $cell = $sheet->getCellByColumnAndRow($col + 1, 1);
@@ -309,7 +326,7 @@ class ReportController extends Controller
             $construction = $group->firstWhere('activity_type', ActivityType::Construction);
             $bast = $group->firstWhere('activity_type', ActivityType::Bast);
 
-            $values = [
+            $hardcodedValues = [
                 $counter,
                 $site?->project?->mainContractor?->name ?? '—',
                 $site?->siteType?->name ?? '—',
@@ -356,6 +373,15 @@ class ReportController extends Controller
                 $site?->invoice_url ?? '',
             ];
 
+            $extraValues = array_merge(
+                array_map(fn (array $f) => $survey?->surveyData?->{$f['key']}, $extraSurveyFields),
+                array_map(fn (array $f) => $pln?->plnData?->{$f['key']}, $extraPlnFields),
+                array_map(fn (array $f) => $construction?->constructionData?->{$f['key']}, $extraConstructionFields),
+                array_map(fn (array $f) => $bast?->bastData?->{$f['key']}, $extraBastFields),
+            );
+
+            $values = array_merge($hardcodedValues, $extraValues);
+
             foreach ($values as $col => $value) {
                 $sheet->getCellByColumnAndRow($col + 1, $rowNum)->setValue($value);
             }
@@ -366,7 +392,7 @@ class ReportController extends Controller
 
         $sheet->freezePane('A2');
 
-        foreach (range(1, 44) as $col) {
+        foreach (range(1, count($headers)) as $col) {
             $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
         }
     }

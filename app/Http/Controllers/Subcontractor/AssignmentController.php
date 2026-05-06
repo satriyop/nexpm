@@ -5,6 +5,10 @@ namespace App\Http\Controllers\Subcontractor;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Subcontractor\UpdateBastDataRequest;
+use App\Http\Requests\Subcontractor\UpdateConstructionDataRequest;
+use App\Http\Requests\Subcontractor\UpdatePlnDataRequest;
+use App\Http\Requests\Subcontractor\UpdateSurveyDataRequest;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentBastPhoto;
@@ -68,31 +72,13 @@ class AssignmentController extends Controller
         ]);
     }
 
-    public function updateSurveyData(Request $request, Assignment $assignment): RedirectResponse
+    public function updateSurveyData(UpdateSurveyDataRequest $request, Assignment $assignment): RedirectResponse
     {
         $this->ensureBelongsToCurrentSubcontractor($assignment);
         $this->ensureEditable($assignment);
         abort_unless($assignment->activity_type === ActivityType::Survey, 422, 'Activity type mismatch.');
 
-        $validated = $request->validate([
-            'surveyor_name' => ['nullable', 'string', 'max:255'],
-            'pic_location_name' => ['nullable', 'string', 'max:255'],
-            'pic_location_phone' => ['nullable', 'string', 'max:255'],
-            'charger_type' => ['nullable', 'string', 'max:255'],
-            'ss_schedule_date' => ['nullable', 'date'],
-            'cable_pulling_type' => ['nullable', 'string', 'max:255'],
-            'power_kva' => ['nullable', 'string', 'max:255'],
-            'pln_network_type' => ['nullable', 'string', 'max:255'],
-            'additional_info' => ['nullable', 'string'],
-            'photo_overall_site' => ['nullable', 'file', 'image', 'max:10240'],
-            'photo_parking_evcs' => ['nullable', 'file', 'image', 'max:10240'],
-            'photo_other_angle' => ['nullable', 'file', 'image', 'max:10240'],
-            'photo_pln_network' => ['nullable', 'file', 'image', 'max:10240'],
-            'photo_satellite_gmaps' => ['nullable', 'file', 'image', 'max:10240'],
-            'file_mockup_3d' => ['nullable', 'file', 'max:20480'],
-            'file_ba_survey' => ['nullable', 'file', 'max:20480'],
-            'parking_slot' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         $survey = AssignmentSurveyData::query()->firstOrNew(['assignment_id' => $assignment->id]);
 
@@ -110,23 +96,13 @@ class AssignmentController extends Controller
         return back()->with('success', 'Survey data saved.');
     }
 
-    public function updatePlnData(Request $request, Assignment $assignment): RedirectResponse
+    public function updatePlnData(UpdatePlnDataRequest $request, Assignment $assignment): RedirectResponse
     {
         $this->ensureBelongsToCurrentSubcontractor($assignment);
         $this->ensureEditable($assignment);
         abort_unless($assignment->activity_type === ActivityType::PlnConnection, 422, 'Activity type mismatch.');
 
-        $validated = $request->validate([
-            'pln_status' => ['nullable', 'string', 'max:255'],
-            'nidi_slo_date_acquired' => ['nullable', 'date'],
-            'type_rate' => ['nullable', 'string', 'max:255'],
-            'file_slo' => ['nullable', 'file', 'max:20480'],
-            'file_nidi' => ['nullable', 'file', 'max:20480'],
-            'file_reg' => ['nullable', 'file', 'max:20480'],
-            'kwh_meter_installation_date' => ['nullable', 'date'],
-            'id_pelanggan' => ['nullable', 'string', 'max:255'],
-            'catatan_progres' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $pln = AssignmentPlnData::query()->firstOrNew(['assignment_id' => $assignment->id]);
 
@@ -144,7 +120,7 @@ class AssignmentController extends Controller
         return back()->with('success', 'PLN data saved.');
     }
 
-    public function updateConstructionData(Request $request, Assignment $assignment): RedirectResponse
+    public function updateConstructionData(UpdateConstructionDataRequest $request, Assignment $assignment): RedirectResponse
     {
         $this->ensureBelongsToCurrentSubcontractor($assignment);
         $this->ensureEditable($assignment);
@@ -153,12 +129,7 @@ class AssignmentController extends Controller
         $constructionData = $assignment->constructionData()->firstOrCreate([]);
         abort_unless($constructionData->isPrerequisiteMet(), 423, 'Awaiting WO Number from admin.');
 
-        $validated = $request->validate([
-            'cons_actual_start_date' => ['nullable', 'date'],
-            'cons_actual_done_date' => ['nullable', 'date'],
-            'machine_serial_number' => ['nullable', 'string', 'max:255'],
-            'catatan_progres' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $constructionData->fill($validated)->save();
 
@@ -191,32 +162,13 @@ class AssignmentController extends Controller
         return back()->with('success', 'Photo uploaded.');
     }
 
-    public function updateBastData(Request $request, Assignment $assignment): RedirectResponse
+    public function updateBastData(UpdateBastDataRequest $request, Assignment $assignment): RedirectResponse
     {
         $this->ensureBelongsToCurrentSubcontractor($assignment);
         $this->ensureEditable($assignment);
         abort_unless($assignment->activity_type === ActivityType::Bast, 422, 'Activity type mismatch.');
 
-        $validated = $request->validate([
-            'plant_name' => ['nullable', 'string', 'max:255'],
-            'plant_address' => ['nullable', 'string'],
-            'plant_coordinate' => ['nullable', 'string', 'max:255'],
-            'gmaps_link' => ['nullable', 'string', 'max:500'],
-            'charger_type' => ['nullable', 'string', 'max:255'],
-            'sn_unit' => ['nullable', 'string', 'max:255'],
-            'id_pln' => ['nullable', 'string', 'max:255'],
-            'sim_provider' => ['nullable', 'string', 'max:255'],
-            'installation_vendor' => ['nullable', 'string', 'max:255'],
-            'pic_vendor_contact' => ['nullable', 'string', 'max:255'],
-            'installation_date' => ['nullable', 'date'],
-            'commissioning_date' => ['nullable', 'date'],
-            'customer' => ['nullable', 'string', 'max:255'],
-            'measurements' => ['nullable', 'array'],
-            'measurements.*' => ['nullable', 'string', 'max:255'],
-            'nomor_simcard' => ['nullable', 'string', 'max:255'],
-            'go_live_date_pln_pass' => ['nullable', 'date'],
-            'go_live_date_pln' => ['nullable', 'date'],
-        ]);
+        $validated = $request->validated();
 
         $bast = AssignmentBastData::query()->firstOrNew(['assignment_id' => $assignment->id]);
         $bast->fill($validated);
