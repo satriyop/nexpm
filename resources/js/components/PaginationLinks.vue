@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import type { PaginationLink } from '@/types';
+import type { PaginatedData } from '@/types';
 
 defineProps<{
-    links: PaginationLink[];
-    from?: number | null;
-    to?: number | null;
-    total?: number;
+    data: PaginatedData<unknown>;
 }>();
 </script>
 
@@ -15,24 +12,24 @@ defineProps<{
         class="flex flex-col items-center justify-between gap-3 border-t border-sidebar-border/70 px-4 py-3 sm:flex-row dark:border-sidebar-border"
     >
         <p
-            v-if="total !== undefined"
+            v-if="data.total !== undefined"
             class="text-xs text-muted-foreground sm:text-sm"
         >
             Showing
-            <span class="font-medium">{{ from ?? 0 }}</span>
+            <span class="font-medium">{{ data.from ?? 0 }}</span>
             to
-            <span class="font-medium">{{ to ?? 0 }}</span>
+            <span class="font-medium">{{ data.to ?? 0 }}</span>
             of
-            <span class="font-medium">{{ total }}</span>
+            <span class="font-medium">{{ data.total }}</span>
             results
         </p>
 
         <nav
-            v-if="links.length > 3"
+            v-if="data.links.length > 3"
             class="inline-flex flex-wrap items-center gap-1"
             aria-label="Pagination"
         >
-            <template v-for="(link, index) in links" :key="index">
+            <template v-for="(link, index) in data.links" :key="index">
                 <Link
                     v-if="link.url"
                     :href="link.url"

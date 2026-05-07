@@ -475,13 +475,7 @@ const activityColumns: { type: ActivityType; label: string }[] = [
                 </table>
             </div>
 
-            <PaginationLinks
-                v-if="sites && sites.data && sites.data.length > 0"
-                :links="sites.links"
-                :from="sites.from"
-                :to="sites.to"
-                :total="sites.total"
-            />
+            <PaginationLinks v-if="sites && sites.data && sites.data.length > 0" :data="sites" />
         </div>
     </div>
 </template>

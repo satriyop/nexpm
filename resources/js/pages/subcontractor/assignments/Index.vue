@@ -339,13 +339,7 @@ function isStarted(assignment: Assignment): boolean {
                 </table>
             </div>
 
-            <PaginationLinks
-                v-if="assignments.data.length > 0"
-                :links="assignments.links"
-                :from="assignments.from"
-                :to="assignments.to"
-                :total="assignments.total"
-            />
+            <PaginationLinks v-if="assignments.data.length > 0" :data="assignments" />
         </div>
     </div>
 </template>
