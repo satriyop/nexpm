@@ -46,11 +46,12 @@ class AssignmentCsvImportService
             ->keyBy('code');
 
         try {
-            // Skip header.
-            fgetcsv($handle, escape: '\\');
+            // Detect delimiter from header row (Indonesian Excel saves with ';').
+            $headerLine = fgets($handle) ?: '';
+            $separator = str_contains($headerLine, ';') ? ';' : ',';
 
             $rowNumber = 1;
-            while (($data = fgetcsv($handle, escape: '\\')) !== false) {
+            while (($data = fgetcsv($handle, separator: $separator, escape: '\\')) !== false) {
                 $rowNumber++;
 
                 if ($this->isEmpty($data)) {

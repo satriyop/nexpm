@@ -47,10 +47,11 @@ class SiteMasterDataImport
         }
 
         try {
-            // Skip the header row.
-            fgetcsv($handle, escape: '\\');
+            // Detect delimiter from header row (Indonesian Excel saves with ';').
+            $headerLine = fgets($handle) ?: '';
+            $separator = str_contains($headerLine, ';') ? ';' : ',';
 
-            while (($data = fgetcsv($handle, escape: '\\')) !== false) {
+            while (($data = fgetcsv($handle, separator: $separator, escape: '\\')) !== false) {
                 if ($data === [null] || $this->isEmpty($data)) {
                     continue;
                 }
