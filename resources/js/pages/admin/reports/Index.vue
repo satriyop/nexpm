@@ -186,7 +186,7 @@ function formatDate(iso: string): string {
         <!-- Header -->
         <div class="flex flex-col gap-1">
             <h1 class="text-xl font-semibold tracking-tight">Reports</h1>
-            <p class="text-sm text-muted-foreground">Select verified assignments and generate Excel reports</p>
+            <p class="text-sm text-muted-foreground">Select verified assignments and generate reports (SSR → PDF, BAST/Daily → Excel)</p>
         </div>
 
         <!-- Tab switcher -->
@@ -388,10 +388,10 @@ function formatDate(iso: string): string {
                                     <a
                                         :href="AdminReportActions.download(report).url"
                                         class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted dark:border-sidebar-border"
-                                        title="Download XLSX"
+                                        :title="report.report_type === 'SSR' ? 'Download PDF' : 'Download XLSX'"
                                     >
                                         <Download class="size-3.5" />
-                                        XLSX
+                                        {{ report.report_type === 'SSR' ? 'PDF' : 'XLSX' }}
                                     </a>
                                 </td>
                             </tr>
