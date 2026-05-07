@@ -14,6 +14,7 @@ use App\Models\Report;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\BastReportExportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -196,77 +197,80 @@ class ReportController extends Controller
     {
         $assignments = $report->assignments()
             ->where('activity_type', ActivityType::Survey)
-            ->with(['site', 'subcontractor', 'surveyData'])
+            ->with(['site.project.mainContractor', 'subcontractor', 'surveyData'])
             ->get();
 
-        $spreadsheet = new Spreadsheet;
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Site Survey Report');
+        abort_if($assignments->isEmpty(), 404, 'No survey assignments in this report.');
 
-        $registryFields = SurveyFields::forReport('ssr');
+        if ($assignments->count() === 1) {
+            $assignment = $assignments->first();
+            $pdf = $this->buildSsrPdf($assignment);
+            $filename = sprintf('SSR-%s-%s.pdf', $assignment->site->site_code, now()->format('Ymd'));
 
-        $headers = array_merge(
-            ['Site Code', 'Location', 'City', 'Province', 'SS WO Number', 'Subcontractor'],
-            array_map(fn (array $f) => $f['report_label'] ?? $f['label'], $registryFields),
-            ['Site Plan', 'SS Report Submission Date', 'Verified At'],
-        );
-
-        foreach ($headers as $col => $header) {
-            $cell = $sheet->getCellByColumnAndRow($col + 1, 1);
-            $cell->setValue($header);
-            $cell->getStyle()->getFont()->setBold(true);
-            $cell->getStyle()->getFill()
-                ->setFillType(Fill::FILL_SOLID)
-                ->getStartColor()->setRGB('D9E1F2');
-            $cell->getStyle()->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            return response()->stream(function () use ($pdf) {
+                echo $pdf->output();
+            }, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            ]);
         }
 
-        foreach ($assignments as $row => $a) {
-            $s = $a->surveyData;
-            $site = $a->site;
-            $rowNum = $row + 2;
+        $zipFilename = sprintf('SSR-Report-%s-%s.zip', $report->id, now()->format('Ymd'));
+        $tmpPath = sys_get_temp_dir().'/'.$zipFilename;
 
-            $values = array_merge(
-                [
-                    $site?->site_code,
-                    $site?->location_name,
-                    $site?->city,
-                    $site?->province,
-                    $site?->ss_wo_number,
-                    $a->subcontractor?->name,
-                ],
-                array_map(function (array $f) use ($s) {
-                    $raw = $s?->{$f['key']};
-                    if (in_array($f['type'], ['image', 'file'], true) && $raw) {
-                        return Storage::url($raw);
-                    }
+        $zip = new ZipArchive;
+        $zip->open($tmpPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
-                    return $raw;
-                }, $registryFields),
-                [
-                    $site?->ssr_url,
-                    $site?->ss_report_submission_date?->format('Y-m-d'),
-                    $a->verified_at?->format('Y-m-d H:i'),
-                ],
-            );
+        foreach ($assignments as $assignment) {
+            $pdf = $this->buildSsrPdf($assignment);
+            $pdfName = sprintf('SSR-%s-%s.pdf', $assignment->site->site_code, now()->format('Ymd'));
+            $zip->addFromString($pdfName, $pdf->output());
+        }
 
-            foreach ($values as $col => $value) {
-                $sheet->getCellByColumnAndRow($col + 1, $rowNum)->setValue($value);
+        $zip->close();
+
+        return response()->streamDownload(function () use ($tmpPath) {
+            readfile($tmpPath);
+            @unlink($tmpPath);
+        }, $zipFilename, ['Content-Type' => 'application/zip']);
+    }
+
+    private function buildSsrPdf(Assignment $assignment): \Barryvdh\DomPDF\PDF
+    {
+        $survey = $assignment->surveyData;
+        $site = $assignment->site;
+
+        $photoFields = [
+            'photo_overall_site', 'photo_parking_evcs', 'photo_other_angle',
+            'photo_pln_network', 'photo_satellite_gmaps',
+        ];
+
+        $photos = collect($photoFields)->map(function (string $field) use ($survey) {
+            $path = $survey?->{$field};
+            if (! $path) {
+                return null;
+            }
+            $abs = storage_path('app/public/'.$path);
+
+            return file_exists($abs) ? $abs : null;
+        })->all();
+
+        $mockupPath = null;
+        if ($survey?->file_mockup_3d) {
+            $abs = storage_path('app/public/'.$survey->file_mockup_3d);
+            $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
+            if (file_exists($abs) && in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                $mockupPath = $abs;
             }
         }
 
-        foreach (range(1, count($headers)) as $col) {
-            $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
-        }
+        $baSurveyUrl = $survey?->file_ba_survey
+            ? Storage::url($survey->file_ba_survey)
+            : null;
 
-        $filename = sprintf('SSR-Report-%s-%s.xlsx', $report->id, now()->format('Ymd'));
+        $data = compact('assignment', 'survey', 'site', 'photos', 'mockupPath', 'baSurveyUrl');
 
-        return response()->stream(function () use ($spreadsheet) {
-            (new Xlsx($spreadsheet))->save('php://output');
-        }, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ]);
+        return Pdf::loadView('pdf.site-survey-report', $data)->setPaper('a4', 'portrait');
     }
 
     private function downloadDaily(Report $report): StreamedResponse
