@@ -54,7 +54,12 @@ class SiteImportController extends Controller
             '2',
         ];
 
-        $csv = implode(',', $headers) . "\n" . implode(',', $example) . "\n";
+        $handle = fopen('php://memory', 'w');
+        fputcsv($handle, $headers);
+        fputcsv($handle, $example);
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',

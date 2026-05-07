@@ -42,7 +42,13 @@ class AssignmentImportController extends Controller
             ['SITE-001', 'BAST', 'SUBCON-001'],
         ];
 
-        $csv = implode("\n", array_map(fn ($row) => implode(',', $row), $rows)) . "\n";
+        $handle = fopen('php://memory', 'w');
+        foreach ($rows as $row) {
+            fputcsv($handle, $row);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
