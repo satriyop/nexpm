@@ -82,6 +82,8 @@ onMounted(() => {
     }
 });
 
+const NONE = '__none__';
+
 // --- Site edit form ---
 const form = useForm({
     location_name: props.site.location_name,
@@ -90,8 +92,8 @@ const form = useForm({
     city: props.site.city,
     google_map_url: props.site.google_map_url ?? '',
     bd_pic: props.site.bd_pic ?? '',
-    site_type_id: props.site.site_type_id ? String(props.site.site_type_id) : '',
-    machine_type_id: props.site.machine_type_id ? String(props.site.machine_type_id) : '',
+    site_type_id: props.site.site_type_id ? String(props.site.site_type_id) : NONE,
+    machine_type_id: props.site.machine_type_id ? String(props.site.machine_type_id) : NONE,
     ss_wo_number: props.site.ss_wo_number ?? '',
     cable_length_to_panel: props.site.cable_length_to_panel ?? '',
     cable_length_panel_to_charger: props.site.cable_length_panel_to_charger ?? '',
@@ -112,7 +114,11 @@ const form = useForm({
 });
 
 function submit(): void {
-    form.patch(SiteActions.update(props.site).url);
+    form.transform((data) => ({
+        ...data,
+        site_type_id: data.site_type_id === NONE ? null : data.site_type_id,
+        machine_type_id: data.machine_type_id === NONE ? null : data.machine_type_id,
+    })).patch(SiteActions.update(props.site).url);
 }
 
 // --- Assignment helpers ---
@@ -266,7 +272,7 @@ function removeAssignment(assignment: Assignment): void {
                         <Select v-model="form.site_type_id">
                             <SelectTrigger><SelectValue placeholder="Select site type" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">— None —</SelectItem>
+                                <SelectItem :value="NONE">— None —</SelectItem>
                                 <SelectItem v-for="st in siteTypes" :key="st.id" :value="String(st.id)">{{ st.name }}</SelectItem>
                             </SelectContent>
                         </Select>
@@ -277,7 +283,7 @@ function removeAssignment(assignment: Assignment): void {
                         <Select v-model="form.machine_type_id">
                             <SelectTrigger><SelectValue placeholder="Select machine type" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">— None —</SelectItem>
+                                <SelectItem :value="NONE">— None —</SelectItem>
                                 <SelectItem v-for="mt in machineTypes" :key="mt.id" :value="String(mt.id)">{{ mt.name }}</SelectItem>
                             </SelectContent>
                         </Select>
