@@ -47,7 +47,6 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::post('assignments/{assignment}/revise', [Admin\AssignmentController::class, 'revise'])->name('assignments.revise');
     Route::patch('assignments/{assignment}/drop', [Admin\AssignmentController::class, 'drop'])->name('assignments.drop');
     Route::patch('assignments/{assignment}/restore', [Admin\AssignmentController::class, 'restore'])->name('assignments.restore');
-    Route::patch('assignments/{assignment}/survey-parking-slot', [Admin\AssignmentController::class, 'updateSurveyParkingSlot'])->name('assignments.survey-parking-slot');
     Route::patch('assignments/{assignment}/construction-prerequisite', [Admin\AssignmentController::class, 'updateConstructionPrerequisite'])->name('assignments.construction-prerequisite');
     Route::get('assignments/{assignment}/bast-report', [Admin\AssignmentController::class, 'downloadBastReport'])->name('assignments.bast-report');
     Route::post('projects/{project}/import-sites', [Admin\SiteImportController::class, 'store'])->name('projects.import-sites');

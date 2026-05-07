@@ -156,22 +156,6 @@ function submitRestore(): void {
     });
 }
 
-// --- Survey parking slot form (admin-only field) ---
-const parkingSlotForm = useForm({
-    parking_slot: survey.value?.parking_slot ?? '',
-});
-
-function submitParkingSlot(): void {
-    router.visit(AdminAssignmentActions.updateSurveyParkingSlot(props.assignment.id).url, {
-        method: 'patch',
-        data: { parking_slot: parkingSlotForm.parking_slot },
-        preserveScroll: true,
-        onError: (errors) => { parkingSlotForm.setError(errors); },
-        onStart: () => { parkingSlotForm.processing = true; parkingSlotForm.clearErrors(); },
-        onFinish: () => { parkingSlotForm.processing = false; },
-    });
-}
-
 // --- Construction prerequisite form ---
 const prereqForm = useForm({
     cons_wo_number: construction.value?.cons_wo_number ?? '',
@@ -599,16 +583,13 @@ function storageUrl(path: string | null | undefined): string {
                                 </p>
                             </div>
 
-                            <!-- Parking Slot: filled by subcon, admin can override -->
-                            <div class="sm:col-span-2">
-                                <p class="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                                    Parking Slot <span class="normal-case font-normal text-primary">(Filled by Subcon)</span>
+                            <div>
+                                <p class="text-xs text-muted-foreground">
+                                    Parking Slot
                                 </p>
-                                <form class="flex items-center gap-2" @submit.prevent="submitParkingSlot">
-                                    <Input v-model="parkingSlotForm.parking_slot" placeholder="e.g. B1-12" class="max-w-xs" />
-                                    <Button type="submit" size="sm" variant="outline" :disabled="parkingSlotForm.processing">Save</Button>
-                                    <InputError :message="parkingSlotForm.errors.parking_slot" />
-                                </form>
+                                <p class="font-medium">
+                                    {{ survey.parking_slot ?? '—' }}
+                                </p>
                             </div>
 
                             <div class="sm:col-span-2">

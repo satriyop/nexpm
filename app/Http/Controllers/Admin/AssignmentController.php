@@ -238,21 +238,6 @@ class AssignmentController extends Controller
         return back()->with('success', 'Assignment restored.');
     }
 
-    public function updateSurveyParkingSlot(Request $request, Assignment $assignment): RedirectResponse
-    {
-        abort_unless($assignment->activity_type === ActivityType::Survey, 422, 'Only Survey assignments have a parking slot.');
-
-        $validated = $request->validate([
-            'parking_slot' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $survey = $assignment->surveyData()->firstOrCreate(['assignment_id' => $assignment->id]);
-        $survey->parking_slot = $validated['parking_slot'];
-        $survey->save();
-
-        return back()->with('success', 'Parking slot saved.');
-    }
-
     public function updateConstructionPrerequisite(Request $request, Assignment $assignment): RedirectResponse
     {
         abort_unless($assignment->activity_type === ActivityType::Construction, 422, 'Only Construction assignments accept this prerequisite.');
