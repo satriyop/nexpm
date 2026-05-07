@@ -11,12 +11,14 @@ use App\Enums\AssignmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
 use App\Models\Report;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\BastReportExportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -37,6 +39,11 @@ class ReportController extends Controller
             ->with(['site.siteType', 'subcontractor'])
             ->latest('verified_at');
 
+        $reportIds = DB::table('reports')
+            ->orderByDesc('created_at')
+            ->limit(15)
+            ->pluck('id');
+
         $recentReports = DB::table('reports')
             ->select([
                 'reports.id',
@@ -46,9 +53,9 @@ class ReportController extends Controller
                 DB::raw('COUNT(report_assignments.assignment_id) as assignments_count'),
             ])
             ->leftJoin('report_assignments', 'reports.id', '=', 'report_assignments.report_id')
+            ->whereIn('reports.id', $reportIds)
             ->groupBy('reports.id', 'reports.name', 'reports.report_type', 'reports.created_at')
             ->orderByDesc('reports.created_at')
-            ->limit(15)
             ->get()
             ->map(fn ($row) => [
                 'id' => $row->id,
@@ -56,7 +63,29 @@ class ReportController extends Controller
                 'report_type' => $row->report_type,
                 'assignments_count' => (int) $row->assignments_count,
                 'created_at' => $row->created_at,
+                'sites' => [],
             ]);
+
+        $reportSites = DB::table('report_assignments')
+            ->join('assignments', 'report_assignments.assignment_id', '=', 'assignments.id')
+            ->join('sites', 'assignments.site_id', '=', 'sites.id')
+            ->whereIn('report_assignments.report_id', $reportIds)
+            ->select('report_assignments.report_id', 'sites.site_code', 'sites.location_name', 'assignments.activity_type')
+            ->orderBy('sites.site_code')
+            ->get()
+            ->groupBy('report_id');
+
+        $recentReports = $recentReports->map(fn ($r) => [
+            ...$r,
+            'sites' => ($reportSites[$r['id']] ?? collect())
+                ->map(fn ($s) => [
+                    'site_code' => $s->site_code,
+                    'location_name' => $s->location_name,
+                    'activity_type' => $s->activity_type,
+                ])
+                ->values()
+                ->all(),
+        ]);
 
         return Inertia::render('admin/reports/Index', [
             'ssrAssignments' => $verifiedBase()->where('activity_type', ActivityType::Survey)->get(),
@@ -100,6 +129,11 @@ class ReportController extends Controller
         $report->assignments()->attach($assignmentIds);
 
         Assignment::whereIn('id', $assignmentIds)->each(fn (Assignment $a) => $a->markReported());
+
+        if ($validated['report_type'] === 'SSR') {
+            $siteIds = Assignment::whereIn('id', $assignmentIds)->pluck('site_id');
+            Site::whereIn('id', $siteIds)->update(['ss_report_submission_date' => today()]);
+        }
 
         return redirect()->route('admin.reports.index')->with('success', $typeLabel.' generated successfully.');
     }
@@ -172,9 +206,9 @@ class ReportController extends Controller
         $registryFields = SurveyFields::forReport('ssr');
 
         $headers = array_merge(
-            ['Site Code', 'Location', 'City', 'Province', 'Subcontractor'],
+            ['Site Code', 'Location', 'City', 'Province', 'SS WO Number', 'Subcontractor'],
             array_map(fn (array $f) => $f['report_label'] ?? $f['label'], $registryFields),
-            ['Verified At'],
+            ['Site Plan', 'SS Report Submission Date', 'Verified At'],
         );
 
         foreach ($headers as $col => $header) {
@@ -189,18 +223,31 @@ class ReportController extends Controller
 
         foreach ($assignments as $row => $a) {
             $s = $a->surveyData;
+            $site = $a->site;
             $rowNum = $row + 2;
 
             $values = array_merge(
                 [
-                    $a->site?->site_code,
-                    $a->site?->location_name,
-                    $a->site?->city,
-                    $a->site?->province,
+                    $site?->site_code,
+                    $site?->location_name,
+                    $site?->city,
+                    $site?->province,
+                    $site?->ss_wo_number,
                     $a->subcontractor?->name,
                 ],
-                array_map(fn (array $f) => $s?->{$f['key']}, $registryFields),
-                [$a->verified_at?->format('Y-m-d H:i')],
+                array_map(function (array $f) use ($s) {
+                    $raw = $s?->{$f['key']};
+                    if (in_array($f['type'], ['image', 'file'], true) && $raw) {
+                        return Storage::url($raw);
+                    }
+
+                    return $raw;
+                }, $registryFields),
+                [
+                    $site?->ssr_url,
+                    $site?->ss_report_submission_date?->format('Y-m-d'),
+                    $a->verified_at?->format('Y-m-d H:i'),
+                ],
             );
 
             foreach ($values as $col => $value) {

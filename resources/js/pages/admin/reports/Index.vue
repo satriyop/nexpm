@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Download, FileText, Search } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Search } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 import * as AdminReportActions from '@/actions/App/Http/Controllers/Admin/ReportController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,13 @@ import { dashboard } from '@/routes';
 import type { Assignment } from '@/types';
 
 type ReportType = 'SSR' | 'BAST' | 'DAILY';
+type TabKey = ReportType | 'HISTORY';
+
+interface ReportSite {
+    site_code: string;
+    location_name: string;
+    activity_type: string;
+}
 
 interface ReportRow {
     id: number;
@@ -17,6 +24,7 @@ interface ReportRow {
     report_type: ReportType;
     assignments_count: number;
     created_at: string;
+    sites: ReportSite[];
 }
 
 const props = defineProps<{
@@ -35,21 +43,23 @@ defineOptions({
 });
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-type Tab = { key: ReportType; label: string; description: string };
+interface Tab { key: TabKey; label: string; description: string }
 
 const tabs: Tab[] = [
-    { key: 'SSR', label: 'Site Survey Report', description: 'Verified survey assignments' },
-    { key: 'BAST', label: 'BAST Report', description: 'Verified BAST assignments (EVCS & BSS)' },
-    { key: 'DAILY', label: 'Daily Report', description: 'All verified assignments snapshot' },
+    { key: 'SSR',     label: 'Site Survey Report', description: 'Verified survey assignments' },
+    { key: 'BAST',    label: 'BAST Report',         description: 'Verified BAST assignments (EVCS & BSS)' },
+    { key: 'DAILY',   label: 'Daily Report',        description: 'All verified assignments snapshot' },
+    { key: 'HISTORY', label: 'Report History',      description: 'Previously generated reports' },
 ];
 
-const activeTab = ref<ReportType>('SSR');
+const activeTab = ref<TabKey>('SSR');
 
 // ── Site type filter (BAST tab only) ──────────────────────────────────────────
 type SiteTypeFilter = 'ALL' | 'EVCS' | 'BSS';
 const siteTypeFilter = ref<SiteTypeFilter>('ALL');
 
 const activeAssignments = computed<Assignment[]>(() => {
+    if (activeTab.value === 'HISTORY') return [];
     let list: Assignment[];
     switch (activeTab.value) {
         case 'SSR':   list = props.ssrAssignments; break;
@@ -62,7 +72,7 @@ const activeAssignments = computed<Assignment[]>(() => {
     return list;
 });
 
-function switchTab(tab: ReportType): void {
+function switchTab(tab: TabKey): void {
     activeTab.value = tab;
     selectedIds.value = [];
 }
@@ -75,6 +85,22 @@ function setSiteTypeFilter(f: SiteTypeFilter): void {
 function siteTypeName(assignment: Assignment): string {
     return assignment.site?.site_type?.name ?? '';
 }
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 20;
+const currentPage = ref(1);
+
+watch(activeAssignments, () => { currentPage.value = 1; });
+
+const totalPages = computed(() => Math.ceil(activeAssignments.value.length / PAGE_SIZE));
+
+const pagedAssignments = computed<Assignment[]>(() => {
+    const start = (currentPage.value - 1) * PAGE_SIZE;
+    return activeAssignments.value.slice(start, start + PAGE_SIZE);
+});
+
+const pageStart = computed(() => (currentPage.value - 1) * PAGE_SIZE + 1);
+const pageEnd = computed(() => Math.min(currentPage.value * PAGE_SIZE, activeAssignments.value.length));
 
 // ── Selection ─────────────────────────────────────────────────────────────────
 const selectedIds = ref<number[]>([]);
@@ -106,6 +132,13 @@ function toggleId(id: number): void {
     }
 }
 
+// ── Report row expansion ──────────────────────────────────────────────────────
+const expandedReportId = ref<number | null>(null);
+
+function toggleReportExpand(id: number): void {
+    expandedReportId.value = expandedReportId.value === id ? null : id;
+}
+
 // ── Generate report ───────────────────────────────────────────────────────────
 const form = useForm({
     report_type: '' as ReportType,
@@ -113,7 +146,8 @@ const form = useForm({
 });
 
 function generateReport(): void {
-    form.report_type = activeTab.value;
+    if (activeTab.value === 'HISTORY') return;
+    form.report_type = activeTab.value as ReportType;
     form.assignment_ids = [...selectedIds.value];
     form.post(AdminReportActions.store().url, {
         onSuccess: () => {
@@ -124,26 +158,23 @@ function generateReport(): void {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const reportTypeBadgeClass: Record<string, string> = {
-    SSR: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-    BAST: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    SSR:   'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+    BAST:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
     DAILY: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
 };
 
 const reportTypeLabel: Record<string, string> = {
-    SSR: 'SSR',
-    BAST: 'BAST',
-    BAST_EVCS: 'BAST',
+    SSR:      'SSR',
+    BAST:     'BAST',
+    BAST_EVCS:'BAST',
     BAST_BSS: 'BAST',
-    DAILY: 'Daily',
+    DAILY:    'Daily',
 };
 
 function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
     });
 }
 </script>
@@ -159,9 +190,7 @@ function formatDate(iso: string): string {
         </div>
 
         <!-- Tab switcher -->
-        <div
-            class="flex flex-wrap gap-1 rounded-xl border border-sidebar-border/70 bg-card p-1 dark:border-sidebar-border"
-        >
+        <div class="flex flex-wrap gap-1 rounded-xl border border-sidebar-border/70 bg-card p-1 dark:border-sidebar-border">
             <button
                 v-for="tab in tabs"
                 :key="tab.key"
@@ -178,8 +207,9 @@ function formatDate(iso: string): string {
             </button>
         </div>
 
-        <!-- Assignment table -->
+        <!-- Assignment table (SSR / BAST / DAILY tabs) -->
         <div
+            v-if="activeTab !== 'HISTORY'"
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div class="flex items-center justify-between border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
@@ -204,10 +234,7 @@ function formatDate(iso: string): string {
                         </button>
                     </div>
                 </div>
-                <Button
-                    :disabled="selectedIds.length === 0 || form.processing"
-                    @click="generateReport"
-                >
+                <Button :disabled="selectedIds.length === 0 || form.processing" @click="generateReport">
                     <FileText class="size-4" />
                     Generate {{ tabs.find((t) => t.key === activeTab)?.label }}
                     <span v-if="selectedIds.length > 0">({{ selectedIds.length }})</span>
@@ -219,10 +246,7 @@ function formatDate(iso: string): string {
                     <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                         <tr>
                             <th class="px-4 py-3 text-left">
-                                <!-- Wrapper div handles the click reliably regardless of Checkbox internals -->
-                                <div class="cursor-pointer" @click="toggleAll">
-                                    <Checkbox :checked="headerChecked" class="pointer-events-none" />
-                                </div>
+                                <Checkbox :checked="headerChecked" @update:checked="toggleAll" />
                             </th>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Site</th>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
@@ -232,20 +256,17 @@ function formatDate(iso: string): string {
                     </thead>
                     <tbody>
                         <tr
-                            v-for="assignment in activeAssignments"
+                            v-for="assignment in pagedAssignments"
                             :key="assignment.id"
                             class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
                             :class="{ 'bg-muted/20': selectedIds.includes(assignment.id) }"
                             @click="toggleId(assignment.id)"
                         >
-                            <td class="px-4 py-3">
-                                <!-- Wrapper div stops row propagation and drives selection -->
-                                <div class="cursor-pointer" @click.stop="toggleId(assignment.id)">
-                                    <Checkbox
-                                        :checked="selectedIds.includes(assignment.id)"
-                                        class="pointer-events-none"
-                                    />
-                                </div>
+                            <td class="px-4 py-3" @click.stop>
+                                <Checkbox
+                                    :checked="selectedIds.includes(assignment.id)"
+                                    @update:checked="toggleId(assignment.id)"
+                                />
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-col">
@@ -289,15 +310,45 @@ function formatDate(iso: string): string {
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination bar -->
+            <div
+                v-if="totalPages > 1"
+                class="flex items-center justify-between border-t border-sidebar-border/70 px-4 py-2 dark:border-sidebar-border"
+            >
+                <p class="text-xs text-muted-foreground">
+                    Showing {{ pageStart }}–{{ pageEnd }} of {{ activeAssignments.length }}
+                </p>
+                <div class="flex items-center gap-1">
+                    <button
+                        type="button"
+                        class="inline-flex size-7 items-center justify-center rounded border border-sidebar-border/70 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40 dark:border-sidebar-border"
+                        :disabled="currentPage === 1"
+                        @click="currentPage--"
+                    >
+                        <ChevronLeft class="size-3.5" />
+                    </button>
+                    <span class="px-2 text-xs text-muted-foreground">{{ currentPage }} / {{ totalPages }}</span>
+                    <button
+                        type="button"
+                        class="inline-flex size-7 items-center justify-center rounded border border-sidebar-border/70 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40 dark:border-sidebar-border"
+                        :disabled="currentPage === totalPages"
+                        @click="currentPage++"
+                    >
+                        <ChevronRight class="size-3.5" />
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <!-- Recent Reports table -->
+        <!-- Report History tab -->
         <div
+            v-else
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
-                <h2 class="text-sm font-semibold">Recent Reports</h2>
-                <p class="text-xs text-muted-foreground">Last 15 generated reports</p>
+                <h2 class="text-sm font-semibold">Report History</h2>
+                <p class="text-xs text-muted-foreground">Last 15 generated reports · click a row to see its sites</p>
             </div>
 
             <div class="overflow-x-auto">
@@ -312,35 +363,55 @@ function formatDate(iso: string): string {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr
-                            v-for="report in recentReports"
-                            :key="report.id"
-                            class="border-t border-sidebar-border/70 dark:border-sidebar-border"
-                        >
-                            <td class="px-4 py-3">
-                                <span
-                                    class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                                    :class="reportTypeBadgeClass[report.report_type] ?? 'bg-muted text-muted-foreground'"
-                                >
-                                    {{ reportTypeLabel[report.report_type] ?? report.report_type }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-xs">{{ report.name }}</td>
-                            <td class="px-4 py-3 text-xs text-muted-foreground">
-                                {{ report.assignments_count }} assignment{{ report.assignments_count !== 1 ? 's' : '' }}
-                            </td>
-                            <td class="px-4 py-3 text-xs text-muted-foreground">{{ formatDate(report.created_at) }}</td>
-                            <td class="px-4 py-3 text-right">
-                                <a
-                                    :href="AdminReportActions.download(report).url"
-                                    class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted dark:border-sidebar-border"
-                                    title="Download XLSX"
-                                >
-                                    <Download class="size-3.5" />
-                                    XLSX
-                                </a>
-                            </td>
-                        </tr>
+                        <template v-for="report in recentReports" :key="report.id">
+                            <tr
+                                class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                                @click="toggleReportExpand(report.id)"
+                            >
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                        :class="reportTypeBadgeClass[report.report_type] ?? 'bg-muted text-muted-foreground'"
+                                    >
+                                        {{ reportTypeLabel[report.report_type] ?? report.report_type }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-xs">{{ report.name }}</td>
+                                <td class="px-4 py-3 text-xs text-muted-foreground">
+                                    <button type="button" class="inline-flex items-center gap-1 hover:text-foreground">
+                                        <component :is="expandedReportId === report.id ? ChevronDown : ChevronRight" class="size-3" />
+                                        {{ report.assignments_count }} assignment{{ report.assignments_count !== 1 ? 's' : '' }}
+                                    </button>
+                                </td>
+                                <td class="px-4 py-3 text-xs text-muted-foreground">{{ formatDate(report.created_at) }}</td>
+                                <td class="px-4 py-3 text-right" @click.stop>
+                                    <a
+                                        :href="AdminReportActions.download(report).url"
+                                        class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted dark:border-sidebar-border"
+                                        title="Download XLSX"
+                                    >
+                                        <Download class="size-3.5" />
+                                        XLSX
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr v-if="expandedReportId === report.id" class="border-t border-sidebar-border/70 dark:border-sidebar-border">
+                                <td colspan="5" class="bg-muted/20 px-8 py-3">
+                                    <div class="flex flex-wrap gap-2">
+                                        <span
+                                            v-for="site in report.sites"
+                                            :key="site.site_code + site.activity_type"
+                                            class="inline-flex items-center gap-1 rounded border border-sidebar-border/70 bg-card px-2 py-0.5 text-[11px] dark:border-sidebar-border"
+                                        >
+                                            <span class="font-mono font-semibold">{{ site.site_code }}</span>
+                                            <span class="text-muted-foreground">{{ site.location_name }}</span>
+                                            <span class="rounded bg-muted px-1 text-[10px] uppercase text-muted-foreground">{{ site.activity_type }}</span>
+                                        </span>
+                                        <span v-if="report.sites.length === 0" class="text-xs text-muted-foreground">No sites found.</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
 
                         <tr v-if="recentReports.length === 0">
                             <td colspan="5" class="px-4 py-10 text-center text-sm text-muted-foreground">
