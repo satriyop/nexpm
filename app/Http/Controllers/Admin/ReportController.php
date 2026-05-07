@@ -9,6 +9,7 @@ use App\ActivityFields\SurveyFields;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\Assignment;
 use App\Models\Report;
 use App\Models\Site;
@@ -268,7 +269,22 @@ class ReportController extends Controller
             ? url(Storage::url($survey->file_ba_survey))
             : null;
 
-        $data = compact('assignment', 'survey', 'site', 'photos', 'mockupPath', 'baSurveyUrl');
+        $companyName = AppSetting::get('company.name', 'VAHANA GASTI TEKNIKA');
+
+        $companyLogoPath = AppSetting::get('company.logo');
+        $companyLogoAbs = $companyLogoPath && file_exists(storage_path('app/public/'.$companyLogoPath))
+            ? storage_path('app/public/'.$companyLogoPath)
+            : null;
+
+        $contractorLogoPath = $site->project?->mainContractor?->logo;
+        $contractorLogoAbs = $contractorLogoPath && file_exists(storage_path('app/public/'.$contractorLogoPath))
+            ? storage_path('app/public/'.$contractorLogoPath)
+            : null;
+
+        $data = compact(
+            'assignment', 'survey', 'site', 'photos', 'mockupPath', 'baSurveyUrl',
+            'companyName', 'companyLogoAbs', 'contractorLogoAbs'
+        );
 
         return Pdf::loadView('pdf.site-survey-report', $data)->setPaper('a4', 'portrait');
     }

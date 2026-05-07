@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { Building2, ClipboardList, FileBarChart2, FolderKanban, LayoutGrid, Users, Wrench } from 'lucide-vue-next';
+import { Building2, ClipboardList, FileBarChart2, FolderKanban, LayoutGrid, Settings2, Users, Wrench } from 'lucide-vue-next';
 import { computed } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import * as AdminReportActions from '@/actions/App/Http/Controllers/Admin/ReportController';
+import * as CompanySettingActions from '@/actions/App/Http/Controllers/Admin/CompanySettingController';
 import * as MainContractorActions from '@/actions/App/Http/Controllers/Admin/MainContractorController';
 import * as ProjectActions from '@/actions/App/Http/Controllers/Admin/ProjectController';
 import * as SubcontractorActions from '@/actions/App/Http/Controllers/Admin/SubcontractorController';
@@ -40,6 +41,7 @@ const mainNavItems = computed<NavItem[]>(() => {
             { title: 'Subcontractors', href: SubcontractorActions.index().url, icon: Wrench },
             { title: 'Users', href: UserActions.index().url, icon: Users },
             { title: 'Main Contractors', href: MainContractorActions.index().url, icon: Building2 },
+            { title: 'Company Settings', href: CompanySettingActions.index().url, icon: Settings2 },
         );
     }
 

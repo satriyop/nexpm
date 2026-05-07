@@ -100,10 +100,16 @@
     {{-- Logo / company name rows --}}
     <tr>
         <td style="width:50%; text-align:center; padding:10px 8px; border-right:1px solid #bbb; border-bottom:1px solid #bbb; font-size:10pt; font-weight:bold; color:#333;">
-            VGREEN INDONESIA
+            @if($contractorLogoAbs)
+                <img src="{{ $contractorLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Client logo">
+            @endif
+            {{ $site->project?->mainContractor?->name ?? 'CLIENT' }}
         </td>
         <td style="width:50%; text-align:center; padding:10px 8px; border-bottom:1px solid #bbb; font-size:10pt; font-weight:bold; color:#333;">
-            VAHANA GASTI TEKNIKA
+            @if($companyLogoAbs)
+                <img src="{{ $companyLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Company logo">
+            @endif
+            {{ $companyName }}
         </td>
     </tr>
     {{-- Version --}}

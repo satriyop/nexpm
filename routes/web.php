@@ -24,6 +24,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('main-contractors', [Admin\MainContractorController::class, 'index'])->name('main-contractors.index');
     Route::post('main-contractors', [Admin\MainContractorController::class, 'store'])->name('main-contractors.store');
+    Route::post('main-contractors/{main_contractor}', [Admin\MainContractorController::class, 'update'])->name('main-contractors.update');
 
     Route::get('clients', [Admin\ClientController::class, 'index'])->name('clients.index');
     Route::post('clients', [Admin\ClientController::class, 'store'])->name('clients.store');
@@ -66,6 +67,9 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::get('reports', [Admin\ReportController::class, 'index'])->name('reports.index');
     Route::post('reports', [Admin\ReportController::class, 'store'])->name('reports.store');
     Route::get('reports/{report}/download', [Admin\ReportController::class, 'download'])->name('reports.download');
+
+    Route::get('company-settings', [Admin\CompanySettingController::class, 'index'])->name('company-settings.index');
+    Route::post('company-settings', [Admin\CompanySettingController::class, 'update'])->name('company-settings.update');
 });
 
 Route::middleware(['auth', 'verified', 'role:subcontractor'])->prefix('subcontractor')->name('subcontractor.')->group(function () {
