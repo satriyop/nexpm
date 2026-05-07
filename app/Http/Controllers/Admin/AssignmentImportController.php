@@ -43,25 +43,27 @@ class AssignmentImportController extends Controller
 
         $activityTypes = ['SURVEY', 'CONSTRUCTION', 'PLN_CONNECTION', 'BAST'];
 
+        // Use semicolon separator so Indonesian-locale Excel auto-splits into columns.
+        // The import service detects the delimiter automatically.
+        $sep = ';';
         $handle = fopen('php://memory', 'w');
 
-        // Available subcontractor codes as reference rows
-        fputcsv($handle, ['# Available subcontractor codes:']);
+        // Reference comment rows (pure ASCII to avoid encoding issues)
+        fputcsv($handle, ['# Available subcontractor codes:'], $sep);
         foreach ($subcontractors as $sc) {
-            fputcsv($handle, ["# {$sc->code} — {$sc->name}"]);
+            fputcsv($handle, ["# {$sc->code} - {$sc->name}"], $sep);
         }
 
-        fputcsv($handle, ['site_code', 'activity_type', 'subcontractor_code']);
+        fputcsv($handle, ['site_code', 'activity_type', 'subcontractor_code'], $sep);
 
         if ($siteCodes->isEmpty()) {
-            // Fallback example when no sites imported yet
             foreach ($activityTypes as $type) {
-                fputcsv($handle, ['SITE-001', $type, '']);
+                fputcsv($handle, ['SITE-001', $type, ''], $sep);
             }
         } else {
             foreach ($siteCodes as $code) {
                 foreach ($activityTypes as $type) {
-                    fputcsv($handle, [$code, $type, '']);
+                    fputcsv($handle, [$code, $type, ''], $sep);
                 }
             }
         }
