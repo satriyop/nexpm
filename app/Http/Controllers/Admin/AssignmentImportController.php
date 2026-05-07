@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Models\Subcontractor;
 use App\Services\AssignmentCsvImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,25 +35,46 @@ class AssignmentImportController extends Controller
 
     public function template(Project $project): Response
     {
-        $rows = [
-            ['site_code', 'activity_type', 'subcontractor_code'],
-            ['SITE-001', 'SURVEY', 'SUBCON-001'],
-            ['SITE-001', 'CONSTRUCTION', 'SUBCON-001'],
-            ['SITE-001', 'PLN_CONNECTION', 'SUBCON-002'],
-            ['SITE-001', 'BAST', 'SUBCON-001'],
-        ];
+        $siteCodes = $project->sites()->orderBy('site_code')->pluck('site_code');
+        $subcontractors = Subcontractor::query()
+            ->where('main_contractor_id', $project->main_contractor_id)
+            ->orderBy('name')
+            ->get(['name', 'code']);
+
+        $activityTypes = ['SURVEY', 'CONSTRUCTION', 'PLN_CONNECTION', 'BAST'];
 
         $handle = fopen('php://memory', 'w');
-        foreach ($rows as $row) {
-            fputcsv($handle, $row);
+
+        // Available subcontractor codes as reference rows
+        fputcsv($handle, ['# Available subcontractor codes:']);
+        foreach ($subcontractors as $sc) {
+            fputcsv($handle, ["# {$sc->code} — {$sc->name}"]);
         }
+
+        fputcsv($handle, ['site_code', 'activity_type', 'subcontractor_code']);
+
+        if ($siteCodes->isEmpty()) {
+            // Fallback example when no sites imported yet
+            foreach ($activityTypes as $type) {
+                fputcsv($handle, ['SITE-001', $type, '']);
+            }
+        } else {
+            foreach ($siteCodes as $code) {
+                foreach ($activityTypes as $type) {
+                    fputcsv($handle, [$code, $type, '']);
+                }
+            }
+        }
+
         rewind($handle);
         $csv = stream_get_contents($handle);
         fclose($handle);
 
+        $filename = 'assignments-import-'.str($project->name)->slug().'.csv';
+
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="assignments-import-template.csv"',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
 }

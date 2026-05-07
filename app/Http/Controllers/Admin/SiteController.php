@@ -25,15 +25,14 @@ class SiteController extends Controller
             ->get();
 
         return Inertia::render('admin/sites/Edit', [
-            'site'           => $site,
-            'siteTypes'      => SiteType::orderBy('name')->get(['id', 'name']),
-            'machineTypes'   => MachineType::orderBy('name')->get(['id', 'name']),
-            'assignments'    => $assignments,
+            'site' => $site,
+            'siteTypes' => SiteType::orderBy('name')->get(['id', 'name']),
+            'machineTypes' => MachineType::orderBy('name')->get(['id', 'name']),
+            'assignments' => $assignments,
             'subcontractors' => Subcontractor::query()
                 ->whereScopedToMainContractor()
-                ->with('subcontractorType')
                 ->orderBy('name')
-                ->get(['id', 'name', 'subcontractor_type_id']),
+                ->get(['id', 'name']),
         ]);
     }
 

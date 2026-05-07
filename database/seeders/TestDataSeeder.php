@@ -18,7 +18,6 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\Site;
 use App\Models\Subcontractor;
-use App\Models\SubcontractorType;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -30,14 +29,6 @@ class TestDataSeeder extends Seeder
     {
         $evcsTypeId = DB::table('site_types')->where('name', 'EVCS')->value('id');
         $bssTypeId = DB::table('site_types')->where('name', 'BSS')->value('id');
-        $consTypeId = DB::table('subcontractor_types')->where('name', 'Construction')->value('id');
-        $plnTypeId = DB::table('subcontractor_types')->where('name', 'PLN')->value('id');
-
-        // Formalise activity scopes so type-enforcement validation is exercised
-        SubcontractorType::where('id', $consTypeId)
-            ->update(['activity_types' => json_encode(['SURVEY', 'CONSTRUCTION', 'BAST'])]);
-        SubcontractorType::where('id', $plnTypeId)
-            ->update(['activity_types' => json_encode(['PLN_CONNECTION'])]);
 
         // ── Users ──────────────────────────────────────────────────────────────
         $mc = MainContractor::firstOrCreate(
@@ -88,7 +79,6 @@ class TestDataSeeder extends Seeder
             [
                 'name' => 'PT Bangun Karya Mandiri',
                 'main_contractor_id' => $mc->id,
-                'subcontractor_type_id' => $consTypeId,
                 'phone' => '+62 811 000 0001',
                 'email' => 'construction1@test.com',
                 'pic' => 'Dodi Prasetyo',
@@ -100,7 +90,6 @@ class TestDataSeeder extends Seeder
             [
                 'name' => 'PT Multi Teknik Mandiri',
                 'main_contractor_id' => $mc->id,
-                'subcontractor_type_id' => $consTypeId,
                 'phone' => '+62 811 000 0002',
                 'email' => 'construction2@test.com',
                 'pic' => 'Irfan Hakim',
@@ -112,7 +101,6 @@ class TestDataSeeder extends Seeder
             [
                 'name' => 'CV Listrik Prima',
                 'main_contractor_id' => $mc->id,
-                'subcontractor_type_id' => $plnTypeId,
                 'phone' => '+62 811 000 0003',
                 'email' => 'pln@test.com',
                 'pic' => 'Hendra Kurniawan',
@@ -403,7 +391,6 @@ class TestDataSeeder extends Seeder
             [
                 'name' => 'PT Graha Teknik Sentosa',
                 'main_contractor_id' => $mcSgt->id,
-                'subcontractor_type_id' => $consTypeId,
                 'phone' => '+62 811 000 0011',
                 'email' => 'sgt-construction1@test.com',
                 'pic' => 'Agus Salim',
@@ -415,7 +402,6 @@ class TestDataSeeder extends Seeder
             [
                 'name' => 'CV Karya Prima Utama',
                 'main_contractor_id' => $mcSgt->id,
-                'subcontractor_type_id' => $consTypeId,
                 'phone' => '+62 811 000 0012',
                 'email' => 'sgt-construction2@test.com',
                 'pic' => 'Wahyu Nugroho',
@@ -427,7 +413,6 @@ class TestDataSeeder extends Seeder
             [
                 'name' => 'PT Daya Listrik Abadi',
                 'main_contractor_id' => $mcSgt->id,
-                'subcontractor_type_id' => $plnTypeId,
                 'phone' => '+62 811 000 0013',
                 'email' => 'sgt-pln@test.com',
                 'pic' => 'Bambang Sutrisno',

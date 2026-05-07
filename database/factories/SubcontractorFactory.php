@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\MainContractor;
 use App\Models\Subcontractor;
-use App\Models\SubcontractorType;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,7 +20,6 @@ class SubcontractorFactory extends Factory
     {
         return [
             'main_contractor_id' => MainContractor::factory(),
-            'subcontractor_type_id' => SubcontractorType::factory(),
             'name' => fake()->company(),
             'phone' => fake()->phoneNumber(),
             'email' => fake()->unique()->companyEmail(),

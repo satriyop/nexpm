@@ -58,12 +58,13 @@ const props = defineProps<{
 }>();
 
 defineOptions({
-    layout: {
+    layout: (page: { assignment: Assignment }) => ({
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Assignments', href: AdminAssignmentActions.index().url },
+            { title: 'Assignments', href: AdminAssignmentActions.siteAssignments(page.assignment.site.id).url },
+            { title: page.assignment.site.site_code, href: '#' },
         ],
-    },
+    }),
 });
 
 const survey = computed(() => props.assignment.survey_data);
@@ -383,7 +384,7 @@ function storageUrl(path: string | null | undefined): string {
                 size="sm"
                 class="w-fit -ml-2 text-muted-foreground"
             >
-                <Link :href="AdminAssignmentActions.index().url">
+                <Link :href="AdminAssignmentActions.siteAssignments(assignment.site.id).url">
                     <ArrowLeft class="size-4" />
                     Back to Assignments
                 </Link>

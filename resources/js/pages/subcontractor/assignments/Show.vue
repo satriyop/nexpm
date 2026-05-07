@@ -18,12 +18,12 @@ const props = defineProps<{
 }>();
 
 defineOptions({
-    layout: {
+    layout: (page: { assignment: Assignment }) => ({
         breadcrumbs: [
             { title: 'My Assignments', href: SubAssignmentIndex.index().url },
-            { title: 'Assignment Detail', href: '#' },
+            { title: page.assignment.site.site_code, href: '#' },
         ],
-    },
+    }),
 });
 
 const isReadOnly = computed(() =>

@@ -15,7 +15,6 @@ import { dashboard } from '@/routes';
 import type { PaginatedData } from '@/types';
 
 interface MainContractor { id: number; name: string }
-interface SubcontractorType { id: number; name: string }
 interface Subcontractor {
     id: number;
     name: string;
@@ -23,13 +22,11 @@ interface Subcontractor {
     pic: string | null;
     phone: string | null;
     email: string | null;
-    subcontractor_type: SubcontractorType | null;
     main_contractor: MainContractor | null;
 }
 
 const props = defineProps<{
     subcontractors: PaginatedData<Subcontractor>;
-    subcontractorTypes: SubcontractorType[];
     mainContractors: MainContractor[];
 }>();
 
@@ -43,7 +40,7 @@ defineOptions({
 });
 
 const open = ref(false);
-const form = useForm({ name: '', code: '', main_contractor_id: '', subcontractor_type_id: '', pic: '', phone: '', email: '' });
+const form = useForm({ name: '', code: '', main_contractor_id: '', pic: '', phone: '', email: '' });
 
 function submit() {
     form.post(Actions.store().url, { onSuccess: () => { open.value = false; form.reset(); } });
@@ -67,7 +64,6 @@ function submit() {
                         <tr>
                             <th class="px-4 py-3 text-left font-medium">Name</th>
                             <th class="px-4 py-3 text-left font-medium">Code</th>
-                            <th class="px-4 py-3 text-left font-medium">Type</th>
                             <th class="px-4 py-3 text-left font-medium">Main Contractor</th>
                             <th class="px-4 py-3 text-left font-medium">PIC</th>
                             <th class="px-4 py-3 text-left font-medium">Phone</th>
@@ -77,13 +73,12 @@ function submit() {
                         <tr v-for="sc in subcontractors.data" :key="sc.id" class="hover:bg-muted/30">
                             <td class="px-4 py-3 font-medium">{{ sc.name }}</td>
                             <td class="px-4 py-3 font-mono text-xs text-muted-foreground">{{ sc.code }}</td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ sc.subcontractor_type?.name ?? '—' }}</td>
                             <td class="px-4 py-3 text-muted-foreground">{{ sc.main_contractor?.name ?? '—' }}</td>
                             <td class="px-4 py-3 text-muted-foreground">{{ sc.pic ?? '—' }}</td>
                             <td class="px-4 py-3 text-muted-foreground">{{ sc.phone ?? '—' }}</td>
                         </tr>
                         <tr v-if="!subcontractors.data.length">
-                            <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">No subcontractors yet.</td>
+                            <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">No subcontractors yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -118,16 +113,6 @@ function submit() {
                         </SelectContent>
                     </Select>
                     <InputError :message="form.errors.main_contractor_id" />
-                </div>
-                <div class="grid gap-1.5">
-                    <Label>Type <span class="text-destructive">*</span></Label>
-                    <Select v-model="form.subcontractor_type_id">
-                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="t in subcontractorTypes" :key="t.id" :value="String(t.id)">{{ t.name }}</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <InputError :message="form.errors.subcontractor_type_id" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label>PIC</Label>

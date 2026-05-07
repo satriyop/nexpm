@@ -130,9 +130,8 @@ class AssignmentController extends Controller
             'assignments' => $assignments,
             'subcontractors' => Subcontractor::query()
                 ->whereScopedToMainContractor()
-                ->with('subcontractorType')
                 ->orderBy('name')
-                ->get(['id', 'name', 'subcontractor_type_id']),
+                ->get(['id', 'name']),
         ]);
     }
 
@@ -438,13 +437,7 @@ class AssignmentController extends Controller
             ],
         ]);
 
-        $newSubcon = Subcontractor::query()->with('subcontractorType')->findOrFail($validated['subcontractor_id']);
-
-        abort_unless(
-            $newSubcon->subcontractorType === null || $newSubcon->subcontractorType->handlesActivity($assignment->activity_type),
-            422,
-            "Subcontractor type '{$newSubcon->subcontractorType?->name}' cannot handle {$assignment->activity_type->label()} assignments."
-        );
+        $newSubcon = Subcontractor::query()->findOrFail($validated['subcontractor_id']);
 
         // Delete all activity data (cascade handles photos)
         $assignment->surveyData?->delete();
@@ -518,14 +511,8 @@ class AssignmentController extends Controller
             'An assignment of this type already exists for this site.'
         );
 
-        $subcon = Subcontractor::query()->with('subcontractorType')->findOrFail($validated['subcontractor_id']);
+        $subcon = Subcontractor::query()->findOrFail($validated['subcontractor_id']);
         $activityType = ActivityType::from($validated['activity_type']);
-
-        abort_unless(
-            $subcon->subcontractorType === null || $subcon->subcontractorType->handlesActivity($activityType),
-            422,
-            "Subcontractor type '{$subcon->subcontractorType?->name}' cannot handle {$activityType->label()} assignments."
-        );
 
         $assignment = Assignment::query()->create([
             'site_id' => $site->id,

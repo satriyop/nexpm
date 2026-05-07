@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['main_contractor_id', 'subcontractor_type_id', 'name', 'phone', 'email', 'pic', 'code'])]
+#[Fillable(['main_contractor_id', 'name', 'phone', 'email', 'pic', 'code'])]
 class Subcontractor extends Model
 {
     /** @use HasFactory<SubcontractorFactory> */
@@ -22,14 +22,6 @@ class Subcontractor extends Model
     public function mainContractor(): BelongsTo
     {
         return $this->belongsTo(MainContractor::class);
-    }
-
-    /**
-     * @return BelongsTo<SubcontractorType, $this>
-     */
-    public function subcontractorType(): BelongsTo
-    {
-        return $this->belongsTo(SubcontractorType::class);
     }
 
     /**

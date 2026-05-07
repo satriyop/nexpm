@@ -9,7 +9,6 @@ use App\Models\Site;
 use App\Models\SitePhoto;
 use App\Models\SiteType;
 use App\Models\Subcontractor;
-use App\Models\SubcontractorType;
 use App\Models\User;
 use Database\Seeders\ConfigTypesSeeder;
 use Database\Seeders\SuperAdminSeeder;
@@ -17,9 +16,7 @@ use Database\Seeders\SuperAdminSeeder;
 test('config types seeder seeds defaults', function () {
     $this->seed(ConfigTypesSeeder::class);
 
-    expect(SubcontractorType::pluck('name')->sort()->values()->all())
-        ->toBe(['Construction', 'PLN'])
-        ->and(SiteType::pluck('name')->sort()->values()->all())
+    expect(SiteType::pluck('name')->sort()->values()->all())
         ->toBe(['BSS', 'EVCS'])
         ->and(MachineType::pluck('name')->sort()->values()->all())
         ->toBe(['BSS 12S 1P', 'BSS 6S 1P', 'EVCS 20KW', 'EVCS 30KW', 'EVCS 60KW']);
