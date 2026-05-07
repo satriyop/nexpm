@@ -75,7 +75,7 @@ defineOptions({
     },
 });
 
-const ALL = '';
+const ALL = '__all__';
 const mainContractorId = ref<string>(props.filters?.main_contractor_id ?? ALL);
 const projectId = ref<string>(props.filters?.project_id ?? ALL);
 
@@ -89,15 +89,15 @@ const selectedProjectName = computed(() =>
 
 function buildQuery(): Record<string, string> {
     const q: Record<string, string> = {};
-    if (mainContractorId.value) { q.main_contractor_id = mainContractorId.value; }
-    if (projectId.value) { q.project_id = projectId.value; }
+    if (mainContractorId.value !== ALL) { q.main_contractor_id = mainContractorId.value; }
+    if (projectId.value !== ALL) { q.project_id = projectId.value; }
     return q;
 }
 
 function applyContractorFilter(value: string): void {
     mainContractorId.value = value;
     projectId.value = ALL;
-    router.get(dashboard(), value ? { main_contractor_id: value } : {}, {
+    router.get(dashboard(), value !== ALL ? { main_contractor_id: value } : {}, {
         preserveState: false,
         replace: true,
     });
