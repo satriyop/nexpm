@@ -265,7 +265,7 @@ class ReportController extends Controller
         }
 
         $baSurveyUrl = $survey?->file_ba_survey
-            ? Storage::url($survey->file_ba_survey)
+            ? url(Storage::url($survey->file_ba_survey))
             : null;
 
         $data = compact('assignment', 'survey', 'site', 'photos', 'mockupPath', 'baSurveyUrl');
