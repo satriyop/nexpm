@@ -139,12 +139,28 @@ const visibleActivityRows = computed(() =>
     activityRows.filter((row) => matrixRowTotal(row.key) > 0),
 );
 
+const visibleStatuses = computed(() =>
+    statuses.filter((s) => matrixColTotal(s.key) > 0),
+);
+
 function getCount(counts: StatusCounts | Record<string, number>, key: string): number {
     return (counts as Record<string, number>)[key] ?? 0;
 }
 
+const INTERMEDIATE_STATUSES: (keyof StatusCounts)[] = [
+    'SURVEY', 'DOCUMENT',
+    'CONSTRUCTION', 'MACHINE_ONSITE', 'DONE', 'LIVE',
+    'REGISTRATION', 'BILLING', 'CONNECTION', 'KWH_DONE',
+    'COMPLETED', 'REVISION',
+];
+
+function projectInProgress(counts: StatusCounts): number {
+    return INTERMEDIATE_STATUSES.reduce((sum, k) => sum + (counts[k] ?? 0), 0);
+}
+
 function projectTotal(counts: StatusCounts): number {
-    return Object.values(counts as Record<string, number>).reduce((sum, v) => sum + v, 0);
+    const drop = counts.DROP ?? 0;
+    return Object.values(counts as Record<string, number>).reduce((sum, v) => sum + v, 0) - drop;
 }
 
 function projectCompletion(counts: StatusCounts): number {
@@ -240,10 +256,11 @@ function timeAgo(isoString: string): string {
             </div>
         </div>
 
-        <!-- Section 1: Status Summary Cards (clickable) -->
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
             <Link
                 v-for="stat in statuses"
+                v-if="getCount(props.statusCounts, stat.key) > 0"
                 :key="stat.key"
                 :href="assignmentFilterUrl({ status: stat.key })"
                 class="rounded-xl border border-sidebar-border/70 bg-card border-l-4 p-4 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
@@ -273,7 +290,7 @@ function timeAgo(isoString: string): string {
                     <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                         <tr>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Activity</th>
-                            <th v-for="stat in statuses" :key="stat.key" class="px-4 py-3 text-center font-medium text-muted-foreground">
+                            <th v-for="stat in visibleStatuses" :key="stat.key" class="px-4 py-3 text-center font-medium text-muted-foreground">
                                 <span class="inline-flex items-center gap-1">
                                     <span class="size-1.5 rounded-full" :class="stat.dotClass" />
                                     {{ stat.label }}
@@ -292,7 +309,7 @@ function timeAgo(isoString: string): string {
                                 <ActivityTypeBadge :activity-type="row.key" />
                             </td>
                             <td
-                                v-for="stat in statuses"
+                                v-for="stat in visibleStatuses"
                                 :key="stat.key"
                                 class="px-4 py-3 text-center"
                             >
@@ -312,7 +329,7 @@ function timeAgo(isoString: string): string {
                         <!-- Column totals -->
                         <tr class="border-t-2 border-sidebar-border/70 bg-muted/20 dark:border-sidebar-border">
                             <td class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</td>
-                            <td v-for="stat in statuses" :key="stat.key" class="px-4 py-3 text-center font-semibold">
+                            <td v-for="stat in visibleStatuses" :key="stat.key" class="px-4 py-3 text-center font-semibold">
                                 <Link
                                     :href="assignmentFilterUrl({ status: stat.key })"
                                     class="inline-block min-w-8 rounded px-2 py-0.5 transition-colors hover:bg-muted"
@@ -341,8 +358,7 @@ function timeAgo(isoString: string): string {
                         <tr>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Project</th>
                             <th class="px-4 py-3 text-center font-medium text-muted-foreground">Pending</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Completed</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Revision</th>
+                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">In Progress</th>
                             <th class="px-4 py-3 text-center font-medium text-muted-foreground">Verified</th>
                             <th class="px-4 py-3 text-center font-medium text-muted-foreground">Reported</th>
                             <th class="px-4 py-3 text-center font-medium text-muted-foreground">Total</th>
@@ -366,13 +382,7 @@ function timeAgo(isoString: string): string {
                             <td class="px-4 py-3 text-center">
                                 <span class="inline-flex items-center gap-1">
                                     <span class="size-1.5 rounded-full bg-blue-500" />
-                                    {{ getCount(project.counts, 'COMPLETED') }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="size-1.5 rounded-full bg-amber-500" />
-                                    {{ getCount(project.counts, 'REVISION') }}
+                                    {{ projectInProgress(project.counts) }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-center">
@@ -415,7 +425,7 @@ function timeAgo(isoString: string): string {
                         </tr>
 
                         <tr v-if="props.projectBreakdowns.length === 0">
-                            <td colspan="9" class="px-4 py-12 text-center text-sm text-muted-foreground">
+                            <td colspan="8" class="px-4 py-12 text-center text-sm text-muted-foreground">
                                 No project data available.
                             </td>
                         </tr>
