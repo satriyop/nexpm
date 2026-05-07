@@ -81,6 +81,12 @@ class SiteCsvImportService
 
             $existing = Site::query()->where('site_code', $row['site_code'])->first();
 
+            if ($existing !== null && $existing->project_id !== $projectId) {
+                $errors[] = "Row {$rowNumber}: site_code '{$row['site_code']}' belongs to a different project.";
+
+                continue;
+            }
+
             if ($existing !== null) {
                 $existing->fill($attributes);
                 $existing->save();

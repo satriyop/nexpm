@@ -34,6 +34,17 @@ class AssignmentCsvImportService
             return ['created' => 0, 'updated' => 0, 'errors' => ['Unable to open CSV file.']];
         }
 
+        // Pre-load lookup maps to avoid N+1 queries.
+        $sites = Site::query()
+            ->where('project_id', $projectId)
+            ->get()
+            ->keyBy('site_code');
+
+        $subcontractors = Subcontractor::query()
+            ->with('subcontractorType')
+            ->get()
+            ->keyBy('code');
+
         try {
             // Skip header.
             fgetcsv($handle, escape: '\\');
@@ -56,10 +67,7 @@ class AssignmentCsvImportService
                     continue;
                 }
 
-                $site = Site::query()
-                    ->where('site_code', $siteCode)
-                    ->where('project_id', $projectId)
-                    ->first();
+                $site = $sites->get($siteCode);
 
                 if ($site === null) {
                     $errors[] = "Row {$rowNumber}: site '{$siteCode}' not found in project.";
@@ -74,10 +82,7 @@ class AssignmentCsvImportService
                     continue;
                 }
 
-                $subcontractor = Subcontractor::query()
-                    ->with('subcontractorType')
-                    ->where('code', $subcontractorCode)
-                    ->first();
+                $subcontractor = $subcontractors->get($subcontractorCode);
                 if ($subcontractor === null) {
                     $errors[] = "Row {$rowNumber}: subcontractor '{$subcontractorCode}' not found.";
 
