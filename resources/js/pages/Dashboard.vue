@@ -258,24 +258,24 @@ function timeAgo(isoString: string): string {
 
         <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
-            <Link
-                v-for="stat in statuses"
-                v-if="getCount(props.statusCounts, stat.key) > 0"
-                :key="stat.key"
-                :href="assignmentFilterUrl({ status: stat.key })"
-                class="rounded-xl border border-sidebar-border/70 bg-card border-l-4 p-4 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
-                :class="stat.borderClass"
-            >
-                <div class="flex flex-col gap-1">
-                    <div class="flex items-center gap-1.5">
-                        <span class="size-2 shrink-0 rounded-full" :class="stat.dotClass" />
-                        <span class="text-xs font-medium text-muted-foreground">{{ stat.label }}</span>
+            <template v-for="stat in statuses" :key="stat.key">
+                <Link
+                    v-if="getCount(props.statusCounts, stat.key) > 0"
+                    :href="assignmentFilterUrl({ status: stat.key })"
+                    class="rounded-xl border border-sidebar-border/70 bg-card border-l-4 p-4 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                    :class="stat.borderClass"
+                >
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-1.5">
+                            <span class="size-2 shrink-0 rounded-full" :class="stat.dotClass" />
+                            <span class="text-xs font-medium text-muted-foreground">{{ stat.label }}</span>
+                        </div>
+                        <p class="text-3xl font-bold tracking-tight" :class="stat.textClass">
+                            {{ getCount(props.statusCounts, stat.key) }}
+                        </p>
                     </div>
-                    <p class="text-3xl font-bold tracking-tight" :class="stat.textClass">
-                        {{ getCount(props.statusCounts, stat.key) }}
-                    </p>
-                </div>
-            </Link>
+                </Link>
+            </template>
         </div>
 
         <!-- Section 2: Activity × Status Pipeline Matrix -->
