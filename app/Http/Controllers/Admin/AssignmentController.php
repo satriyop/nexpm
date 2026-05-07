@@ -327,6 +327,7 @@ class AssignmentController extends Controller
             'file_slo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'file_nidi' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'file_reg' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'file_pk' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'email_bpujl_req_date' => ['nullable', 'date'],
             'bpujl_acquired_date' => ['nullable', 'date'],
             'foto_kwh' => ['nullable', 'file', 'image', 'max:10240'],

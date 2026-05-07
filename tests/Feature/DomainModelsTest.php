@@ -22,7 +22,7 @@ test('config types seeder seeds defaults', function () {
         ->and(SiteType::pluck('name')->sort()->values()->all())
         ->toBe(['BSS', 'EVCS'])
         ->and(MachineType::pluck('name')->sort()->values()->all())
-        ->toBe(['22kVA', '50kVA', '7.7kVA']);
+        ->toBe(['BSS 12S 1P', 'BSS 6S 1P', 'EVCS 20KW', 'EVCS 30KW', 'EVCS 60KW']);
 });
 
 test('super admin seeder creates the super admin user', function () {

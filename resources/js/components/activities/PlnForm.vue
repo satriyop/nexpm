@@ -23,15 +23,25 @@ const plnForm = useForm({
     file_slo: null as File | null,
     file_nidi: null as File | null,
     file_reg: null as File | null,
+    file_pk: null as File | null,
     kwh_meter_installation_date: props.assignment.pln_data?.kwh_meter_installation_date ?? '',
     id_pelanggan: props.assignment.pln_data?.id_pelanggan ?? '',
     catatan_progres: props.assignment.pln_data?.catatan_progres ?? '',
 });
 
+const plnStatusOptions = [
+    'NOT YET REGISTER',
+    'WAITING BILLING',
+    'WAITING PAYMENT',
+    'REBILLING',
+    'WAITING KWH',
+    'DONE KWH',
+];
+
 function submitPln() {
     plnForm.post(SubActions.updatePlnData(props.assignment).url, {
         forceFormData: true,
-        onSuccess: () => plnForm.reset('file_slo', 'file_nidi', 'file_reg'),
+        onSuccess: () => plnForm.reset('file_slo', 'file_nidi', 'file_reg', 'file_pk'),
     });
 }
 
@@ -45,6 +55,7 @@ const docFields = [
     { key: 'file_slo', label: 'File SLO' },
     { key: 'file_nidi', label: 'File NIDI' },
     { key: 'file_reg', label: 'File Reg' },
+    { key: 'file_pk', label: 'File PK' },
 ];
 </script>
 
@@ -61,9 +72,9 @@ const docFields = [
                         <Select v-model="plnForm.pln_status" :disabled="isReadOnly">
                             <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="DONE KWH">Done KWH</SelectItem>
-                                <SelectItem value="NOT YET REGISTERED">Not Yet Registered</SelectItem>
-                                <SelectItem value="IN PROGRESS">In Progress</SelectItem>
+                                <SelectItem v-for="opt in plnStatusOptions" :key="opt" :value="opt">
+                                    {{ opt }}
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                         <InputError :message="plnForm.errors.pln_status" />

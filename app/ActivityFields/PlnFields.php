@@ -62,6 +62,12 @@ class PlnFields
                 'section' => 'documents', 'reportable' => false, 'report_order' => 120,
                 'reports' => [],
             ],
+            [
+                'key' => 'file_pk', 'label' => 'File PK',
+                'type' => 'file', 'required' => false, 'max' => 20480,
+                'section' => 'documents', 'reportable' => false, 'report_order' => 130,
+                'reports' => [],
+            ],
         ];
     }
 
