@@ -54,9 +54,11 @@ class SiteImportController extends Controller
             '2',
         ];
 
+        // Use semicolon separator so Indonesian-locale Excel auto-splits into columns.
+        $sep = ';';
         $handle = fopen('php://memory', 'w');
-        fputcsv($handle, $headers);
-        fputcsv($handle, $example);
+        fputcsv($handle, $headers, $sep);
+        fputcsv($handle, $example, $sep);
         rewind($handle);
         $csv = stream_get_contents($handle);
         fclose($handle);
