@@ -46,7 +46,7 @@ class SiteCsvImportService
             if (($row['site_type'] ?? '') !== '') {
                 $siteTypeId = $siteTypes[$row['site_type']] ?? null;
                 if ($siteTypeId === null) {
-                    $errors[] = "Row {$rowNumber}: unknown site_type '{$row['site_type']}'.";
+                    $errors[] = "Row {$rowNumber}: unknown site_type '{$row['site_type']}'. Available: ".$siteTypes->keys()->join(', ').'.';
 
                     continue;
                 }
@@ -56,7 +56,7 @@ class SiteCsvImportService
             if (($row['machine_type'] ?? '') !== '') {
                 $machineTypeId = $machineTypes[$row['machine_type']] ?? null;
                 if ($machineTypeId === null) {
-                    $errors[] = "Row {$rowNumber}: unknown machine_type '{$row['machine_type']}'.";
+                    $errors[] = "Row {$rowNumber}: unknown machine_type '{$row['machine_type']}'. Available: ".$machineTypes->keys()->join(', ').'.';
 
                     continue;
                 }

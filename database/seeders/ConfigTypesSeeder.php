@@ -22,7 +22,7 @@ class ConfigTypesSeeder extends Seeder
             SiteType::firstOrCreate(['name' => $name]);
         }
 
-        foreach (['7.7kVA', '22kVA', '50kVA'] as $name) {
+        foreach (['BSS 12S 1P', 'BSS 6S 1P', 'EVCS 20KW', 'EVCS 30KW', 'EVCS 60KW'] as $name) {
             MachineType::firstOrCreate(['name' => $name]);
         }
     }
