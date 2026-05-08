@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { AlertTriangle, Eye, PencilLine, Search, X } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import * as SubAssignmentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
@@ -138,6 +138,21 @@ function isStarted(assignment: Assignment): boolean {
         assignment.construction_data ??
         assignment.bast_data
     );
+}
+
+const TERMINAL_STATUSES = ['VERIFIED', 'REPORTED', 'DROP'];
+const sla = usePage().props.sla;
+
+function daysStalled(assignment: Assignment): number | null {
+    if (TERMINAL_STATUSES.includes(assignment.status)) { return null; }
+    const ts =
+        assignment.survey_data?.updated_at ??
+        assignment.pln_data?.updated_at ??
+        assignment.construction_data?.updated_at ??
+        assignment.bast_data?.updated_at ??
+        null;
+    if (!ts) { return null; }
+    return Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
 }
 </script>
 
@@ -279,6 +294,18 @@ function isStarted(assignment: Assignment): boolean {
                                         class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
                                     >
                                         Not started
+                                    </span>
+                                    <span
+                                        v-if="daysStalled(assignment) !== null && daysStalled(assignment)! >= sla.stalled_days"
+                                        class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-800 dark:bg-red-900/40 dark:text-red-200"
+                                    >
+                                        Stalled · {{ daysStalled(assignment) }}d
+                                    </span>
+                                    <span
+                                        v-else-if="daysStalled(assignment) !== null && daysStalled(assignment)! >= sla.slow_days"
+                                        class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                    >
+                                        Slow · {{ daysStalled(assignment) }}d
                                     </span>
                                 </div>
                             </td>

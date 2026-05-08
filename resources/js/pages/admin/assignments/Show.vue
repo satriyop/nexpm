@@ -6,6 +6,7 @@ import {
     BadgeCheck,
     CalendarClock,
     CheckCircle2,
+    ClipboardList,
     Download,
     ExternalLink,
     FileText,
@@ -15,7 +16,7 @@ import {
     RefreshCw,
     RotateCw,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onUnmounted, ref } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import InputError from '@/components/InputError.vue';
@@ -52,9 +53,18 @@ import type { Assignment } from '@/types';
 
 interface SubcontractorOption { id: number; name: string; code: string }
 
+interface AuditLog {
+    id: number;
+    event: string;
+    payload: Record<string, unknown> | null;
+    user: { id: number; name: string } | null;
+    created_at: string | null;
+}
+
 const props = defineProps<{
     assignment: Assignment;
     subcontractors: SubcontractorOption[];
+    auditLogs: AuditLog[] | null;
 }>();
 
 defineOptions({
@@ -357,6 +367,32 @@ function storageUrl(path: string | null | undefined): string {
 
     return `/storage/${path}`;
 }
+
+// --- Dirty form guard (admin edit forms + prereq) ---
+const anyEditDirty = computed(() =>
+    prereqForm.isDirty ||
+    adminSurveyForm.isDirty ||
+    adminPlnForm.isDirty ||
+    adminConstructionForm.isDirty ||
+    adminBastForm.isDirty,
+);
+
+function handleBeforeUnload(e: BeforeUnloadEvent): void {
+    if (anyEditDirty.value) { e.preventDefault(); e.returnValue = ''; }
+}
+
+const removeNavGuard = router.on('before', (e) => {
+    if (anyEditDirty.value && !window.confirm('You have unsaved changes. Leave anyway?')) {
+        e.preventDefault();
+    }
+});
+
+window.addEventListener('beforeunload', handleBeforeUnload);
+
+onUnmounted(() => {
+    removeNavGuard();
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+});
 </script>
 
 <template>
@@ -1590,6 +1626,45 @@ function storageUrl(path: string | null | undefined): string {
                     </CardContent>
                 </Card>
             </div>
+        </div>
+
+        <!-- Audit Log -->
+        <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
+            <div class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <ClipboardList class="size-4 text-muted-foreground" />
+                <h2 class="text-sm font-semibold">Audit Log</h2>
+                <span v-if="auditLogs" class="ml-auto text-xs text-muted-foreground">{{ auditLogs.length }} event(s)</span>
+            </div>
+
+            <template v-if="auditLogs !== null">
+                <div v-if="auditLogs.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No audit events recorded.
+                </div>
+                <ul v-else class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
+                    <li v-for="log in auditLogs" :key="log.id" class="flex items-start gap-3 px-4 py-3 text-sm">
+                        <span class="mt-0.5 size-2 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-muted/30" />
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="font-medium capitalize">{{ log.event.replace(/_/g, ' ') }}</span>
+                                <span v-if="log.user" class="text-muted-foreground">by {{ log.user.name }}</span>
+                            </div>
+                            <div v-if="log.payload && Object.keys(log.payload).length" class="mt-1 rounded-md bg-muted/50 px-2 py-1 font-mono text-xs text-muted-foreground">
+                                <span v-for="(val, key) in log.payload" :key="String(key)">
+                                    {{ key }}: {{ String(val) }}
+                                </span>
+                            </div>
+                        </div>
+                        <span class="shrink-0 text-xs text-muted-foreground">
+                            {{ log.created_at ? new Date(log.created_at).toLocaleString() : '—' }}
+                        </span>
+                    </li>
+                </ul>
+            </template>
+            <template v-else>
+                <div class="flex flex-col gap-2 p-4">
+                    <div v-for="n in 3" :key="n" class="h-10 animate-pulse rounded bg-muted" />
+                </div>
+            </template>
         </div>
 
         <!-- Verify Dialog -->

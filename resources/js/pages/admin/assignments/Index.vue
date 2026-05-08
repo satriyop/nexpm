@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { Archive, ArrowRight, Download, LockKeyhole, Search, X } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
@@ -241,6 +241,16 @@ const activityColumns: { type: ActivityType; label: string }[] = [
     { type: 'PLN_CONNECTION', label: 'PLN' },
     { type: 'BAST', label: 'BAST' },
 ];
+
+// --- Stall indicator ---
+const TERMINAL_STATUSES = ['VERIFIED', 'REPORTED', 'DROP'];
+const sla = usePage().props.sla;
+
+function daysStalled(assignment: Assignment): number | null {
+    if (TERMINAL_STATUSES.includes(assignment.status)) { return null; }
+    if (!assignment.updated_at) { return null; }
+    return Math.floor((Date.now() - new Date(assignment.updated_at).getTime()) / 86_400_000);
+}
 
 // --- Bulk selection ---
 const selectedSiteIds = ref<Set<number>>(new Set());
@@ -502,6 +512,7 @@ function exportSelected(): void {
                             class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
                             :class="{ 'bg-primary/5': selectedSiteIds.has(site.id) }"
                             @click="router.visit('/admin/assignments/sites/' + site.id)"
+                            @mouseenter="router.prefetch(AdminAssignmentActions.siteAssignments(site).url)"
                         >
                             <td class="w-10 px-4 py-3" @click.stop>
                                 <Checkbox
@@ -528,20 +539,34 @@ function exportSelected(): void {
                                 <td class="px-4 py-3">
                                     <div v-if="site && site.assignments">
                                         <div v-for="assignment in [getAssignment(site.assignments, col.type)]" :key="site.id + '-' + col.type">
-                                            <div v-if="assignment && assignment.status" class="flex items-center gap-1.5">
+                                            <div v-if="assignment && assignment.status" class="flex flex-col gap-0.5">
+                                                <div class="flex items-center gap-1.5">
+                                                    <span
+                                                        class="size-2 shrink-0 rounded-full"
+                                                        :class="statusDotMap[assignment.status] ?? 'bg-gray-400'"
+                                                    />
+                                                    <span class="text-xs">
+                                                        {{ statusLabelMap[assignment.status] ?? assignment.status }}
+                                                    </span>
+                                                    <span
+                                                        v-if="col.type === 'CONSTRUCTION' && assignment.status === 'PENDING' && assignment.construction_data && !assignment.construction_data.cons_wo_number"
+                                                        class="ml-0.5"
+                                                        title="Sub-contractor locked — WO number not set"
+                                                    >
+                                                        <LockKeyhole class="size-3 text-amber-500" />
+                                                    </span>
+                                                </div>
                                                 <span
-                                                    class="size-2 shrink-0 rounded-full"
-                                                    :class="statusDotMap[assignment.status] ?? 'bg-gray-400'"
-                                                />
-                                                <span class="text-xs">
-                                                    {{ statusLabelMap[assignment.status] ?? assignment.status }}
+                                                    v-if="daysStalled(assignment) !== null && daysStalled(assignment)! >= sla.stalled_days"
+                                                    class="inline-flex w-fit items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800 dark:bg-red-900/40 dark:text-red-200"
+                                                >
+                                                    Stalled · {{ daysStalled(assignment) }}d
                                                 </span>
                                                 <span
-                                                    v-if="col.type === 'CONSTRUCTION' && assignment.status === 'PENDING' && assignment.construction_data && !assignment.construction_data.cons_wo_number"
-                                                    class="ml-0.5"
-                                                    title="Sub-contractor locked — WO number not set"
+                                                    v-else-if="daysStalled(assignment) !== null && daysStalled(assignment)! >= sla.slow_days"
+                                                    class="inline-flex w-fit items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                                                 >
-                                                    <LockKeyhole class="size-3 text-amber-500" />
+                                                    Slow · {{ daysStalled(assignment) }}d
                                                 </span>
                                             </div>
                                             <span v-else class="text-xs text-muted-foreground">—</span>

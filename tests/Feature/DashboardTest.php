@@ -16,7 +16,7 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
-test('dashboard returns required inertia props', function () {
+test('dashboard renders the Dashboard component with correct props', function () {
     $user = User::factory()->create(['role' => Role::Admin]);
     $this->actingAs($user);
 
@@ -25,9 +25,7 @@ test('dashboard returns required inertia props', function () {
     $response->assertInertia(
         fn ($page) => $page
             ->component('Dashboard')
-            ->has('statusCounts')
-            ->has('projectBreakdowns')
-            ->has('recentActivity')
+            ->has('filters')
     );
 });
 

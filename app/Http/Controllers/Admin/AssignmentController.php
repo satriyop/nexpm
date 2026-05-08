@@ -157,6 +157,19 @@ class AssignmentController extends Controller
                 ->whereScopedToMainContractor()
                 ->orderBy('name')
                 ->get(['id', 'name', 'code']),
+            'auditLogs' => Inertia::defer(fn () => AssignmentAuditLog::where('assignment_id', $assignment->id)
+                ->with('user:id,name')
+                ->orderByDesc('created_at')
+                ->limit(100)
+                ->get()
+                ->map(fn ($log) => [
+                    'id' => $log->id,
+                    'event' => $log->event,
+                    'payload' => $log->payload,
+                    'user' => $log->user?->only('id', 'name'),
+                    'created_at' => $log->created_at?->toISOString(),
+                ])
+                ->all()),
         ]);
     }
 

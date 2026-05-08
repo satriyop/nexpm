@@ -153,6 +153,7 @@ export interface Assignment {
     revision_comment: string | null;
     verified_at: string | null;
     reported_at: string | null;
+    updated_at: string | null;
     site: Site;
     subcontractor: Subcontractor;
     verified_by: User | null;

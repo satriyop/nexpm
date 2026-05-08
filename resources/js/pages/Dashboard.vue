@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePoll } from '@inertiajs/vue3';
 import { ArrowRight, HelpCircle, TrendingUp, Activity, CheckCircle2, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import ActivityMatrixChart from '@/components/ActivityMatrixChart.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,15 +61,29 @@ interface RecentActivityItem {
     subcontractor: { name: string } | null;
 }
 
+interface ChartDataset {
+    label: string;
+    backgroundColor: string;
+    data: number[];
+}
+
+interface ActivityChartData {
+    labels: string[];
+    datasets: ChartDataset[];
+}
+
 const props = defineProps<{
-    statusCounts: StatusCounts;
-    activityMatrix: ActivityMatrix;
-    projectBreakdowns: ProjectBreakdown[];
-    recentActivity: RecentActivityItem[];
+    statusCounts: StatusCounts | null;
+    activityMatrix: ActivityMatrix | null;
+    projectBreakdowns: ProjectBreakdown[] | null;
+    recentActivity: RecentActivityItem[] | null;
+    activityChart: ActivityChartData | null;
     mainContractors: MainContractor[] | null;
     projects: Project[] | null;
     filters: { main_contractor_id?: string | null; project_id?: string | null };
 }>();
+
+usePoll(30_000, { only: ['statusCounts', 'activityMatrix', 'projectBreakdowns', 'recentActivity', 'activityChart'] });
 
 defineOptions({
     layout: {
@@ -171,12 +186,14 @@ function projectCompletion(counts: StatusCounts): number {
 }
 
 function matrixRowTotal(activityKey: string): number {
+    if (!props.activityMatrix) { return 0; }
     const row = props.activityMatrix[activityKey] ?? {};
     return Object.values(row).reduce((sum, v) => sum + v, 0);
 }
 
 function matrixColTotal(statusKey: string): number {
-    return visibleActivityRows.value.reduce((sum, row) => sum + getCount(props.activityMatrix[row.key] ?? {}, statusKey), 0);
+    if (!props.activityMatrix) { return 0; }
+    return visibleActivityRows.value.reduce((sum, row) => sum + getCount(props.activityMatrix![row.key] ?? {}, statusKey), 0);
 }
 
 function matrixGrandTotal(): number {
@@ -203,15 +220,15 @@ function cellHighlight(statusKey: string, count: number): string {
 
 // ── KPI strip ────────────────────────────────────────────────────────────────
 const kpiTotal = computed(() =>
-    Object.values(props.statusCounts as Record<string, number>).reduce((s, v) => s + v, 0),
+    props.statusCounts ? Object.values(props.statusCounts as Record<string, number>).reduce((s, v) => s + v, 0) : 0,
 );
 const kpiCompleted = computed(() =>
-    (props.statusCounts.VERIFIED ?? 0) + (props.statusCounts.REPORTED ?? 0),
+    props.statusCounts ? (props.statusCounts.VERIFIED ?? 0) + (props.statusCounts.REPORTED ?? 0) : 0,
 );
 const kpiInProgress = computed(() =>
-    INTERMEDIATE_STATUSES.reduce((s, k) => s + (props.statusCounts[k] ?? 0), 0),
+    props.statusCounts ? INTERMEDIATE_STATUSES.reduce((s, k) => s + (props.statusCounts![k] ?? 0), 0) : 0,
 );
-const kpiDropped = computed(() => props.statusCounts.DROP ?? 0);
+const kpiDropped = computed(() => props.statusCounts?.DROP ?? 0);
 const kpiCompletionPct = computed(() =>
     kpiTotal.value ? Math.round((kpiCompleted.value / kpiTotal.value) * 100) : 0,
 );
@@ -295,58 +312,71 @@ function timeAgo(isoString: string): string {
 
         <!-- KPI Strip -->
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
-                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Activity class="size-3.5" />
-                    Total Assignments
+            <template v-if="statusCounts !== null">
+                <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                    <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Activity class="size-3.5" />
+                        Total Assignments
+                    </div>
+                    <p class="text-3xl font-bold tracking-tight">{{ kpiTotal }}</p>
                 </div>
-                <p class="text-3xl font-bold tracking-tight">{{ kpiTotal }}</p>
-            </div>
-            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
-                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <TrendingUp class="size-3.5" />
-                    In Progress
+                <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                    <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <TrendingUp class="size-3.5" />
+                        In Progress
+                    </div>
+                    <p class="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">{{ kpiInProgress }}</p>
                 </div>
-                <p class="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">{{ kpiInProgress }}</p>
-            </div>
-            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
-                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <CheckCircle2 class="size-3.5" />
-                    Completed
+                <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                    <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <CheckCircle2 class="size-3.5" />
+                        Completed
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <p class="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">{{ kpiCompleted }}</p>
+                        <p class="mb-0.5 text-sm font-medium text-muted-foreground">{{ kpiCompletionPct }}%</p>
+                    </div>
                 </div>
-                <div class="flex items-end gap-2">
-                    <p class="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">{{ kpiCompleted }}</p>
-                    <p class="mb-0.5 text-sm font-medium text-muted-foreground">{{ kpiCompletionPct }}%</p>
+                <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                    <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <XCircle class="size-3.5" />
+                        Dropped
+                    </div>
+                    <p class="text-3xl font-bold tracking-tight" :class="kpiDropped > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'">{{ kpiDropped }}</p>
                 </div>
-            </div>
-            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
-                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <XCircle class="size-3.5" />
-                    Dropped
+            </template>
+            <template v-else>
+                <div v-for="n in 4" :key="n" class="flex flex-col gap-3 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                    <div class="h-3 w-24 animate-pulse rounded bg-muted" />
+                    <div class="h-9 w-16 animate-pulse rounded bg-muted" />
                 </div>
-                <p class="text-3xl font-bold tracking-tight" :class="kpiDropped > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'">{{ kpiDropped }}</p>
-            </div>
+            </template>
         </div>
 
         <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
-            <template v-for="stat in statuses" :key="stat.key">
-                <Link
-                    v-if="getCount(props.statusCounts, stat.key) > 0"
-                    :href="assignmentFilterUrl({ status: stat.key })"
-                    class="rounded-xl border border-sidebar-border/70 bg-card border-l-4 p-4 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
-                    :class="stat.borderClass"
-                >
-                    <div class="flex flex-col gap-1">
-                        <div class="flex items-center gap-1.5">
-                            <span class="size-2 shrink-0 rounded-full" :class="stat.dotClass" />
-                            <span class="text-xs font-medium text-muted-foreground">{{ stat.label }}</span>
+            <template v-if="statusCounts !== null">
+                <template v-for="stat in statuses" :key="stat.key">
+                    <Link
+                        v-if="getCount(props.statusCounts!, stat.key) > 0"
+                        :href="assignmentFilterUrl({ status: stat.key })"
+                        class="rounded-xl border border-sidebar-border/70 bg-card border-l-4 p-4 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                        :class="stat.borderClass"
+                    >
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-1.5">
+                                <span class="size-2 shrink-0 rounded-full" :class="stat.dotClass" />
+                                <span class="text-xs font-medium text-muted-foreground">{{ stat.label }}</span>
+                            </div>
+                            <p class="text-3xl font-bold tracking-tight" :class="stat.textClass">
+                                {{ getCount(props.statusCounts!, stat.key) }}
+                            </p>
                         </div>
-                        <p class="text-3xl font-bold tracking-tight" :class="stat.textClass">
-                            {{ getCount(props.statusCounts, stat.key) }}
-                        </p>
-                    </div>
-                </Link>
+                    </Link>
+                </template>
+            </template>
+            <template v-else>
+                <div v-for="n in 8" :key="n" class="h-20 animate-pulse rounded-xl bg-muted" />
             </template>
         </div>
 
@@ -368,62 +398,67 @@ function timeAgo(isoString: string): string {
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-muted/40 text-xs uppercase tracking-wide">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Activity</th>
-                            <th v-for="stat in visibleStatuses" :key="stat.key" class="px-4 py-3 text-center font-medium text-muted-foreground">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="size-1.5 rounded-full" :class="stat.dotClass" />
-                                    {{ stat.label }}
-                                </span>
-                            </th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="row in visibleActivityRows"
-                            :key="row.key"
-                            class="border-t border-sidebar-border/70 dark:border-sidebar-border"
-                        >
-                            <td class="px-4 py-3 font-medium">
-                                <ActivityTypeBadge :activity-type="row.key" />
-                            </td>
-                            <td
-                                v-for="stat in visibleStatuses"
-                                :key="stat.key"
-                                class="px-4 py-3 text-center"
+                <template v-if="activityMatrix !== null">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/40 text-xs uppercase tracking-wide">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Activity</th>
+                                <th v-for="stat in visibleStatuses" :key="stat.key" class="px-4 py-3 text-center font-medium text-muted-foreground">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="size-1.5 rounded-full" :class="stat.dotClass" />
+                                        {{ stat.label }}
+                                    </span>
+                                </th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="row in visibleActivityRows"
+                                :key="row.key"
+                                class="border-t border-sidebar-border/70 dark:border-sidebar-border"
                             >
-                                <Link
-                                    :href="assignmentFilterUrl({ activity_type: row.key, status: stat.key })"
-                                    class="inline-block min-w-8 rounded px-2 py-0.5 text-sm transition-colors hover:ring-1 hover:ring-sidebar-border"
-                                    :class="cellHighlight(stat.key, getCount(activityMatrix[row.key] ?? {}, stat.key))"
+                                <td class="px-4 py-3 font-medium">
+                                    <ActivityTypeBadge :activity-type="row.key" />
+                                </td>
+                                <td
+                                    v-for="stat in visibleStatuses"
+                                    :key="stat.key"
+                                    class="px-4 py-3 text-center"
                                 >
-                                    {{ getCount(activityMatrix[row.key] ?? {}, stat.key) }}
-                                </Link>
-                            </td>
-                            <td class="px-4 py-3 text-center font-semibold text-muted-foreground">
-                                {{ matrixRowTotal(row.key) }}
-                            </td>
-                        </tr>
+                                    <Link
+                                        :href="assignmentFilterUrl({ activity_type: row.key, status: stat.key })"
+                                        class="inline-block min-w-8 rounded px-2 py-0.5 text-sm transition-colors hover:ring-1 hover:ring-sidebar-border"
+                                        :class="cellHighlight(stat.key, getCount(activityMatrix![row.key] ?? {}, stat.key))"
+                                    >
+                                        {{ getCount(activityMatrix![row.key] ?? {}, stat.key) }}
+                                    </Link>
+                                </td>
+                                <td class="px-4 py-3 text-center font-semibold text-muted-foreground">
+                                    {{ matrixRowTotal(row.key) }}
+                                </td>
+                            </tr>
 
-                        <!-- Column totals -->
-                        <tr class="border-t-2 border-sidebar-border/70 bg-muted/20 dark:border-sidebar-border">
-                            <td class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</td>
-                            <td v-for="stat in visibleStatuses" :key="stat.key" class="px-4 py-3 text-center font-semibold">
-                                <Link
-                                    :href="assignmentFilterUrl({ status: stat.key })"
-                                    class="inline-block min-w-8 rounded px-2 py-0.5 transition-colors hover:bg-muted"
-                                    :class="stat.textClass"
-                                >
-                                    {{ matrixColTotal(stat.key) }}
-                                </Link>
-                            </td>
-                            <td class="px-4 py-3 text-center font-bold">{{ matrixGrandTotal() }}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                            <!-- Column totals -->
+                            <tr class="border-t-2 border-sidebar-border/70 bg-muted/20 dark:border-sidebar-border">
+                                <td class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</td>
+                                <td v-for="stat in visibleStatuses" :key="stat.key" class="px-4 py-3 text-center font-semibold">
+                                    <Link
+                                        :href="assignmentFilterUrl({ status: stat.key })"
+                                        class="inline-block min-w-8 rounded px-2 py-0.5 transition-colors hover:bg-muted"
+                                        :class="stat.textClass"
+                                    >
+                                        {{ matrixColTotal(stat.key) }}
+                                    </Link>
+                                </td>
+                                <td class="px-4 py-3 text-center font-bold">{{ matrixGrandTotal() }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
+                <div v-else class="flex flex-col gap-2 p-4">
+                    <div v-for="n in 4" :key="n" class="h-10 animate-pulse rounded bg-muted" />
+                </div>
             </div>
         </div>
 
@@ -435,88 +470,112 @@ function timeAgo(isoString: string): string {
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-muted/40 text-xs uppercase tracking-wide">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Project</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Pending</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">In Progress</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Verified</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Reported</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Total</th>
-                            <th class="px-4 py-3 text-center font-medium text-muted-foreground">Completion</th>
-                            <th class="px-4 py-3 text-right font-medium text-muted-foreground">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="project in props.projectBreakdowns"
-                            :key="project.id"
-                            class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
-                        >
-                            <td class="px-4 py-3 font-medium">{{ project.name }}</td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="size-1.5 rounded-full bg-gray-400" />
-                                    {{ getCount(project.counts, 'PENDING') }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="size-1.5 rounded-full bg-blue-500" />
-                                    {{ projectInProgress(project.counts) }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="size-1.5 rounded-full bg-emerald-500" />
-                                    {{ getCount(project.counts, 'VERIFIED') }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="size-1.5 rounded-full bg-purple-500" />
-                                    {{ getCount(project.counts, 'REPORTED') }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-center font-semibold">
-                                {{ projectTotal(project.counts) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-2">
-                                    <div class="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-                                        <div
-                                            class="h-full rounded-full bg-emerald-500 transition-all"
-                                            :style="{ width: projectCompletion(project.counts) + '%' }"
-                                        />
-                                    </div>
-                                    <span class="text-xs tabular-nums text-muted-foreground">
-                                        {{ projectCompletion(project.counts) }}%
+                <template v-if="projectBreakdowns !== null">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/40 text-xs uppercase tracking-wide">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Project</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Pending</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">In Progress</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Verified</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Reported</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Total</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Completion</th>
+                                <th class="px-4 py-3 text-right font-medium text-muted-foreground">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="project in props.projectBreakdowns"
+                                :key="project.id"
+                                class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            >
+                                <td class="px-4 py-3 font-medium">{{ project.name }}</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="size-1.5 rounded-full bg-gray-400" />
+                                        {{ getCount(project.counts, 'PENDING') }}
                                     </span>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <Link
-                                    :href="assignmentFilterUrl({ project_id: project.id.toString() })"
-                                    class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted dark:border-sidebar-border"
-                                >
-                                    View
-                                    <ArrowRight class="size-3" />
-                                </Link>
-                            </td>
-                        </tr>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="size-1.5 rounded-full bg-blue-500" />
+                                        {{ projectInProgress(project.counts) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="size-1.5 rounded-full bg-emerald-500" />
+                                        {{ getCount(project.counts, 'VERIFIED') }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="size-1.5 rounded-full bg-purple-500" />
+                                        {{ getCount(project.counts, 'REPORTED') }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center font-semibold">
+                                    {{ projectTotal(project.counts) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        <div class="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
+                                            <div
+                                                class="h-full rounded-full bg-emerald-500 transition-all"
+                                                :style="{ width: projectCompletion(project.counts) + '%' }"
+                                            />
+                                        </div>
+                                        <span class="text-xs tabular-nums text-muted-foreground">
+                                            {{ projectCompletion(project.counts) }}%
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <Link
+                                        :href="assignmentFilterUrl({ project_id: project.id.toString() })"
+                                        class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted dark:border-sidebar-border"
+                                    >
+                                        View
+                                        <ArrowRight class="size-3" />
+                                    </Link>
+                                </td>
+                            </tr>
 
-                        <tr v-if="props.projectBreakdowns.length === 0">
-                            <td colspan="8" class="px-4 py-12 text-center text-sm text-muted-foreground">
-                                No project data available.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            <tr v-if="props.projectBreakdowns.length === 0">
+                                <td colspan="8" class="px-4 py-12 text-center text-sm text-muted-foreground">
+                                    No project data available.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
+                <div v-else class="flex flex-col gap-2 p-4">
+                    <div v-for="n in 3" :key="n" class="h-12 animate-pulse rounded bg-muted" />
+                </div>
             </div>
         </div>
 
-        <!-- Section 4: Recent Activity -->
+        <!-- Section 4: Activity Chart -->
+        <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
+            <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <h2 class="text-sm font-semibold">Activity Progress by Project</h2>
+                <p class="text-xs text-muted-foreground">Stacked bar chart of active assignments per activity type</p>
+            </div>
+            <div class="p-4">
+                <template v-if="activityChart !== null && activityChart.labels.length > 0">
+                    <div class="h-64">
+                        <ActivityMatrixChart :labels="activityChart.labels" :datasets="activityChart.datasets" />
+                    </div>
+                </template>
+                <div v-else-if="activityChart !== null" class="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                    No data to display.
+                </div>
+                <div v-else class="h-64 animate-pulse rounded bg-muted" />
+            </div>
+        </div>
+
+        <!-- Section 5: Recent Activity -->
         <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
             <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
                 <h2 class="text-sm font-semibold">Recent Activity</h2>
@@ -524,35 +583,46 @@ function timeAgo(isoString: string): string {
             </div>
 
             <div class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                <Link
-                    v-for="item in props.recentActivity"
-                    :key="item.id"
-                    :href="'/admin/assignments/' + item.id"
-                    class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30"
-                >
-                    <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="font-mono text-xs font-semibold">
-                                {{ item.site?.site_code ?? '—' }}
-                            </span>
-                            <ActivityTypeBadge :activity-type="item.activity_type" />
-                            <StatusBadge :status="item.status" />
+                <template v-if="recentActivity !== null">
+                    <Link
+                        v-for="item in props.recentActivity"
+                        :key="item.id"
+                        :href="'/admin/assignments/' + item.id"
+                        class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30"
+                    >
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-mono text-xs font-semibold">
+                                    {{ item.site?.site_code ?? '—' }}
+                                </span>
+                                <ActivityTypeBadge :activity-type="item.activity_type" />
+                                <StatusBadge :status="item.status" />
+                            </div>
+                            <div class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <span>{{ item.site?.location_name ?? '—' }}</span>
+                                <span v-if="item.subcontractor" class="text-muted-foreground/60">·</span>
+                                <span v-if="item.subcontractor">{{ item.subcontractor.name }}</span>
+                            </div>
                         </div>
-                        <div class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <span>{{ item.site?.location_name ?? '—' }}</span>
-                            <span v-if="item.subcontractor" class="text-muted-foreground/60">·</span>
-                            <span v-if="item.subcontractor">{{ item.subcontractor.name }}</span>
+                        <div class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                            <span>{{ timeAgo(item.updated_at) }}</span>
+                            <ArrowRight class="size-3.5" />
                         </div>
-                    </div>
-                    <div class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                        <span>{{ timeAgo(item.updated_at) }}</span>
-                        <ArrowRight class="size-3.5" />
-                    </div>
-                </Link>
+                    </Link>
 
-                <div v-if="props.recentActivity.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
-                    No recent activity.
-                </div>
+                    <div v-if="props.recentActivity.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
+                        No recent activity.
+                    </div>
+                </template>
+                <template v-else>
+                    <div v-for="n in 5" :key="n" class="flex items-center gap-3 px-4 py-3">
+                        <div class="flex-1 space-y-2">
+                            <div class="h-3 w-40 animate-pulse rounded bg-muted" />
+                            <div class="h-3 w-56 animate-pulse rounded bg-muted" />
+                        </div>
+                        <div class="h-3 w-12 animate-pulse rounded bg-muted" />
+                    </div>
+                </template>
             </div>
         </div>
     </div>

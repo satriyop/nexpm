@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { AlertTriangle, ArrowLeft, LockKeyhole } from 'lucide-vue-next';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import * as ProjectActions from '@/actions/App/Http/Controllers/Admin/ProjectController';
 import * as SiteActions from '@/actions/App/Http/Controllers/Admin/SiteController';
@@ -126,6 +126,24 @@ function submit(): void {
         machine_type_id: data.machine_type_id === NONE ? null : data.machine_type_id,
     })).patch(SiteActions.update(props.site).url);
 }
+
+// --- Dirty form guard ---
+function handleBeforeUnload(e: BeforeUnloadEvent): void {
+    if (form.isDirty) { e.preventDefault(); e.returnValue = ''; }
+}
+
+const removeNavGuard = router.on('before', (e) => {
+    if (form.isDirty && !window.confirm('You have unsaved changes. Leave anyway?')) {
+        e.preventDefault();
+    }
+});
+
+window.addEventListener('beforeunload', handleBeforeUnload);
+
+onUnmounted(() => {
+    removeNavGuard();
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+});
 
 // --- Assignment helpers ---
 function getAssignment(activityType: ActivityType): Assignment | null {
