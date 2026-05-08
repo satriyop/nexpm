@@ -251,20 +251,16 @@ class ReportController extends Controller
 
         $photos = collect($photoFields)->map(function (string $field) use ($survey) {
             $path = $survey?->{$field};
-            if (! $path) {
-                return null;
-            }
-            $abs = storage_path('app/public/'.$path);
 
-            return file_exists($abs) ? $abs : null;
+            return $path ? self::imageToDataUri(storage_path('app/public/'.$path)) : null;
         })->all();
 
         $mockupPath = null;
         if ($survey?->file_mockup_3d) {
             $abs = storage_path('app/public/'.$survey->file_mockup_3d);
             $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
-            if (file_exists($abs) && in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
-                $mockupPath = $abs;
+            if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                $mockupPath = self::imageToDataUri($abs);
             }
         }
 
@@ -275,15 +271,15 @@ class ReportController extends Controller
         // Left side of PDF header = Client (commissioning organisation, e.g. vGreen)
         $clientName = $site->project?->client?->name ?? 'CLIENT';
         $clientLogoPath = $site->project?->client?->logo;
-        $clientLogoAbs = $clientLogoPath && file_exists(storage_path('app/public/'.$clientLogoPath))
-            ? storage_path('app/public/'.$clientLogoPath)
+        $clientLogoAbs = $clientLogoPath
+            ? self::imageToDataUri(storage_path('app/public/'.$clientLogoPath))
             : null;
 
         // Right side of PDF header = Main Contractor / EPC
         $contractorName = $site->project?->mainContractor?->name ?? '';
         $contractorLogoPath = $site->project?->mainContractor?->logo;
-        $contractorLogoAbs = $contractorLogoPath && file_exists(storage_path('app/public/'.$contractorLogoPath))
-            ? storage_path('app/public/'.$contractorLogoPath)
+        $contractorLogoAbs = $contractorLogoPath
+            ? self::imageToDataUri(storage_path('app/public/'.$contractorLogoPath))
             : null;
 
         $pdfFooterNote = AppSetting::get('pdf.footer_note', '');
@@ -469,5 +465,15 @@ class ReportController extends Controller
         foreach (range(1, count($headers)) as $col) {
             $sheet->getColumnDimensionByColumn($col)->setAutoSize(true);
         }
+    }
+
+    private static function imageToDataUri(string $absPath): ?string
+    {
+        if (! file_exists($absPath)) {
+            return null;
+        }
+        $mime = mime_content_type($absPath) ?: 'image/jpeg';
+
+        return 'data:'.$mime.';base64,'.base64_encode(file_get_contents($absPath));
     }
 }
