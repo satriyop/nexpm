@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, Activity, HelpCircle, TrendingDown, TrendingU
 import { computed, ref } from 'vue';
 import ActivityMatrixChart from '@/components/ActivityMatrixChart.vue';
 import VelocitySparkline from '@/components/VelocitySparkline.vue';
+import WorkloadChart from '@/components/WorkloadChart.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -112,6 +113,35 @@ interface VelocityTrendData {
     four_week_avg: number;
 }
 
+interface AgingHeatmap {
+    statuses: string[];
+    buckets: string[];
+    bucket_keys: string[];
+    cells: Record<string, Record<string, number>>;
+    total_stalled: number;
+}
+
+interface WorkloadItem {
+    id: number;
+    name: string;
+    pending: number;
+    in_progress: number;
+    revision: number;
+    completed: number;
+    total: number;
+}
+
+interface ForecastItem {
+    id: number;
+    name: string;
+    remaining: number;
+    weekly_rate: number;
+    weeks_to_finish: number | null;
+    projected_finish: string | null;
+    end_date: string | null;
+    on_track: boolean | null;
+}
+
 const props = defineProps<{
     deadlineRisk: DeadlineRisk[] | null;
     statusCounts: StatusCounts | null;
@@ -121,12 +151,15 @@ const props = defineProps<{
     activityChart: ActivityChartData | null;
     subcontractorLeaderboard: SubcontractorStat[] | null;
     velocityTrend: VelocityTrendData | null;
+    agingHeatmap: AgingHeatmap | null;
+    workloadDistribution: WorkloadItem[] | null;
+    completionForecast: ForecastItem[] | null;
     mainContractors: MainContractor[] | null;
     projects: Project[] | null;
     filters: { main_contractor_id?: string | null; project_id?: string | null };
 }>();
 
-usePoll(30_000, { only: ['statusCounts', 'activityMatrix', 'projectBreakdowns', 'recentActivity', 'activityChart', 'deadlineRisk', 'subcontractorLeaderboard', 'velocityTrend'] });
+usePoll(30_000, { only: ['statusCounts', 'activityMatrix', 'projectBreakdowns', 'recentActivity', 'activityChart', 'deadlineRisk', 'subcontractorLeaderboard', 'velocityTrend', 'agingHeatmap', 'workloadDistribution', 'completionForecast'] });
 
 defineOptions({
     layout: {
@@ -296,6 +329,35 @@ const statusDescriptions: { key: keyof typeof StatusCounts; label: string; descr
     { key: 'REPORTED',       label: 'Reported',       description: 'Included in a generated report.' },
     { key: 'DROP',           label: 'Dropped',        description: 'Assignment archived / removed from active tracking.' },
 ] as any;
+
+// ── Aging heatmap helpers ─────────────────────────────────────────────────────
+const bucketBgClass: Record<string, string> = {
+    '0_7':   'bg-transparent',
+    '7_14':  'bg-amber-50 dark:bg-amber-900/10',
+    '14_30': 'bg-amber-100 dark:bg-amber-900/20',
+    '30_60': 'bg-orange-200 dark:bg-orange-900/30',
+    '60p':   'bg-red-200 dark:bg-red-900/40',
+};
+
+const bucketTextClass: Record<string, string> = {
+    '0_7':   'text-foreground',
+    '7_14':  'text-amber-700 dark:text-amber-400',
+    '14_30': 'text-amber-800 dark:text-amber-300',
+    '30_60': 'text-orange-800 dark:text-orange-300',
+    '60p':   'text-red-800 dark:text-red-300',
+};
+
+function agingCellCount(status: string, bucketKey: string): number {
+    return props.agingHeatmap?.cells?.[status]?.[bucketKey] ?? 0;
+}
+
+const statusLabelMapFull: Record<string, string> = {
+    PENDING: 'Pending', SURVEY: 'Survey', DOCUMENT: 'Document',
+    CONSTRUCTION: 'Construction', MACHINE_ONSITE: 'Machine Onsite',
+    DONE: 'Done', LIVE: 'Live', REGISTRATION: 'Registration',
+    BILLING: 'Billing', CONNECTION: 'Connection', KWH_DONE: 'KWH Done',
+    COMPLETED: 'Completed', REVISION: 'Revision',
+};
 
 function timeAgo(isoString: string): string {
     const diff = Date.now() - new Date(isoString).getTime();
@@ -527,6 +589,78 @@ function timeAgo(isoString: string): string {
             </div>
         </div>
 
+        <!-- Section: Completion Forecast -->
+        <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
+            <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <h2 class="text-sm font-semibold">Completion Forecast</h2>
+                <p class="text-xs text-muted-foreground">Projected finish date per project based on 4-week rolling pace — update weekly to stay accurate</p>
+            </div>
+            <div class="overflow-x-auto">
+                <template v-if="completionForecast !== null">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/40 text-xs uppercase tracking-wide">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Project</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Remaining</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Pace / week</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Projected Finish</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Deadline</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="item in completionForecast"
+                                :key="item.id"
+                                class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                                @click="router.visit(assignmentFilterUrl({ project_id: item.id.toString() }))"
+                            >
+                                <td class="px-4 py-3 font-medium">{{ item.name }}</td>
+                                <td class="px-4 py-3 text-center tabular-nums">{{ item.remaining }}</td>
+                                <td class="px-4 py-3 text-center tabular-nums">
+                                    <span v-if="item.weekly_rate > 0">{{ item.weekly_rate }}/wk</span>
+                                    <span v-else class="text-xs text-amber-600 dark:text-amber-400">No recent progress</span>
+                                </td>
+                                <td class="px-4 py-3 text-center font-medium">
+                                    <span v-if="item.projected_finish === 'Done'" class="text-purple-600 dark:text-purple-400">Done ✓</span>
+                                    <span v-else-if="item.projected_finish">{{ item.projected_finish }}</span>
+                                    <span v-else class="text-xs text-muted-foreground">Insufficient data</span>
+                                </td>
+                                <td class="px-4 py-3 text-center text-muted-foreground">
+                                    {{ item.end_date ?? '—' }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <span
+                                        v-if="item.projected_finish === 'Done'"
+                                        class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                                    >Done</span>
+                                    <span
+                                        v-else-if="item.on_track === true"
+                                        class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                    >✓ On Track</span>
+                                    <span
+                                        v-else-if="item.on_track === false"
+                                        class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                    >✕ Late</span>
+                                    <span
+                                        v-else-if="item.weekly_rate === 0 && item.remaining > 0"
+                                        class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    >⚠ Stalled</span>
+                                    <span v-else class="text-xs text-muted-foreground">—</span>
+                                </td>
+                            </tr>
+                            <tr v-if="completionForecast.length === 0">
+                                <td colspan="6" class="px-4 py-8 text-center text-sm text-muted-foreground">No project data available.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
+                <div v-else class="flex flex-col gap-2 p-4">
+                    <div v-for="n in 3" :key="n" class="h-10 animate-pulse rounded bg-muted" />
+                </div>
+            </div>
+        </div>
+
         <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
             <template v-if="statusCounts !== null">
@@ -552,6 +686,78 @@ function timeAgo(isoString: string): string {
             <template v-else>
                 <div v-for="n in 8" :key="n" class="h-20 animate-pulse rounded-xl bg-muted" />
             </template>
+        </div>
+
+        <!-- Section: Assignment Aging Heatmap -->
+        <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
+            <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <h2 class="text-sm font-semibold">Assignment Aging</h2>
+                <p class="text-xs text-muted-foreground">Active assignments by status and time since last update — redder = older</p>
+            </div>
+
+            <template v-if="agingHeatmap !== null">
+                <!-- Stalled warning banner -->
+                <div
+                    v-if="agingHeatmap.total_stalled > 0"
+                    class="flex items-center gap-2 border-b border-sidebar-border/70 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-sidebar-border dark:bg-red-900/20 dark:text-red-300"
+                >
+                    <span class="font-semibold">⚠ {{ agingHeatmap.total_stalled }} assignment{{ agingHeatmap.total_stalled === 1 ? '' : 's' }}</span>
+                    <span>with no progress in 30+ days</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/40 text-xs uppercase tracking-wide">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                                <th
+                                    v-for="(bucket, idx) in agingHeatmap.buckets"
+                                    :key="bucket"
+                                    class="px-4 py-3 text-center font-medium"
+                                    :class="idx >= 3 ? 'text-red-500 dark:text-red-400' : idx >= 2 ? 'text-orange-500 dark:text-orange-400' : idx >= 1 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'"
+                                >
+                                    {{ bucket }}
+                                </th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="status in agingHeatmap.statuses"
+                                :key="status"
+                                class="border-t border-sidebar-border/70 dark:border-sidebar-border"
+                            >
+                                <td class="px-4 py-3 font-medium">
+                                    {{ statusLabelMapFull[status] ?? status }}
+                                </td>
+                                <td
+                                    v-for="bucketKey in agingHeatmap.bucket_keys"
+                                    :key="bucketKey"
+                                    class="px-4 py-2 text-center"
+                                    :class="bucketBgClass[bucketKey]"
+                                >
+                                    <Link
+                                        v-if="agingCellCount(status, bucketKey) > 0"
+                                        :href="assignmentFilterUrl({ status })"
+                                        class="inline-block min-w-8 rounded px-2 py-0.5 font-semibold tabular-nums transition-colors hover:underline"
+                                        :class="bucketTextClass[bucketKey]"
+                                        @click.stop
+                                    >
+                                        {{ agingCellCount(status, bucketKey) }}
+                                    </Link>
+                                    <span v-else class="text-xs text-muted-foreground/40">—</span>
+                                </td>
+                                <td class="px-4 py-3 text-center font-semibold text-muted-foreground tabular-nums">
+                                    {{ agingHeatmap.bucket_keys.reduce((s, k) => s + agingCellCount(status, k), 0) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+            <div v-else class="grid grid-cols-5 gap-2 p-4">
+                <div v-for="n in 20" :key="n" class="h-8 animate-pulse rounded bg-muted" />
+            </div>
         </div>
 
         <!-- Section 2: Activity × Status Pipeline Matrix -->
@@ -823,6 +1029,23 @@ function timeAgo(isoString: string): string {
                 <div v-else class="flex flex-col gap-2 p-4">
                     <div v-for="n in 5" :key="n" class="h-10 animate-pulse rounded bg-muted" />
                 </div>
+            </div>
+        </div>
+
+        <!-- Section: Workload Distribution -->
+        <div
+            v-if="workloadDistribution === null || workloadDistribution.length > 0"
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <h2 class="text-sm font-semibold">Subcontractor Workload Distribution</h2>
+                <p class="text-xs text-muted-foreground">Active assignment load per subcontractor — top 20 by volume</p>
+            </div>
+            <div class="p-4">
+                <template v-if="workloadDistribution !== null">
+                    <WorkloadChart :items="workloadDistribution" />
+                </template>
+                <div v-else class="h-64 animate-pulse rounded bg-muted" />
             </div>
         </div>
 

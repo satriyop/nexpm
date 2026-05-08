@@ -337,6 +337,167 @@ class DashboardController extends Controller
                 ];
             }),
 
+            'agingHeatmap' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
+                $now = now();
+
+                $rows = DB::table('assignments')
+                    ->join('sites', 'sites.id', '=', 'assignments.site_id')
+                    ->join('projects', 'projects.id', '=', 'sites.project_id')
+                    ->tap($applyTenantScope)
+                    ->when($projectFilter, fn ($q) => $q->where('sites.project_id', $projectFilter))
+                    ->whereNotIn('assignments.status', ['VERIFIED', 'REPORTED', 'DROP'])
+                    ->select('assignments.status', 'assignments.updated_at')
+                    ->get();
+
+                $buckets = [
+                    '0_7' => ['label' => '0–7d',   'min' => 0,  'max' => 7],
+                    '7_14' => ['label' => '7–14d',  'min' => 7,  'max' => 14],
+                    '14_30' => ['label' => '14–30d', 'min' => 14, 'max' => 30],
+                    '30_60' => ['label' => '30–60d', 'min' => 30, 'max' => 60],
+                    '60p' => ['label' => '60+d',   'min' => 60, 'max' => PHP_INT_MAX],
+                ];
+
+                $statusOrder = [
+                    'PENDING', 'SURVEY', 'DOCUMENT', 'CONSTRUCTION', 'MACHINE_ONSITE',
+                    'DONE', 'LIVE', 'REGISTRATION', 'BILLING', 'CONNECTION',
+                    'KWH_DONE', 'COMPLETED', 'REVISION',
+                ];
+
+                $cells = [];
+                foreach ($rows as $row) {
+                    $days = (int) Carbon::parse($row->updated_at)->diffInDays($now);
+                    foreach ($buckets as $key => $bucket) {
+                        if ($days >= $bucket['min'] && $days < $bucket['max']) {
+                            $cells[$row->status][$key] = ($cells[$row->status][$key] ?? 0) + 1;
+                            break;
+                        }
+                    }
+                }
+
+                $activeStatuses = array_values(array_filter($statusOrder, fn ($s) => isset($cells[$s])));
+                $totalStalled = $rows->filter(
+                    fn ($r) => (int) Carbon::parse($r->updated_at)->diffInDays($now) >= 30
+                )->count();
+
+                return [
+                    'statuses' => $activeStatuses,
+                    'buckets' => array_map(fn ($b) => $b['label'], $buckets),
+                    'bucket_keys' => array_keys($buckets),
+                    'cells' => $cells,
+                    'total_stalled' => $totalStalled,
+                ];
+            }),
+
+            'workloadDistribution' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
+                $inProgressStatuses = [
+                    'SURVEY', 'DOCUMENT', 'CONSTRUCTION', 'MACHINE_ONSITE', 'DONE', 'LIVE',
+                    'REGISTRATION', 'BILLING', 'CONNECTION', 'KWH_DONE', 'COMPLETED',
+                ];
+
+                $rows = DB::table('assignments')
+                    ->join('sites', 'sites.id', '=', 'assignments.site_id')
+                    ->join('projects', 'projects.id', '=', 'sites.project_id')
+                    ->join('subcontractors', 'subcontractors.id', '=', 'assignments.subcontractor_id')
+                    ->tap($applyTenantScope)
+                    ->when($projectFilter, fn ($q) => $q->where('sites.project_id', $projectFilter))
+                    ->where('assignments.status', '!=', 'DROP')
+                    ->select(
+                        'subcontractors.id',
+                        'subcontractors.name',
+                        'assignments.status',
+                        DB::raw('count(*) as total')
+                    )
+                    ->groupBy('subcontractors.id', 'subcontractors.name', 'assignments.status')
+                    ->get()
+                    ->groupBy('id');
+
+                return $rows->map(function ($subRows) use ($inProgressStatuses) {
+                    $first = $subRows->first();
+                    $byStatus = $subRows->pluck('total', 'status');
+                    $pending = (int) ($byStatus['PENDING'] ?? 0);
+                    $inProgress = (int) collect($inProgressStatuses)->sum(fn ($s) => $byStatus[$s] ?? 0);
+                    $revision = (int) ($byStatus['REVISION'] ?? 0);
+                    $completed = (int) (($byStatus['VERIFIED'] ?? 0) + ($byStatus['REPORTED'] ?? 0));
+
+                    return [
+                        'id' => $first->id,
+                        'name' => $first->name,
+                        'pending' => $pending,
+                        'in_progress' => $inProgress,
+                        'revision' => $revision,
+                        'completed' => $completed,
+                        'total' => $pending + $inProgress + $revision + $completed,
+                    ];
+                })
+                    ->sortByDesc('total')
+                    ->take(20)
+                    ->values()
+                    ->all();
+            }),
+
+            'completionForecast' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
+                $fourWeeksAgo = now()->subWeeks(4);
+
+                $recentCompletions = DB::table('assignments')
+                    ->join('sites', 'sites.id', '=', 'assignments.site_id')
+                    ->join('projects', 'projects.id', '=', 'sites.project_id')
+                    ->tap($applyTenantScope)
+                    ->when($projectFilter, fn ($q) => $q->where('projects.id', $projectFilter))
+                    ->whereIn('assignments.status', ['VERIFIED', 'REPORTED'])
+                    ->whereNotNull('assignments.verified_at')
+                    ->where('assignments.verified_at', '>=', $fourWeeksAgo)
+                    ->select('sites.project_id', DB::raw('count(*) as completed_last_4w'))
+                    ->groupBy('sites.project_id')
+                    ->pluck('completed_last_4w', 'project_id');
+
+                $remaining = DB::table('assignments')
+                    ->join('sites', 'sites.id', '=', 'assignments.site_id')
+                    ->join('projects', 'projects.id', '=', 'sites.project_id')
+                    ->tap($applyTenantScope)
+                    ->when($projectFilter, fn ($q) => $q->where('projects.id', $projectFilter))
+                    ->whereNotIn('assignments.status', ['VERIFIED', 'REPORTED', 'DROP'])
+                    ->select('sites.project_id', DB::raw('count(*) as remaining'))
+                    ->groupBy('sites.project_id')
+                    ->pluck('remaining', 'project_id');
+
+                $projects = DB::table('projects')
+                    ->tap(fn ($q) => $applyTenantScope($q))
+                    ->when($projectFilter, fn ($q) => $q->where('projects.id', $projectFilter))
+                    ->select('id', 'name', 'end_date')
+                    ->get();
+
+                return $projects->map(function ($project) use ($recentCompletions, $remaining) {
+                    $completedLast4w = (int) ($recentCompletions[$project->id] ?? 0);
+                    $remainingCount = (int) ($remaining[$project->id] ?? 0);
+                    $weeklyRate = round($completedLast4w / 4, 1);
+                    $endDate = $project->end_date ? Carbon::parse($project->end_date) : null;
+
+                    $projectedFinish = null;
+                    $weeksToFinish = null;
+                    $onTrack = null;
+
+                    if ($remainingCount === 0) {
+                        $projectedFinish = 'Done';
+                        $onTrack = true;
+                    } elseif ($weeklyRate > 0) {
+                        $weeksToFinish = (int) ceil($remainingCount / $weeklyRate);
+                        $projectedFinish = now()->addWeeks($weeksToFinish)->format('d M Y');
+                        $onTrack = $endDate ? now()->addWeeks($weeksToFinish)->lte($endDate) : null;
+                    }
+
+                    return [
+                        'id' => $project->id,
+                        'name' => $project->name,
+                        'remaining' => $remainingCount,
+                        'weekly_rate' => $weeklyRate,
+                        'weeks_to_finish' => $weeksToFinish,
+                        'projected_finish' => $projectedFinish,
+                        'end_date' => $endDate?->format('d M Y'),
+                        'on_track' => $onTrack,
+                    ];
+                })->values()->all();
+            }),
+
             'mainContractors' => $user->isSuperAdmin()
                 ? MainContractor::query()->orderBy('name')->get(['id', 'name'])
                 : null,
