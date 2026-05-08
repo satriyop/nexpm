@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import { ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Search } from 'lucide-vue-next';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { ChevronDown, ChevronLeft, ChevronRight, Download, FileText, RefreshCw, Search } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import * as AdminReportActions from '@/actions/App/Http/Controllers/Admin/ReportController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
@@ -153,6 +153,15 @@ function generateReport(): void {
         onSuccess: () => {
             selectedIds.value = [];
         },
+    });
+}
+
+const regeneratingId = ref<number | null>(null);
+
+function regenerateReport(report: ReportRow): void {
+    regeneratingId.value = report.id;
+    router.post(AdminReportActions.regenerate(report).url, {}, {
+        onFinish: () => { regeneratingId.value = null; },
     });
 }
 
@@ -359,7 +368,7 @@ function formatDate(iso: string): string {
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Assignments</th>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Generated</th>
-                            <th class="px-4 py-3 text-right font-medium text-muted-foreground">Download</th>
+                            <th class="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -385,14 +394,26 @@ function formatDate(iso: string): string {
                                 </td>
                                 <td class="px-4 py-3 text-xs text-muted-foreground">{{ formatDate(report.created_at) }}</td>
                                 <td class="px-4 py-3 text-right" @click.stop>
-                                    <a
-                                        :href="AdminReportActions.download(report).url"
-                                        class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted dark:border-sidebar-border"
-                                        :title="report.report_type === 'SSR' ? 'Download PDF' : 'Download XLSX'"
-                                    >
-                                        <Download class="size-3.5" />
-                                        {{ report.report_type === 'SSR' ? 'PDF' : 'XLSX' }}
-                                    </a>
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50 dark:border-sidebar-border"
+                                            title="Re-generate this report with the same assignments"
+                                            :disabled="regeneratingId === report.id"
+                                            @click="regenerateReport(report)"
+                                        >
+                                            <RefreshCw class="size-3.5" :class="{ 'animate-spin': regeneratingId === report.id }" />
+                                            Re-generate
+                                        </button>
+                                        <a
+                                            :href="AdminReportActions.download(report).url"
+                                            class="inline-flex items-center gap-1 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted dark:border-sidebar-border"
+                                            :title="report.report_type === 'SSR' ? 'Download PDF' : 'Download XLSX'"
+                                        >
+                                            <Download class="size-3.5" />
+                                            {{ report.report_type === 'SSR' ? 'PDF' : 'XLSX' }}
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                             <tr v-if="expandedReportId === report.id" class="border-t border-sidebar-border/70 dark:border-sidebar-border">

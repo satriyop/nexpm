@@ -152,6 +152,30 @@ class ReportController extends Controller
         };
     }
 
+    public function regenerate(Report $report): RedirectResponse
+    {
+        $assignmentIds = $report->assignments()->pluck('assignments.id')->toArray();
+
+        $typeLabel = match ($report->report_type) {
+            'SSR' => 'SSR Report',
+            'BAST', 'BAST_EVCS', 'BAST_BSS' => 'BAST Report',
+            default => 'Daily Report',
+        };
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        $newReport = Report::create([
+            'name' => $typeLabel.' '.now()->format('Y-m-d H:i'),
+            'report_type' => $report->report_type,
+            'exported_by' => $user->id,
+        ]);
+
+        $newReport->assignments()->attach($assignmentIds);
+
+        return redirect()->route('admin.reports.index')->with('success', $typeLabel.' regenerated successfully.');
+    }
+
     private function downloadBast(Report $report, BastReportExportService $bastService): StreamedResponse
     {
         $assignments = $report->assignments()
