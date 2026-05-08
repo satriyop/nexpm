@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { AlertCircle, ArrowLeft, CheckCircle2, ClipboardList, Download, Pencil, Upload } from 'lucide-vue-next';
+import { AlertCircle, ArrowLeft, CheckCircle2, ClipboardList, Download, Eye, Pencil, Upload } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import * as AssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import * as AssignmentImport from '@/actions/App/Http/Controllers/Admin/AssignmentImportController';
@@ -12,6 +12,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
 import type { PaginatedData } from '@/types';
@@ -65,6 +73,62 @@ const assignmentFileRef = ref<HTMLInputElement | null>(null);
 const siteForm = useForm({ file: null as File | null });
 const assignmentForm = useForm({ file: null as File | null });
 
+// --- CSV preview ---
+type PreviewType = 'sites' | 'assignments';
+interface CsvPreview {
+    type: PreviewType;
+    headers: string[];
+    rows: string[][];
+    totalRows: number;
+}
+const preview = ref<CsvPreview | null>(null);
+const previewOpen = ref(false);
+
+function detectDelimiter(sample: string): string {
+    const semicolons = (sample.match(/;/g) ?? []).length;
+    const commas = (sample.match(/,/g) ?? []).length;
+    return semicolons >= commas ? ';' : ',';
+}
+
+function parseCsvText(text: string): string[][] {
+    const sep = detectDelimiter(text.slice(0, 500));
+    return text
+        .split(/\r?\n/)
+        .filter((line) => line.trim() && !line.startsWith('#'))
+        .map((line) => line.split(sep).map((cell) => cell.trim().replace(/^["']|["']$/g, '')));
+}
+
+function openPreview(type: PreviewType): void {
+    const fileRef = type === 'sites' ? siteFileRef.value : assignmentFileRef.value;
+    const file = fileRef?.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target?.result as string;
+        const allRows = parseCsvText(text);
+        if (allRows.length < 1) return;
+        preview.value = {
+            type,
+            headers: allRows[0],
+            rows: allRows.slice(1, 21),
+            totalRows: allRows.length - 1,
+        };
+        previewOpen.value = true;
+    };
+    reader.readAsText(file);
+}
+
+function confirmImport(): void {
+    if (!preview.value) return;
+    previewOpen.value = false;
+    if (preview.value.type === 'sites') {
+        submitSiteImport();
+    } else {
+        submitAssignmentImport();
+    }
+}
+
 function submitSiteImport() {
     if (!siteFileRef.value?.files?.[0]) { return; }
     siteForm.file = siteFileRef.value.files[0];
@@ -89,13 +153,13 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
 <template>
     <Head :title="project.name" />
 
-    <div class="space-y-6 p-6">
-        <div class="flex items-center justify-between gap-3">
+    <div class="space-y-6 p-4 md:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-3">
                 <a :href="ProjectActions.index().url">
                     <Button variant="ghost" size="icon"><ArrowLeft class="h-4 w-4" /></Button>
                 </a>
-                <h1 class="text-2xl font-semibold">{{ project.name }}</h1>
+                <h1 class="text-xl font-semibold md:text-2xl">{{ project.name }}</h1>
             </div>
             <a :href="AssignmentActions.index({ project_id: project.id }).url">
                 <Button variant="outline" size="sm">
@@ -163,15 +227,15 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <form class="flex items-end gap-3" @submit.prevent="submitSiteImport">
+                    <div class="flex items-end gap-3">
                         <div class="grid flex-1 gap-1.5">
                             <Label>CSV File</Label>
                             <input ref="siteFileRef" type="file" accept=".csv,.txt" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" />
                         </div>
-                        <Button type="submit" :disabled="siteForm.processing" size="sm">
-                            <Upload class="mr-1.5 h-3.5 w-3.5" />Upload
+                        <Button type="button" :disabled="siteForm.processing" size="sm" @click="openPreview('sites')">
+                            <Eye class="mr-1.5 h-3.5 w-3.5" />Preview
                         </Button>
-                    </form>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -189,18 +253,73 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <form class="flex items-end gap-3" @submit.prevent="submitAssignmentImport">
+                    <div class="flex items-end gap-3">
                         <div class="grid flex-1 gap-1.5">
                             <Label>CSV File</Label>
                             <input ref="assignmentFileRef" type="file" accept=".csv,.txt" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" />
                         </div>
-                        <Button type="submit" :disabled="assignmentForm.processing" size="sm">
-                            <Upload class="mr-1.5 h-3.5 w-3.5" />Upload
+                        <Button type="button" :disabled="assignmentForm.processing" size="sm" @click="openPreview('assignments')">
+                            <Eye class="mr-1.5 h-3.5 w-3.5" />Preview
                         </Button>
-                    </form>
+                    </div>
                 </CardContent>
             </Card>
         </div>
+
+        <!-- CSV preview dialog -->
+        <Dialog v-model:open="previewOpen">
+            <DialogContent class="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>Preview: {{ preview?.type === 'sites' ? 'Sites' : 'Assignments' }} Import</DialogTitle>
+                    <DialogDescription>
+                        Showing {{ preview?.rows.length }} of {{ preview?.totalRows }} rows. Review before confirming.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div v-if="preview" class="max-h-[60vh] overflow-auto rounded-md border">
+                    <table class="w-full text-xs">
+                        <thead class="sticky top-0 bg-muted/90">
+                            <tr>
+                                <th
+                                    v-for="(header, i) in preview.headers"
+                                    :key="i"
+                                    class="px-3 py-2 text-left font-medium text-muted-foreground"
+                                >
+                                    {{ header }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr
+                                v-for="(row, ri) in preview.rows"
+                                :key="ri"
+                                class="hover:bg-muted/30"
+                            >
+                                <td
+                                    v-for="(cell, ci) in row"
+                                    :key="ci"
+                                    class="px-3 py-2"
+                                    :class="cell ? '' : 'text-muted-foreground'"
+                                >
+                                    {{ cell || '—' }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" @click="previewOpen = false">Cancel</Button>
+                    <Button
+                        :disabled="(preview?.type === 'sites' ? siteForm : assignmentForm).processing"
+                        @click="confirmImport"
+                    >
+                        <Upload class="mr-1.5 h-4 w-4" />
+                        {{ (preview?.type === 'sites' ? siteForm : assignmentForm).processing ? 'Importing…' : 'Confirm Import' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
         <!-- Sites table -->
         <Card>

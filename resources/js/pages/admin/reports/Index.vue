@@ -221,7 +221,7 @@ function formatDate(iso: string): string {
             v-if="activeTab !== 'HISTORY'"
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
-            <div class="flex items-center justify-between border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
                 <div class="flex flex-col gap-1.5">
                     <p class="text-sm font-medium">{{ tabs.find((t) => t.key === activeTab)?.description }}</p>
                     <p class="text-xs text-muted-foreground">{{ activeAssignments.length }} available · {{ selectedIds.length }} selected</p>

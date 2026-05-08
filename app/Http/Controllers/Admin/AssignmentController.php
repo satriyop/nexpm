@@ -77,7 +77,10 @@ class AssignmentController extends Controller
             $query->where('project_id', $request->integer('project_id'));
         }
 
-        $sites = $query->latest('id')->paginate(20)->withQueryString();
+        $perPage = (int) $request->input('per_page', 20);
+        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 20;
+
+        $sites = $query->latest('id')->paginate($perPage)->withQueryString();
 
         $sites->setCollection(
             $sites->getCollection()->map(fn ($site) => (new SiteRowResource($site))->resolve())
@@ -106,6 +109,7 @@ class AssignmentController extends Controller
             'mainContractors' => $user->isSuperAdmin()
                 ? MainContractor::query()->orderBy('name')->get(['id', 'name'])
                 : null,
+            'per_page' => $perPage,
             'filters' => (object) $request->only(['search', 'status', 'activity_type', 'subcontractor_id', 'main_contractor_id', 'project_id']),
         ]);
     }
@@ -546,6 +550,83 @@ class AssignmentController extends Controller
         ]);
 
         return back()->with('success', 'Assignment removed.');
+    }
+
+    public function bulkDrop(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'assignment_ids' => ['required', 'array', 'min:1'],
+            'assignment_ids.*' => ['integer', 'exists:assignments,id'],
+        ]);
+
+        $assignments = Assignment::whereIn('id', $validated['assignment_ids'])
+            ->whereHas('site.project', fn ($q) => $q->whereScopedToMainContractor())
+            ->get();
+
+        foreach ($assignments as $assignment) {
+            $assignment->markDropped();
+        }
+
+        $count = $assignments->count();
+
+        return back()->with('success', "{$count} assignment(s) archived.");
+    }
+
+    public function export(Request $request): HttpResponse
+    {
+        $siteIds = array_filter(explode(',', $request->string('site_ids', '')));
+
+        $query = Site::query()
+            ->with(['project', 'assignments.subcontractor'])
+            ->whereHas('project', fn ($q) => $q->whereScopedToMainContractor());
+
+        if (! empty($siteIds)) {
+            $query->whereIn('id', $siteIds);
+        }
+
+        $sites = $query->orderBy('site_code')->get();
+
+        $activityTypes = ['SURVEY', 'CONSTRUCTION', 'PLN_CONNECTION', 'BAST'];
+        $sep = ';';
+
+        $handle = fopen('php://memory', 'w');
+
+        fputcsv($handle, [
+            'Site Code', 'Location', 'City', 'Province', 'Project',
+            'Survey Status', 'Survey Subcon',
+            'Construction Status', 'Construction Subcon',
+            'PLN Status', 'PLN Subcon',
+            'BAST Status', 'BAST Subcon',
+        ], $sep);
+
+        foreach ($sites as $site) {
+            $row = [
+                $site->site_code,
+                $site->location_name,
+                $site->city ?? '',
+                $site->province ?? '',
+                $site->project?->name ?? '',
+            ];
+
+            foreach ($activityTypes as $type) {
+                $assignment = $site->assignments->firstWhere('activity_type', $type);
+                $row[] = $assignment?->status ?? '';
+                $row[] = $assignment?->subcontractor?->name ?? '';
+            }
+
+            fputcsv($handle, $row, $sep);
+        }
+
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        $filename = 'assignments-export-'.now()->format('Ymd-His').'.csv';
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
     }
 
     private function currentUser(): User

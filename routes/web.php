@@ -41,6 +41,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::post('users', [Admin\UserController::class, 'store'])->name('users.store');
 
     Route::get('assignments', [Admin\AssignmentController::class, 'index'])->name('assignments.index');
+    Route::post('assignments/bulk-drop', [Admin\AssignmentController::class, 'bulkDrop'])->name('assignments.bulk-drop');
+    Route::get('assignments/export', [Admin\AssignmentController::class, 'export'])->name('assignments.export');
     Route::get('assignments/sites/{site}', [Admin\AssignmentController::class, 'siteAssignments'])->name('assignments.site-assignments');
     Route::post('assignments/sites/{site}/assign', [Admin\AssignmentController::class, 'storeForSite'])->name('assignments.site-assign');
     Route::delete('assignments/{assignment}', [Admin\AssignmentController::class, 'destroy'])->name('assignments.destroy');
