@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowRight } from 'lucide-vue-next';
+import { ArrowRight, HelpCircle, TrendingUp, Activity, CheckCircle2, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import { dashboard } from '@/routes';
 
@@ -200,6 +201,42 @@ function cellHighlight(statusKey: string, count: number): string {
     return highlights[statusKey] ?? '';
 }
 
+// ── KPI strip ────────────────────────────────────────────────────────────────
+const kpiTotal = computed(() =>
+    Object.values(props.statusCounts as Record<string, number>).reduce((s, v) => s + v, 0),
+);
+const kpiCompleted = computed(() =>
+    (props.statusCounts.VERIFIED ?? 0) + (props.statusCounts.REPORTED ?? 0),
+);
+const kpiInProgress = computed(() =>
+    INTERMEDIATE_STATUSES.reduce((s, k) => s + (props.statusCounts[k] ?? 0), 0),
+);
+const kpiDropped = computed(() => props.statusCounts.DROP ?? 0);
+const kpiCompletionPct = computed(() =>
+    kpiTotal.value ? Math.round((kpiCompleted.value / kpiTotal.value) * 100) : 0,
+);
+
+// ── Status legend dialog ──────────────────────────────────────────────────────
+const legendOpen = ref(false);
+const statusDescriptions: { key: keyof typeof StatusCounts; label: string; description: string }[] = [
+    { key: 'PENDING',        label: 'Pending',        description: 'Assignment created, awaiting subcontractor action.' },
+    { key: 'SURVEY',         label: 'Survey',         description: 'Survey has been scheduled (date set by subcontractor).' },
+    { key: 'DOCUMENT',       label: 'Document',       description: 'Survey complete; all required documents submitted.' },
+    { key: 'CONSTRUCTION',   label: 'Construction',   description: 'Construction work is in progress.' },
+    { key: 'MACHINE_ONSITE', label: 'Machine Onsite', description: 'Charger machine has arrived on site.' },
+    { key: 'DONE',           label: 'Done',           description: 'Construction work completed.' },
+    { key: 'LIVE',           label: 'Live',           description: 'Charger is live and operational.' },
+    { key: 'REGISTRATION',   label: 'Registration',   description: 'PLN connection registration in progress.' },
+    { key: 'BILLING',        label: 'Billing',        description: 'PLN billing setup in progress.' },
+    { key: 'CONNECTION',     label: 'Connection',     description: 'PLN connection established.' },
+    { key: 'KWH_DONE',       label: 'kWh Done',       description: 'kWh meter installed and verified.' },
+    { key: 'COMPLETED',      label: 'Completed',      description: 'All required data submitted; pending admin verification.' },
+    { key: 'REVISION',       label: 'Revision',       description: 'Admin requested a revision — subcontractor must resubmit.' },
+    { key: 'VERIFIED',       label: 'Verified',       description: 'Admin verified all data; ready for report generation.' },
+    { key: 'REPORTED',       label: 'Reported',       description: 'Included in a generated report.' },
+    { key: 'DROP',           label: 'Dropped',        description: 'Assignment archived / removed from active tracking.' },
+] as any;
+
 function timeAgo(isoString: string): string {
     const diff = Date.now() - new Date(isoString).getTime();
     const seconds = Math.floor(diff / 1000);
@@ -256,6 +293,41 @@ function timeAgo(isoString: string): string {
             </div>
         </div>
 
+        <!-- KPI Strip -->
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Activity class="size-3.5" />
+                    Total Assignments
+                </div>
+                <p class="text-3xl font-bold tracking-tight">{{ kpiTotal }}</p>
+            </div>
+            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <TrendingUp class="size-3.5" />
+                    In Progress
+                </div>
+                <p class="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">{{ kpiInProgress }}</p>
+            </div>
+            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <CheckCircle2 class="size-3.5" />
+                    Completed
+                </div>
+                <div class="flex items-end gap-2">
+                    <p class="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">{{ kpiCompleted }}</p>
+                    <p class="mb-0.5 text-sm font-medium text-muted-foreground">{{ kpiCompletionPct }}%</p>
+                </div>
+            </div>
+            <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
+                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <XCircle class="size-3.5" />
+                    Dropped
+                </div>
+                <p class="text-3xl font-bold tracking-tight" :class="kpiDropped > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'">{{ kpiDropped }}</p>
+            </div>
+        </div>
+
         <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
             <template v-for="stat in statuses" :key="stat.key">
@@ -280,9 +352,19 @@ function timeAgo(isoString: string): string {
 
         <!-- Section 2: Activity × Status Pipeline Matrix -->
         <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
-            <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
-                <h2 class="text-sm font-semibold">Activity Pipeline</h2>
-                <p class="text-xs text-muted-foreground">Assignment counts by activity type and status — click any cell to drill down</p>
+            <div class="flex items-center justify-between border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <div>
+                    <h2 class="text-sm font-semibold">Activity Pipeline</h2>
+                    <p class="text-xs text-muted-foreground">Assignment counts by activity type and status — click any cell to drill down</p>
+                </div>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    @click="legendOpen = true"
+                >
+                    <HelpCircle class="size-3.5" />
+                    Status guide
+                </button>
             </div>
 
             <div class="overflow-x-auto">
@@ -474,4 +556,29 @@ function timeAgo(isoString: string): string {
             </div>
         </div>
     </div>
+
+    <!-- Status legend dialog -->
+    <Dialog :open="legendOpen" @update:open="legendOpen = $event">
+        <DialogContent class="max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Assignment Status Guide</DialogTitle>
+            </DialogHeader>
+            <div class="grid gap-2 py-2">
+                <div
+                    v-for="s in statusDescriptions"
+                    :key="s.key"
+                    class="flex items-start gap-3 rounded-lg px-2 py-1.5"
+                >
+                    <span
+                        class="mt-1 size-2.5 shrink-0 rounded-full"
+                        :class="statuses.find(st => st.key === s.key)?.dotClass ?? 'bg-gray-400'"
+                    />
+                    <div>
+                        <p class="text-sm font-medium">{{ s.label }}</p>
+                        <p class="text-xs text-muted-foreground">{{ s.description }}</p>
+                    </div>
+                </div>
+            </div>
+        </DialogContent>
+    </Dialog>
 </template>

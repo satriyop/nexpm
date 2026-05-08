@@ -12,7 +12,7 @@ import * as SubcontractorActions from '@/actions/App/Http/Controllers/Admin/Subc
 import * as UserActions from '@/actions/App/Http/Controllers/Admin/UserController';
 import * as SubAssignmentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
 import AppLogo from '@/components/AppLogo.vue';
-import NavMain from '@/components/NavMain.vue';
+import NavMain, { type NavGroup } from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
     Sidebar,
@@ -24,38 +24,54 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import type { NavItem } from '@/types';
 
 const page = usePage();
 const role = computed(() => (page.props.auth?.user as any)?.role as string | undefined);
 
-const mainNavItems = computed<NavItem[]>(() => {
-    const items: NavItem[] = [
-        { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
-    ];
-
+const navGroups = computed<NavGroup[]>(() => {
     if (role.value === 'admin' || role.value === 'super_admin') {
-        items.push(
-            { title: 'Projects', href: ProjectActions.index().url, icon: FolderKanban },
-            { title: 'Clients', href: ClientActions.index().url, icon: Briefcase },
-            { title: 'Assignments', href: AdminAssignmentActions.index().url, icon: ClipboardList },
-            { title: 'Reports', href: AdminReportActions.index().url, icon: FileBarChart2 },
-            { title: 'Subcontractors', href: SubcontractorActions.index().url, icon: Wrench },
-            { title: 'Users', href: UserActions.index().url, icon: Users },
-            { title: 'Main Contractors', href: MainContractorActions.index().url, icon: Building2 },
-            { title: 'App Settings', href: CompanySettingActions.index().url, icon: Settings2 },
-        );
+        return [
+            {
+                label: 'Operations',
+                items: [
+                    { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+                    { title: 'Projects', href: ProjectActions.index().url, icon: FolderKanban },
+                    { title: 'Assignments', href: AdminAssignmentActions.index().url, icon: ClipboardList },
+                    { title: 'Reports', href: AdminReportActions.index().url, icon: FileBarChart2 },
+                ],
+            },
+            {
+                label: 'Configuration',
+                items: [
+                    { title: 'Clients', href: ClientActions.index().url, icon: Briefcase },
+                    { title: 'Main Contractors', href: MainContractorActions.index().url, icon: Building2 },
+                    { title: 'Subcontractors', href: SubcontractorActions.index().url, icon: Wrench },
+                    { title: 'Users', href: UserActions.index().url, icon: Users },
+                    { title: 'App Settings', href: CompanySettingActions.index().url, icon: Settings2 },
+                ],
+            },
+        ];
     }
 
     if (role.value === 'subcontractor') {
-        items.push({
-            title: 'My Assignments',
-            href: SubAssignmentActions.index().url,
-            icon: ClipboardList,
-        });
+        return [
+            {
+                label: 'Menu',
+                items: [
+                    { title: 'My Assignments', href: SubAssignmentActions.index().url, icon: ClipboardList },
+                ],
+            },
+        ];
     }
 
-    return items;
+    return [
+        {
+            label: 'Menu',
+            items: [
+                { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+            ],
+        },
+    ];
 });
 </script>
 
@@ -74,7 +90,7 @@ const mainNavItems = computed<NavItem[]>(() => {
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain :groups="navGroups" />
         </SidebarContent>
 
         <SidebarFooter>

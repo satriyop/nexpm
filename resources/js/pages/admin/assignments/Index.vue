@@ -404,9 +404,10 @@ const activityColumns: { type: ActivityType; label: string }[] = [
                         <tr
                             v-for="site in (sites?.data || [])"
                             :key="site.id"
-                            class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            @click="router.visit('/admin/assignments/sites/' + site.id)"
                         >
-                            <td class="px-4 py-3 font-mono text-xs font-semibold">
+                            <td class="px-4 py-3 font-mono text-xs font-semibold text-primary underline-offset-2 hover:underline">
                                 {{ site.site_code }}
                             </td>
                             <td class="px-4 py-3">
@@ -448,7 +449,7 @@ const activityColumns: { type: ActivityType; label: string }[] = [
                                 </td>
                             </template>
 
-                            <td class="px-4 py-3 text-right">
+                            <td class="px-4 py-3 text-right" @click.stop>
                                 <Button as-child variant="outline" size="sm">
                                     <Link :href="'/admin/assignments/sites/' + site.id">
                                         <ArrowRight class="size-4" />
