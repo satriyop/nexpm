@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, router, usePoll } from '@inertiajs/vue3';
-import { ArrowRight, HelpCircle, TrendingUp, Activity, CheckCircle2, XCircle } from 'lucide-vue-next';
+import { ArrowRight, CheckCircle2, Activity, HelpCircle, TrendingDown, TrendingUp, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import ActivityMatrixChart from '@/components/ActivityMatrixChart.vue';
+import VelocitySparkline from '@/components/VelocitySparkline.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -72,18 +73,60 @@ interface ActivityChartData {
     datasets: ChartDataset[];
 }
 
+interface DeadlineRisk {
+    id: number;
+    name: string;
+    total: number;
+    completed: number;
+    completion_pct: number;
+    days_elapsed: number | null;
+    days_remaining: number | null;
+    expected_pct: number | null;
+    gap: number | null;
+    risk_level: 'on_track' | 'at_risk' | 'behind' | 'overdue' | 'no_deadline';
+}
+
+interface SubcontractorStat {
+    id: number;
+    name: string;
+    total: number;
+    completed: number;
+    completion_pct: number;
+    avg_cycle_days: number | null;
+    revision_count: number;
+    in_revision: number;
+    score: number;
+}
+
+interface VelocityWeek {
+    week_start: string;
+    label: string;
+    count: number;
+}
+
+interface VelocityTrendData {
+    weeks: VelocityWeek[];
+    this_week: number;
+    last_week: number;
+    delta: number;
+    four_week_avg: number;
+}
+
 const props = defineProps<{
+    deadlineRisk: DeadlineRisk[] | null;
     statusCounts: StatusCounts | null;
     activityMatrix: ActivityMatrix | null;
     projectBreakdowns: ProjectBreakdown[] | null;
     recentActivity: RecentActivityItem[] | null;
     activityChart: ActivityChartData | null;
+    subcontractorLeaderboard: SubcontractorStat[] | null;
+    velocityTrend: VelocityTrendData | null;
     mainContractors: MainContractor[] | null;
     projects: Project[] | null;
     filters: { main_contractor_id?: string | null; project_id?: string | null };
 }>();
 
-usePoll(30_000, { only: ['statusCounts', 'activityMatrix', 'projectBreakdowns', 'recentActivity', 'activityChart'] });
+usePoll(30_000, { only: ['statusCounts', 'activityMatrix', 'projectBreakdowns', 'recentActivity', 'activityChart', 'deadlineRisk', 'subcontractorLeaderboard', 'velocityTrend'] });
 
 defineOptions({
     layout: {
@@ -311,7 +354,7 @@ function timeAgo(isoString: string): string {
         </div>
 
         <!-- KPI Strip -->
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
             <template v-if="statusCounts !== null">
                 <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
                     <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -351,6 +394,137 @@ function timeAgo(isoString: string): string {
                     <div class="h-9 w-16 animate-pulse rounded bg-muted" />
                 </div>
             </template>
+
+            <!-- Velocity card (5th) -->
+            <div class="col-span-2 flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border md:col-span-4 xl:col-span-1">
+                <template v-if="velocityTrend !== null">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-muted-foreground">Velocity (12w)</span>
+                        <span
+                            class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                            :class="velocityTrend.delta > 0
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : velocityTrend.delta < 0
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                    : 'bg-muted text-muted-foreground'"
+                        >
+                            <TrendingUp v-if="velocityTrend.delta > 0" class="size-2.5" />
+                            <TrendingDown v-else-if="velocityTrend.delta < 0" class="size-2.5" />
+                            {{ velocityTrend.delta > 0 ? '+' : '' }}{{ velocityTrend.delta }}
+                        </span>
+                    </div>
+                    <div class="h-14 w-full">
+                        <VelocitySparkline :weeks="velocityTrend.weeks" />
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                        <span class="font-semibold text-foreground">{{ velocityTrend.this_week }}</span> this week
+                        · {{ velocityTrend.four_week_avg }} avg/wk
+                    </p>
+                </template>
+                <template v-else>
+                    <div class="h-3 w-24 animate-pulse rounded bg-muted" />
+                    <div class="h-14 animate-pulse rounded bg-muted" />
+                    <div class="h-3 w-32 animate-pulse rounded bg-muted" />
+                </template>
+            </div>
+        </div>
+
+        <!-- Section: Deadline Risk -->
+        <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
+            <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <h2 class="text-sm font-semibold">Project Deadline Risk</h2>
+                <p class="text-xs text-muted-foreground">Actual completion pace vs expected pace — click a project to drill down</p>
+            </div>
+            <div class="overflow-x-auto">
+                <template v-if="deadlineRisk !== null">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/40 text-xs uppercase tracking-wide">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Project</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Risk</th>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Progress</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Completed</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Expected</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Days Left</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="project in deadlineRisk"
+                                :key="project.id"
+                                class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                                @click="router.visit(assignmentFilterUrl({ project_id: project.id.toString() }))"
+                            >
+                                <td class="px-4 py-3 font-medium">{{ project.name }}</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                        :class="{
+                                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400': project.risk_level === 'on_track',
+                                            'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400': project.risk_level === 'at_risk',
+                                            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': project.risk_level === 'behind' || project.risk_level === 'overdue',
+                                            'bg-muted text-muted-foreground': project.risk_level === 'no_deadline',
+                                        }"
+                                    >
+                                        {{ project.risk_level === 'on_track' ? '✓ On Track'
+                                            : project.risk_level === 'at_risk' ? '⚠ At Risk'
+                                            : project.risk_level === 'behind' ? '✕ Behind'
+                                            : project.risk_level === 'overdue' ? '✕ Overdue'
+                                            : '— No Deadline' }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="relative h-2 w-40 overflow-hidden rounded-full bg-muted">
+                                        <!-- Expected pace marker -->
+                                        <div
+                                            v-if="project.expected_pct !== null"
+                                            class="absolute top-0 h-full w-0.5 bg-foreground/20"
+                                            :style="{ left: project.expected_pct + '%' }"
+                                        />
+                                        <!-- Actual completion bar -->
+                                        <div
+                                            class="h-full rounded-full transition-all"
+                                            :class="{
+                                                'bg-emerald-500': project.risk_level === 'on_track',
+                                                'bg-amber-500': project.risk_level === 'at_risk',
+                                                'bg-red-500': project.risk_level === 'behind' || project.risk_level === 'overdue',
+                                                'bg-muted-foreground/40': project.risk_level === 'no_deadline',
+                                            }"
+                                            :style="{ width: project.completion_pct + '%' }"
+                                        />
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-center tabular-nums">
+                                    {{ project.completion_pct }}%
+                                    <span class="ml-1 text-xs text-muted-foreground">({{ project.completed }}/{{ project.total }})</span>
+                                </td>
+                                <td class="px-4 py-3 text-center tabular-nums text-muted-foreground">
+                                    {{ project.expected_pct !== null ? project.expected_pct + '%' : '—' }}
+                                </td>
+                                <td class="px-4 py-3 text-center tabular-nums">
+                                    <span
+                                        v-if="project.days_remaining !== null"
+                                        :class="{
+                                            'text-emerald-600 dark:text-emerald-400': project.days_remaining > 30,
+                                            'text-amber-600 dark:text-amber-400': project.days_remaining > 0 && project.days_remaining <= 30,
+                                            'text-red-600 dark:text-red-400': project.days_remaining <= 0,
+                                        }"
+                                    >
+                                        {{ project.days_remaining < 0 ? Math.abs(project.days_remaining) + 'd overdue' : project.days_remaining + 'd' }}
+                                    </span>
+                                    <span v-else class="text-muted-foreground">—</span>
+                                </td>
+                            </tr>
+                            <tr v-if="deadlineRisk.length === 0">
+                                <td colspan="6" class="px-4 py-8 text-center text-sm text-muted-foreground">No project data available.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
+                <div v-else class="flex flex-col gap-2 p-4">
+                    <div v-for="n in 3" :key="n" class="h-10 animate-pulse rounded bg-muted" />
+                </div>
+            </div>
         </div>
 
         <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
@@ -572,6 +746,83 @@ function timeAgo(isoString: string): string {
                     No data to display.
                 </div>
                 <div v-else class="h-64 animate-pulse rounded bg-muted" />
+            </div>
+        </div>
+
+        <!-- Section: Subcontractor Leaderboard -->
+        <div
+            v-if="subcontractorLeaderboard === null || subcontractorLeaderboard.length > 0"
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <h2 class="text-sm font-semibold">Subcontractor Performance</h2>
+                <p class="text-xs text-muted-foreground">Ranked by score — cycle time, completion rate, and revision history</p>
+            </div>
+            <div class="overflow-x-auto">
+                <template v-if="subcontractorLeaderboard !== null">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/40 text-xs uppercase tracking-wide">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">#</th>
+                                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Subcontractor</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Score</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Assigned</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Completed</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Avg Cycle</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">Revisions</th>
+                                <th class="px-4 py-3 text-center font-medium text-muted-foreground">In Revision</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="(sub, idx) in subcontractorLeaderboard"
+                                :key="sub.id"
+                                class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            >
+                                <td class="px-4 py-3 text-xs text-muted-foreground">{{ idx + 1 }}</td>
+                                <td class="px-4 py-3 font-medium">{{ sub.name }}</td>
+                                <td class="px-4 py-3 text-center">
+                                    <span class="inline-flex gap-0.5">
+                                        <span
+                                            v-for="i in 5"
+                                            :key="i"
+                                            class="size-2 rounded-full"
+                                            :class="i <= sub.score ? 'bg-emerald-500' : 'bg-muted'"
+                                        />
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center tabular-nums">{{ sub.total }}</td>
+                                <td class="px-4 py-3 text-center tabular-nums">
+                                    <span :class="sub.completion_pct >= 80 ? 'text-emerald-600 dark:text-emerald-400' : sub.completion_pct >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'">
+                                        {{ sub.completion_pct }}%
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center tabular-nums">
+                                    <span
+                                        v-if="sub.avg_cycle_days !== null"
+                                        :class="sub.avg_cycle_days <= 21 ? 'text-emerald-600 dark:text-emerald-400' : sub.avg_cycle_days <= 45 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'"
+                                    >
+                                        {{ sub.avg_cycle_days }}d
+                                    </span>
+                                    <span v-else class="text-muted-foreground">—</span>
+                                </td>
+                                <td class="px-4 py-3 text-center tabular-nums">
+                                    <span :class="sub.revision_count === 0 ? 'text-emerald-600 dark:text-emerald-400' : sub.revision_count <= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'">
+                                        {{ sub.revision_count }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-center tabular-nums">
+                                    <span :class="sub.in_revision > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted-foreground'">
+                                        {{ sub.in_revision }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
+                <div v-else class="flex flex-col gap-2 p-4">
+                    <div v-for="n in 5" :key="n" class="h-10 animate-pulse rounded bg-muted" />
+                </div>
             </div>
         </div>
 
