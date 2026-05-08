@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
                 'warning' => fn () => $request->session()->get('warning'),
                 'info' => fn () => $request->session()->get('info'),
                 'toast' => fn () => $request->session()->get('toast'),
+                'download_url' => fn () => $request->session()->get('download_url'),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'notifications' => fn () => $request->user()

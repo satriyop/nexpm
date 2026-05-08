@@ -70,15 +70,25 @@ defineOptions({
 });
 
 // --- Tab state ---
-type Tab = 'site' | 'assignments';
+type Tab = 'site' | 'financials' | 'assignments';
 const activeTab = ref<Tab>('site');
 
 onMounted(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('tab') === 'assignments') {
         activeTab.value = 'assignments';
+    } else if (params.get('tab') === 'financials') {
+        activeTab.value = 'financials';
     }
 });
+
+const financialFields = [
+    'invoice_submission_date', 'dp_35_date',
+    'invoice_60_submission_date', 'payment_60_date',
+    'invoice_5_submission_date', 'payment_5_date',
+    'invoice_url',
+] as const;
+const hasFinancialErrors = computed(() => financialFields.some((f) => !!form.errors[f]));
 
 const NONE = '__none__';
 
@@ -175,7 +185,7 @@ function removeAssignment(assignment: Assignment): void {
 <template>
     <Head :title="`Edit ${site.site_code}`" />
 
-    <div class="space-y-6 p-6">
+    <div class="space-y-6 p-4 md:p-6">
         <!-- Page Header -->
         <div class="flex items-center gap-3">
             <a :href="ProjectActions.show(site.project).url">
@@ -201,6 +211,20 @@ function removeAssignment(assignment: Assignment): void {
             </button>
             <button
                 type="button"
+                class="relative px-4 py-2 text-sm font-medium transition-colors"
+                :class="activeTab === 'financials'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-muted-foreground hover:text-foreground'"
+                @click="activeTab = 'financials'"
+            >
+                Financials
+                <span
+                    v-if="hasFinancialErrors"
+                    class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-destructive"
+                />
+            </button>
+            <button
+                type="button"
                 class="px-4 py-2 text-sm font-medium transition-colors"
                 :class="activeTab === 'assignments'
                     ? 'border-b-2 border-primary text-primary'
@@ -215,7 +239,7 @@ function removeAssignment(assignment: Assignment): void {
         </div>
 
         <!-- ── Tab 1: Site Details ── -->
-        <form v-if="activeTab === 'site'" class="space-y-6" @submit.prevent="submit">
+        <form v-if="activeTab === 'site'" class="space-y-6" @submit.prevent="submit" novalidate>
             <!-- Card 1: Basic Info -->
             <Card>
                 <CardHeader class="pb-2"><h2 class="text-base font-semibold">Basic Info</h2></CardHeader>
@@ -347,7 +371,15 @@ function removeAssignment(assignment: Assignment): void {
                 </CardContent>
             </Card>
 
-            <!-- Card 5: Invoice & Payment Tracking -->
+            <div class="flex justify-end">
+                <Button type="submit" :disabled="form.processing" class="min-w-40">
+                    {{ form.processing ? 'Saving…' : 'Save Masterdata' }}
+                </Button>
+            </div>
+        </form>
+
+        <!-- ── Tab 2: Financials ── -->
+        <form v-else-if="activeTab === 'financials'" class="space-y-6" @submit.prevent="submit" novalidate>
             <Card>
                 <CardHeader class="pb-2"><h2 class="text-base font-semibold">Invoice &amp; Payment Tracking</h2></CardHeader>
                 <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -396,8 +428,8 @@ function removeAssignment(assignment: Assignment): void {
             </div>
         </form>
 
-        <!-- ── Tab 2: Assignments ── -->
-        <div v-else class="grid gap-4 md:grid-cols-2">
+        <!-- ── Tab 3: Assignments ── -->
+        <div v-else-if="activeTab === 'assignments'" class="grid gap-4 md:grid-cols-2">
 
             <!-- SURVEY card -->
             <Card>

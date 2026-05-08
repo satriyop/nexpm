@@ -19,5 +19,15 @@ export function initializeFlashToast(): void {
         if (typeof flash.error === 'string') toast.error(flash.error);
         if (typeof flash.warning === 'string') toast.warning(flash.warning);
         if (typeof flash.info === 'string') toast.info(flash.info);
+
+        // Auto-trigger file download when backend flashes a download_url
+        if (typeof flash.download_url === 'string') {
+            const a = document.createElement('a');
+            a.href = flash.download_url;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
     });
 }

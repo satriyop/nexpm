@@ -140,13 +140,12 @@ function submitRevise(): void {
 // --- Drop / Restore ---
 const dropForm = useForm({});
 const restoreForm = useForm({});
+const dropDialogOpen = ref(false);
 
-function submitDrop(): void {
-    if (!confirm('Archive this assignment? It will be hidden from the main list.')) {
-        return;
-    }
+function confirmDrop(): void {
     dropForm.patch(AdminAssignmentActions.drop(props.assignment.id).url, {
         preserveScroll: true,
+        onSuccess: () => { dropDialogOpen.value = false; },
     });
 }
 
@@ -1382,7 +1381,7 @@ function storageUrl(path: string | null | undefined): string {
             </div>
 
             <!-- Right column: Admin actions and prerequisite -->
-            <div class="flex flex-col gap-6">
+            <div class="flex flex-col gap-6 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
                 <Card>
                     <CardHeader>
                         <CardTitle>Verification</CardTitle>
@@ -1493,8 +1492,7 @@ function storageUrl(path: string | null | undefined): string {
                                 type="button"
                                 variant="destructive"
                                 class="w-full"
-                                :disabled="dropForm.processing"
-                                @click="submitDrop"
+                                @click="dropDialogOpen = true"
                             >
                                 Archive (Drop) Assignment
                             </Button>
@@ -1704,6 +1702,37 @@ function storageUrl(path: string | null | undefined): string {
                         @click="submitReassign"
                     >
                         Confirm Reassign
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Drop confirmation dialog -->
+        <Dialog v-model:open="dropDialogOpen">
+            <DialogContent class="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Archive Assignment?</DialogTitle>
+                    <DialogDescription>
+                        This assignment will be marked as <strong>DROPPED</strong> and hidden from the active list.
+                        You can restore it later from this page.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        :disabled="dropForm.processing"
+                        @click="dropDialogOpen = false"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        :disabled="dropForm.processing"
+                        @click="confirmDrop"
+                    >
+                        {{ dropForm.processing ? 'Archiving…' : 'Archive Assignment' }}
                     </Button>
                 </DialogFooter>
             </DialogContent>

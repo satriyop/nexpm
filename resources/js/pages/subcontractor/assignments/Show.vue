@@ -8,6 +8,7 @@ import ConstructionForm from '@/components/activities/ConstructionForm.vue';
 import PlnForm from '@/components/activities/PlnForm.vue';
 import SurveyForm from '@/components/activities/SurveyForm.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
+import AssignmentStepper from '@/components/AssignmentStepper.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { Assignment } from '@/types';
@@ -46,6 +47,9 @@ const isReadOnly = computed(() =>
                 <StatusBadge :status="assignment.status" />
             </div>
         </div>
+
+        <!-- Activity stepper -->
+        <AssignmentStepper :activity-type="assignment.activity_type" :status="assignment.status" />
 
         <!-- Revision alert -->
         <Alert v-if="assignment.status === 'REVISION'" variant="destructive" class="border-amber-300 bg-amber-50 text-amber-800">

@@ -140,7 +140,9 @@ class ReportController extends Controller
                 ->update(['ss_report_submission_date' => today()]);
         }
 
-        return redirect()->route('admin.reports.index')->with('success', $typeLabel.' generated successfully.');
+        return redirect()->route('admin.reports.index')
+            ->with('success', $typeLabel.' generated successfully.')
+            ->with('download_url', route('admin.reports.download', $report));
     }
 
     public function download(Report $report, BastReportExportService $bastService): StreamedResponse
@@ -173,7 +175,9 @@ class ReportController extends Controller
 
         $newReport->assignments()->attach($assignmentIds);
 
-        return redirect()->route('admin.reports.index')->with('success', $typeLabel.' regenerated successfully.');
+        return redirect()->route('admin.reports.index')
+            ->with('success', $typeLabel.' regenerated successfully.')
+            ->with('download_url', route('admin.reports.download', $newReport));
     }
 
     private function downloadBast(Report $report, BastReportExportService $bastService): StreamedResponse
