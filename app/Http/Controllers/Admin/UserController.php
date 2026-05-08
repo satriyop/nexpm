@@ -15,11 +15,15 @@ use Inertia\Response;
 
 class UserController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $perPage = (int) $request->input('per_page', 15);
+        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 15;
+
         return Inertia::render('admin/users/Index', [
-            'users'           => User::query()->whereScopedToMainContractor()->with('subcontractor', 'mainContractor')->latest('id')->paginate(15),
-            'subcontractors'  => Subcontractor::query()->whereScopedToMainContractor()->orderBy('name')->get(['id', 'name', 'main_contractor_id']),
+            'users' => User::query()->whereScopedToMainContractor()->with('subcontractor', 'mainContractor')->latest('id')->paginate($perPage)->withQueryString(),
+            'per_page' => $perPage,
+            'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->orderBy('name')->get(['id', 'name', 'main_contractor_id']),
             'mainContractors' => MainContractor::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
@@ -27,22 +31,22 @@ class UserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name'                => ['required', 'string', 'max:255'],
-            'email'               => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password'            => ['required', Password::min(8)],
-            'role'                => ['required', 'in:admin,subcontractor'],
-            'main_contractor_id'  => ['required_if:role,admin', 'nullable', 'exists:main_contractors,id'],
-            'subcontractor_id'    => ['required_if:role,subcontractor', 'nullable', 'exists:subcontractors,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', Password::min(8)],
+            'role' => ['required', 'in:admin,subcontractor'],
+            'main_contractor_id' => ['required_if:role,admin', 'nullable', 'exists:main_contractors,id'],
+            'subcontractor_id' => ['required_if:role,subcontractor', 'nullable', 'exists:subcontractors,id'],
         ]);
 
         User::query()->create([
-            'name'                => $validated['name'],
-            'email'               => $validated['email'],
-            'password'            => $validated['password'],
-            'role'                => Role::from($validated['role']),
-            'main_contractor_id'  => $validated['main_contractor_id'] ?? null,
-            'subcontractor_id'    => $validated['subcontractor_id'] ?? null,
-            'email_verified_at'   => now(),
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'role' => Role::from($validated['role']),
+            'main_contractor_id' => $validated['main_contractor_id'] ?? null,
+            'subcontractor_id' => $validated['subcontractor_id'] ?? null,
+            'email_verified_at' => now(),
         ]);
 
         return back()->with('success', 'User created successfully.');

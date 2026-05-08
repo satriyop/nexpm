@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { Eye, Plus } from 'lucide-vue-next';
+import { Eye, FolderKanban, Plus } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ProjectController';
 import InputError from '@/components/InputError.vue';
@@ -21,7 +21,7 @@ interface Project {
     main_contractor: MainContractor | null; client: Client | null;
 }
 
-const props = defineProps<{ projects: PaginatedData<Project>; mainContractors: MainContractor[]; clients: Client[] }>();
+const props = defineProps<{ projects: PaginatedData<Project>; mainContractors: MainContractor[]; clients: Client[]; per_page: number }>();
 
 defineOptions({
     layout: {
@@ -88,14 +88,25 @@ function submit() {
                             </td>
                         </tr>
                         <tr v-if="!projects.data.length">
-                            <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">No projects yet.</td>
+                            <td colspan="6" class="px-6 py-16 text-center">
+                                <div class="flex flex-col items-center gap-3">
+                                    <FolderKanban class="size-10 text-muted-foreground/40" />
+                                    <div>
+                                        <p class="font-medium text-foreground">No projects yet</p>
+                                        <p class="mt-0.5 text-sm text-muted-foreground">Create your first project to get started.</p>
+                                    </div>
+                                    <Button size="sm" @click="open = true">
+                                        <Plus class="mr-1.5 h-4 w-4" />New Project
+                                    </Button>
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </CardContent>
         </Card>
 
-        <PaginationLinks :data="projects" />
+        <PaginationLinks :data="projects" :per-page="props.per_page" />
     </div>
 
     <Dialog v-model:open="open">

@@ -1,28 +1,57 @@
 <script setup lang="ts">
+import { router } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PaginatedData } from '@/types';
 
-defineProps<{
+const props = defineProps<{
     data: PaginatedData<unknown>;
+    perPage?: number;
+    perPageOptions?: number[];
 }>();
+
+const pageSizes = props.perPageOptions ?? [10, 25, 50, 100];
+
+function changePerPage(value: string): void {
+    const url = new URL(window.location.href);
+    url.searchParams.set('per_page', value);
+    url.searchParams.delete('page');
+    router.visit(url.toString(), { preserveState: true, preserveScroll: false });
+}
 </script>
 
 <template>
     <div
         class="flex flex-col items-center justify-between gap-3 border-t border-sidebar-border/70 px-4 py-3 sm:flex-row dark:border-sidebar-border"
     >
-        <p
-            v-if="data.total !== undefined"
-            class="text-xs text-muted-foreground sm:text-sm"
-        >
-            Showing
-            <span class="font-medium">{{ data.from ?? 0 }}</span>
-            to
-            <span class="font-medium">{{ data.to ?? 0 }}</span>
-            of
-            <span class="font-medium">{{ data.total }}</span>
-            results
-        </p>
+        <div class="flex items-center gap-3">
+            <p
+                v-if="data.total !== undefined"
+                class="text-xs text-muted-foreground sm:text-sm"
+            >
+                Showing
+                <span class="font-medium">{{ data.from ?? 0 }}</span>
+                to
+                <span class="font-medium">{{ data.to ?? 0 }}</span>
+                of
+                <span class="font-medium">{{ data.total }}</span>
+                results
+            </p>
+
+            <div v-if="perPage !== undefined" class="flex items-center gap-1.5">
+                <span class="text-xs text-muted-foreground">per page</span>
+                <Select :model-value="String(perPage)" @update:model-value="changePerPage">
+                    <SelectTrigger class="h-7 w-16 text-xs">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem v-for="size in pageSizes" :key="size" :value="String(size)" class="text-xs">
+                            {{ size }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
 
         <nav
             v-if="data.links.length > 3"

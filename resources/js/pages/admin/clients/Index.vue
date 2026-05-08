@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Pencil, Plus } from 'lucide-vue-next';
+import { Briefcase, Pencil, Plus } from 'lucide-vue-next';
 import { ref } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ClientController';
 import InputError from '@/components/InputError.vue';
@@ -26,7 +26,7 @@ interface Client {
     main_contractor: MainContractor | null;
 }
 
-defineProps<{ clients: PaginatedData<Client>; mainContractors: MainContractor[] }>();
+const props = defineProps<{ clients: PaginatedData<Client>; mainContractors: MainContractor[]; per_page: number }>();
 
 defineOptions({
     layout: {
@@ -124,14 +124,25 @@ function submitEdit() {
                             </td>
                         </tr>
                         <tr v-if="!clients.data.length">
-                            <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">No clients yet.</td>
+                            <td colspan="6" class="px-6 py-16 text-center">
+                                <div class="flex flex-col items-center gap-3">
+                                    <Briefcase class="size-10 text-muted-foreground/40" />
+                                    <div>
+                                        <p class="font-medium text-foreground">No clients yet</p>
+                                        <p class="mt-0.5 text-sm text-muted-foreground">Add your first client to start managing projects.</p>
+                                    </div>
+                                    <Button size="sm" @click="addOpen = true">
+                                        <Plus class="mr-1.5 h-4 w-4" />Add Client
+                                    </Button>
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </CardContent>
         </Card>
 
-        <PaginationLinks :data="clients" />
+        <PaginationLinks :data="clients" :per-page="props.per_page" />
     </div>
 
     <!-- Add modal -->

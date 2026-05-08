@@ -12,10 +12,14 @@ use Inertia\Response;
 
 class SubcontractorController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $perPage = (int) $request->input('per_page', 15);
+        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 15;
+
         return Inertia::render('admin/subcontractors/Index', [
-            'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractor')->latest('id')->paginate(15),
+            'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractor')->latest('id')->paginate($perPage)->withQueryString(),
+            'per_page' => $perPage,
             'mainContractors' => MainContractor::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }

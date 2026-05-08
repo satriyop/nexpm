@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Plus } from 'lucide-vue-next';
+import { Plus, Wrench } from 'lucide-vue-next';
 import { ref } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/SubcontractorController';
 import InputError from '@/components/InputError.vue';
@@ -28,6 +28,7 @@ interface Subcontractor {
 const props = defineProps<{
     subcontractors: PaginatedData<Subcontractor>;
     mainContractors: MainContractor[];
+    per_page: number;
 }>();
 
 defineOptions({
@@ -78,14 +79,25 @@ function submit() {
                             <td class="px-4 py-3 text-muted-foreground">{{ sc.phone ?? '—' }}</td>
                         </tr>
                         <tr v-if="!subcontractors.data.length">
-                            <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">No subcontractors yet.</td>
+                            <td colspan="5" class="px-6 py-16 text-center">
+                                <div class="flex flex-col items-center gap-3">
+                                    <Wrench class="size-10 text-muted-foreground/40" />
+                                    <div>
+                                        <p class="font-medium text-foreground">No subcontractors yet</p>
+                                        <p class="mt-0.5 text-sm text-muted-foreground">Add subcontractors to assign them to sites.</p>
+                                    </div>
+                                    <Button size="sm" @click="open = true">
+                                        <Plus class="mr-1.5 h-4 w-4" />Add Subcontractor
+                                    </Button>
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </CardContent>
         </Card>
 
-        <PaginationLinks :data="subcontractors" />
+        <PaginationLinks :data="subcontractors" :per-page="props.per_page" />
     </div>
 
     <Dialog v-model:open="open">

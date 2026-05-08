@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Plus } from 'lucide-vue-next';
+import { Plus, Users } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/UserController';
 import InputError from '@/components/InputError.vue';
@@ -30,6 +30,7 @@ const props = defineProps<{
     users: PaginatedData<User>;
     mainContractors: MainContractor[];
     subcontractors: Subcontractor[];
+    per_page: number;
 }>();
 
 defineOptions({
@@ -93,14 +94,25 @@ const roleBadgeVariant = (role: string) => {
                             </td>
                         </tr>
                         <tr v-if="!users.data.length">
-                            <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">No users yet.</td>
+                            <td colspan="4" class="px-6 py-16 text-center">
+                                <div class="flex flex-col items-center gap-3">
+                                    <Users class="size-10 text-muted-foreground/40" />
+                                    <div>
+                                        <p class="font-medium text-foreground">No users yet</p>
+                                        <p class="mt-0.5 text-sm text-muted-foreground">Add team members to give them access to the platform.</p>
+                                    </div>
+                                    <Button size="sm" @click="open = true">
+                                        <Plus class="mr-1.5 h-4 w-4" />Add User
+                                    </Button>
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </CardContent>
         </Card>
 
-        <PaginationLinks :data="users" />
+        <PaginationLinks :data="users" :per-page="props.per_page" />
     </div>
 
     <Dialog v-model:open="open">

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowRight, LockKeyhole, Search, X } from 'lucide-vue-next';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Archive, ArrowRight, Download, LockKeyhole, Search, X } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -57,6 +59,7 @@ const props = defineProps<{
     projects: Project[];
     mainContractors: MainContractor[] | null;
     filters: Filters;
+    per_page: number;
 }>();
 
 defineOptions({
@@ -238,6 +241,57 @@ const activityColumns: { type: ActivityType; label: string }[] = [
     { type: 'PLN_CONNECTION', label: 'PLN' },
     { type: 'BAST', label: 'BAST' },
 ];
+
+// --- Bulk selection ---
+const selectedSiteIds = ref<Set<number>>(new Set());
+
+const pageIds = computed(() => (props.sites?.data ?? []).map((s) => s.id));
+
+const allOnPageSelected = computed(
+    () => pageIds.value.length > 0 && pageIds.value.every((id) => selectedSiteIds.value.has(id)),
+);
+const someOnPageSelected = computed(
+    () => pageIds.value.some((id) => selectedSiteIds.value.has(id)) && !allOnPageSelected.value,
+);
+
+function toggleSelectAll(): void {
+    if (allOnPageSelected.value) {
+        pageIds.value.forEach((id) => selectedSiteIds.value.delete(id));
+    } else {
+        pageIds.value.forEach((id) => selectedSiteIds.value.add(id));
+    }
+    selectedSiteIds.value = new Set(selectedSiteIds.value);
+}
+
+function toggleSite(id: number): void {
+    if (selectedSiteIds.value.has(id)) {
+        selectedSiteIds.value.delete(id);
+    } else {
+        selectedSiteIds.value.add(id);
+    }
+    selectedSiteIds.value = new Set(selectedSiteIds.value);
+}
+
+// Clear selection on filter/page change
+watch(() => props.sites?.data, () => { selectedSiteIds.value = new Set(); });
+
+const bulkDropForm = useForm({ assignment_ids: [] as number[] });
+
+function bulkDropSelected(): void {
+    const sites = (props.sites?.data ?? []).filter((s) => selectedSiteIds.value.has(s.id));
+    const assignmentIds = sites.flatMap((s) => s.assignments.map((a) => a.id));
+    if (assignmentIds.length === 0) return;
+    bulkDropForm.assignment_ids = assignmentIds;
+    bulkDropForm.post(AdminAssignmentActions.bulkDrop().url, {
+        onSuccess: () => { selectedSiteIds.value = new Set(); },
+    });
+}
+
+function exportSelected(): void {
+    const ids = [...selectedSiteIds.value];
+    const url = AdminAssignmentActions.exportMethod().url + (ids.length ? `?site_ids=${ids.join(',')}` : '');
+    window.location.href = url;
+}
 </script>
 
 <template>
@@ -367,6 +421,41 @@ const activityColumns: { type: ActivityType; label: string }[] = [
             </div>
         </div>
 
+        <!-- Bulk action toolbar -->
+        <Transition
+            enter-active-class="transition-all duration-150"
+            enter-from-class="opacity-0 -translate-y-2"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition-all duration-100"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 -translate-y-2"
+        >
+            <div
+                v-if="selectedSiteIds.size > 0"
+                class="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5"
+            >
+                <span class="text-sm font-medium text-primary">{{ selectedSiteIds.size }} site(s) selected</span>
+                <div class="flex items-center gap-2 ml-auto">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        :disabled="bulkDropForm.processing"
+                        @click="bulkDropSelected"
+                    >
+                        <Archive class="mr-1.5 h-3.5 w-3.5" />
+                        {{ bulkDropForm.processing ? 'Archiving…' : 'Bulk Drop' }}
+                    </Button>
+                    <Button size="sm" variant="outline" @click="exportSelected">
+                        <Download class="mr-1.5 h-3.5 w-3.5" />
+                        Export CSV
+                    </Button>
+                    <Button size="sm" variant="ghost" @click="selectedSiteIds = new Set()">
+                        <X class="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            </div>
+        </Transition>
+
         <div
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
@@ -374,6 +463,12 @@ const activityColumns: { type: ActivityType; label: string }[] = [
                 <table class="w-full text-sm">
                     <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                         <tr>
+                            <th class="w-10 px-4 py-3">
+                                <Checkbox
+                                    :checked="someOnPageSelected ? 'indeterminate' : allOnPageSelected"
+                                    @update:checked="toggleSelectAll"
+                                />
+                            </th>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">
                                 Site Code
                             </th>
@@ -405,8 +500,15 @@ const activityColumns: { type: ActivityType; label: string }[] = [
                             v-for="site in (sites?.data || [])"
                             :key="site.id"
                             class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            :class="{ 'bg-primary/5': selectedSiteIds.has(site.id) }"
                             @click="router.visit('/admin/assignments/sites/' + site.id)"
                         >
+                            <td class="w-10 px-4 py-3" @click.stop>
+                                <Checkbox
+                                    :checked="selectedSiteIds.has(site.id)"
+                                    @update:checked="toggleSite(site.id)"
+                                />
+                            </td>
                             <td class="px-4 py-3 font-mono text-xs font-semibold text-primary underline-offset-2 hover:underline">
                                 {{ site.site_code }}
                             </td>
@@ -460,7 +562,7 @@ const activityColumns: { type: ActivityType; label: string }[] = [
 
                         <tr v-if="!sites || !sites.data || sites.data.length === 0">
                             <td
-                                colspan="8"
+                                colspan="9"
                                 class="px-4 py-12 text-center text-sm text-muted-foreground"
                             >
                                 <div class="flex flex-col items-center gap-2 py-4">
@@ -476,7 +578,7 @@ const activityColumns: { type: ActivityType; label: string }[] = [
                 </table>
             </div>
 
-            <PaginationLinks v-if="sites && sites.data && sites.data.length > 0" :data="sites" />
+            <PaginationLinks v-if="sites && sites.data && sites.data.length > 0" :data="sites" :per-page="props.per_page" />
         </div>
     </div>
 </template>
