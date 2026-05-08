@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AppSetting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -63,6 +64,10 @@ class HandleInertiaRequests extends Middleware
                     ])
                 : [],
             'unread_notifications_count' => fn () => $request->user()?->unreadNotifications()->count() ?? 0,
+            'sla' => fn () => [
+                'slow_days' => (int) AppSetting::get('sla.slow_days', 15),
+                'stalled_days' => (int) AppSetting::get('sla.stalled_days', 30),
+            ],
         ];
     }
 }

@@ -34,6 +34,10 @@ declare module '@inertiajs/core' {
                 created_at: string;
             }>;
             unread_notifications_count: number;
+            sla: {
+                slow_days: number;
+                stalled_days: number;
+            };
             [key: string]: unknown;
         };
     }

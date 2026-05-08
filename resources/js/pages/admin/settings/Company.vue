@@ -13,6 +13,8 @@ const props = defineProps<{
     reportEmail: string;
     surveySlaDays: number;
     constructionSlaDays: number;
+    slowDays: number;
+    stalledDays: number;
 }>();
 
 defineOptions({
@@ -29,6 +31,8 @@ const form = useForm({
     report_email: props.reportEmail,
     survey_sla_days: props.surveySlaDays,
     construction_sla_days: props.constructionSlaDays,
+    slow_days: props.slowDays,
+    stalled_days: props.stalledDays,
 });
 
 function submit() {
@@ -100,6 +104,20 @@ function submit() {
                             <Label>Construction SLA (days)</Label>
                             <Input v-model.number="form.construction_sla_days" type="number" min="1" max="365" />
                             <InputError :message="form.errors.construction_sla_days" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="grid gap-1.5">
+                            <Label>Slow badge threshold (days)</Label>
+                            <Input v-model.number="form.slow_days" type="number" min="1" max="365" />
+                            <p class="text-xs text-muted-foreground">Amber "Slow" badge appears after this many days without progress.</p>
+                            <InputError :message="form.errors.slow_days" />
+                        </div>
+                        <div class="grid gap-1.5">
+                            <Label>Stalled badge threshold (days)</Label>
+                            <Input v-model.number="form.stalled_days" type="number" min="1" max="365" />
+                            <p class="text-xs text-muted-foreground">Red "Stalled" badge appears after this many days without progress.</p>
+                            <InputError :message="form.errors.stalled_days" />
                         </div>
                     </div>
                 </CardContent>
