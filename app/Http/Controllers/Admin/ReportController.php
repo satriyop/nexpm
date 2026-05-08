@@ -198,7 +198,7 @@ class ReportController extends Controller
     {
         $assignments = $report->assignments()
             ->where('activity_type', ActivityType::Survey)
-            ->with(['site.project.mainContractor', 'subcontractor', 'surveyData'])
+            ->with(['site.project.mainContractor', 'site.project.client', 'subcontractor', 'surveyData'])
             ->get();
 
         abort_if($assignments->isEmpty(), 404, 'No survey assignments in this report.');
@@ -269,21 +269,25 @@ class ReportController extends Controller
             ? url(Storage::url($survey->file_ba_survey))
             : null;
 
-        $companyName = AppSetting::get('company.name', 'VAHANA GASTI TEKNIKA');
-
-        $companyLogoPath = AppSetting::get('company.logo');
-        $companyLogoAbs = $companyLogoPath && file_exists(storage_path('app/public/'.$companyLogoPath))
-            ? storage_path('app/public/'.$companyLogoPath)
+        // Left side of PDF header = Client (commissioning organisation, e.g. vGreen)
+        $clientName = $site->project?->client?->name ?? 'CLIENT';
+        $clientLogoPath = $site->project?->client?->logo;
+        $clientLogoAbs = $clientLogoPath && file_exists(storage_path('app/public/'.$clientLogoPath))
+            ? storage_path('app/public/'.$clientLogoPath)
             : null;
 
+        // Right side of PDF header = Main Contractor / EPC
+        $contractorName = $site->project?->mainContractor?->name ?? '';
         $contractorLogoPath = $site->project?->mainContractor?->logo;
         $contractorLogoAbs = $contractorLogoPath && file_exists(storage_path('app/public/'.$contractorLogoPath))
             ? storage_path('app/public/'.$contractorLogoPath)
             : null;
 
+        $pdfFooterNote = AppSetting::get('pdf.footer_note', '');
+
         $data = compact(
             'assignment', 'survey', 'site', 'photos', 'mockupPath', 'baSurveyUrl',
-            'companyName', 'companyLogoAbs', 'contractorLogoAbs'
+            'clientName', 'clientLogoAbs', 'contractorName', 'contractorLogoAbs', 'pdfFooterNote'
         );
 
         return Pdf::loadView('pdf.site-survey-report', $data)->setPaper('a4', 'portrait');

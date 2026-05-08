@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,32 +13,28 @@ class CompanySettingController extends Controller
 {
     public function index(): Response
     {
-        $logoPath = AppSetting::get('company.logo');
-
         return Inertia::render('admin/settings/Company', [
-            'companyName' => AppSetting::get('company.name', ''),
-            'logoUrl' => $logoPath ? Storage::url($logoPath) : null,
+            'pdfFooterNote' => AppSetting::get('pdf.footer_note', ''),
+            'reportEmail' => AppSetting::get('notifications.report_email', ''),
+            'surveySlaDays' => (int) AppSetting::get('sla.survey_days', 14),
+            'constructionSlaDays' => (int) AppSetting::get('sla.construction_days', 30),
         ]);
     }
 
     public function update(Request $request): RedirectResponse
     {
         $request->validate([
-            'company_name' => ['nullable', 'string', 'max:255'],
-            'logo' => ['nullable', 'file', 'image', 'max:2048'],
+            'pdf_footer_note' => ['nullable', 'string', 'max:1000'],
+            'report_email' => ['nullable', 'email', 'max:255'],
+            'survey_sla_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'construction_sla_days' => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
-        AppSetting::set('company.name', $request->input('company_name', ''));
+        AppSetting::set('pdf.footer_note', $request->input('pdf_footer_note', ''));
+        AppSetting::set('notifications.report_email', $request->input('report_email', ''));
+        AppSetting::set('sla.survey_days', $request->input('survey_sla_days', 14));
+        AppSetting::set('sla.construction_days', $request->input('construction_sla_days', 30));
 
-        if ($request->hasFile('logo')) {
-            $oldPath = AppSetting::get('company.logo');
-            if ($oldPath) {
-                Storage::disk('public')->delete($oldPath);
-            }
-            $path = $request->file('logo')->store('logos/company', 'public');
-            AppSetting::set('company.logo', $path);
-        }
-
-        return back()->with('success', 'Company settings updated.');
+        return back()->with('success', 'App settings saved.');
     }
 }

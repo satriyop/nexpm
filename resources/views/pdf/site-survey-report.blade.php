@@ -100,16 +100,16 @@
     {{-- Logo / company name rows --}}
     <tr>
         <td style="width:50%; text-align:center; padding:10px 8px; border-right:1px solid #bbb; border-bottom:1px solid #bbb; font-size:10pt; font-weight:bold; color:#333;">
-            @if($contractorLogoAbs)
-                <img src="{{ $contractorLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Client logo">
+            @if($clientLogoAbs)
+                <img src="{{ $clientLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Client logo">
             @endif
-            {{ $site->project?->mainContractor?->name ?? 'CLIENT' }}
+            {{ $clientName }}
         </td>
         <td style="width:50%; text-align:center; padding:10px 8px; border-bottom:1px solid #bbb; font-size:10pt; font-weight:bold; color:#333;">
-            @if($companyLogoAbs)
-                <img src="{{ $companyLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Company logo">
+            @if($contractorLogoAbs)
+                <img src="{{ $contractorLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Contractor logo">
             @endif
-            {{ $companyName }}
+            {{ $contractorName }}
         </td>
     </tr>
     {{-- Version --}}
@@ -312,12 +312,18 @@
                 </tr>
                 <tr>
                     <td style="text-align:left;">Site: {{ $site->site_code }}</td>
-                    <td style="text-align:right;">PT Vahana Gasti Teknika</td>
+                    <td style="text-align:right;">{{ $contractorName }}</td>
                 </tr>
             </table>
         </td>
     </tr>
 </table>
+
+@if($pdfFooterNote)
+<div style="margin-top:12px; padding:6px 10px; border-top:1px solid #ccc; font-size:7.5pt; color:#777; font-style:italic;">
+    {{ $pdfFooterNote }}
+</div>
+@endif
 
 </body>
 </html>

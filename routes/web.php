@@ -28,6 +28,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
 
     Route::get('clients', [Admin\ClientController::class, 'index'])->name('clients.index');
     Route::post('clients', [Admin\ClientController::class, 'store'])->name('clients.store');
+    Route::post('clients/{client}', [Admin\ClientController::class, 'update'])->name('clients.update');
 
     Route::get('projects', [Admin\ProjectController::class, 'index'])->name('projects.index');
     Route::post('projects', [Admin\ProjectController::class, 'store'])->name('projects.store');
