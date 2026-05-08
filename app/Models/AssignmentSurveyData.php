@@ -40,6 +40,7 @@ class AssignmentSurveyData extends Model
         'file_mockup_3d',
         'file_ba_survey',
         'parking_slot',
+        'ss_report_submission_date',
     ];
 
     /**
@@ -71,6 +72,7 @@ class AssignmentSurveyData extends Model
     {
         return [
             'ss_schedule_date' => 'date',
+            'ss_report_submission_date' => 'date',
         ];
     }
 

@@ -11,8 +11,8 @@ use App\Enums\AssignmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\Assignment;
+use App\Models\AssignmentSurveyData;
 use App\Models\Report;
-use App\Models\Site;
 use App\Models\User;
 use App\Services\BastReportExportService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -133,8 +133,11 @@ class ReportController extends Controller
         Assignment::whereIn('id', $assignmentIds)->each(fn (Assignment $a) => $a->markReported());
 
         if ($validated['report_type'] === 'SSR') {
-            $siteIds = Assignment::whereIn('id', $assignmentIds)->pluck('site_id');
-            Site::whereIn('id', $siteIds)->update(['ss_report_submission_date' => today()]);
+            $surveyAssignmentIds = Assignment::whereIn('id', $assignmentIds)
+                ->where('activity_type', ActivityType::Survey)
+                ->pluck('id');
+            AssignmentSurveyData::whereIn('assignment_id', $surveyAssignmentIds)
+                ->update(['ss_report_submission_date' => today()]);
         }
 
         return redirect()->route('admin.reports.index')->with('success', $typeLabel.' generated successfully.');
@@ -411,7 +414,7 @@ class ReportController extends Controller
                 $site?->bd_pic ?? '',
                 $site?->ss_wo_number ?? '',
                 $survey?->surveyData?->ss_schedule_date?->format('d-M-y') ?? '',
-                $site?->ss_report_submission_date?->format('d-M-y') ?? '',
+                $survey?->surveyData?->ss_report_submission_date?->format('d-M-y') ?? '',
                 $site?->cable_length_to_panel ?? '',
                 $site?->cable_length_panel_to_charger ?? '',
                 $survey?->surveyData?->cable_pulling_type ?? '',
@@ -424,7 +427,7 @@ class ReportController extends Controller
                 $construction?->constructionData?->cons_actual_start_date?->format('d-M-y') ?? '',
                 $construction?->constructionData?->cons_actual_done_date?->format('d-M-y') ?? '',
                 $pln?->plnData?->nidi_slo_date_acquired?->format('d-M-y') ?? '',
-                $site?->bpujl_date_acquired?->format('d-M-y') ?? '',
+                $pln?->plnData?->bpujl_acquired_date?->format('d-M-y') ?? '',
                 $site?->nidi_slo_bpujl_url ?? '',
                 $site?->sik_url ?? '',
                 $pln?->plnData?->type_rate ?? '',

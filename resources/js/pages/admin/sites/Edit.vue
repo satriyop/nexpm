@@ -36,9 +36,7 @@ interface Site {
     cable_length_to_panel: string | null;
     cable_length_panel_to_charger: string | null;
     charging_station_count: number | null;
-    ss_report_submission_date: string | null;
     ssr_url: string | null;
-    bpujl_date_acquired: string | null;
     nidi_slo_bpujl_url: string | null;
     sik_url: string | null;
     latest_remark: string | null;
@@ -98,9 +96,7 @@ const form = useForm({
     cable_length_to_panel: props.site.cable_length_to_panel ?? '',
     cable_length_panel_to_charger: props.site.cable_length_panel_to_charger ?? '',
     charging_station_count: props.site.charging_station_count ?? '',
-    ss_report_submission_date: props.site.ss_report_submission_date ?? '',
     ssr_url: props.site.ssr_url ?? '',
-    bpujl_date_acquired: props.site.bpujl_date_acquired ?? '',
     nidi_slo_bpujl_url: props.site.nidi_slo_bpujl_url ?? '',
     sik_url: props.site.sik_url ?? '',
     latest_remark: props.site.latest_remark ?? '',
@@ -310,11 +306,6 @@ function removeAssignment(assignment: Assignment): void {
                         <InputError :message="form.errors.cable_length_panel_to_charger" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="ss_report_submission_date">SS Report Submission Date</Label>
-                        <Input id="ss_report_submission_date" v-model="form.ss_report_submission_date" type="date" />
-                        <InputError :message="form.errors.ss_report_submission_date" />
-                    </div>
-                    <div class="grid gap-1.5">
                         <Label for="ssr_url">SSR URL</Label>
                         <Input id="ssr_url" v-model="form.ssr_url" type="url" />
                         <InputError :message="form.errors.ssr_url" />
@@ -326,11 +317,6 @@ function removeAssignment(assignment: Assignment): void {
             <Card>
                 <CardHeader class="pb-2"><h2 class="text-base font-semibold">Permits &amp; Legal</h2></CardHeader>
                 <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div class="grid gap-1.5">
-                        <Label for="bpujl_date_acquired">BPUJL Date Acquired</Label>
-                        <Input id="bpujl_date_acquired" v-model="form.bpujl_date_acquired" type="date" />
-                        <InputError :message="form.errors.bpujl_date_acquired" />
-                    </div>
                     <div class="grid gap-1.5">
                         <Label for="nidi_slo_bpujl_url">NIDI SLO / BPUJL URL</Label>
                         <Input id="nidi_slo_bpujl_url" v-model="form.nidi_slo_bpujl_url" type="url" />
@@ -371,7 +357,7 @@ function removeAssignment(assignment: Assignment): void {
                         <InputError :message="form.errors.invoice_submission_date" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="dp_35_date">DP 35% Date</Label>
+                        <Label for="dp_35_date">35% DP Date</Label>
                         <Input id="dp_35_date" v-model="form.dp_35_date" type="date" />
                         <InputError :message="form.errors.dp_35_date" />
                     </div>

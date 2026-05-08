@@ -274,6 +274,7 @@ class AssignmentController extends Controller
             'photo_satellite_gmaps' => ['nullable', 'file', 'image', 'max:10240'],
             'file_mockup_3d' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,dwg', 'max:20480'],
             'file_ba_survey' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'ss_report_submission_date' => ['nullable', 'date'],
         ]);
 
         $survey = $assignment->surveyData()->firstOrNew([]);

@@ -208,6 +208,7 @@ const adminSurveyForm = useForm({
     pln_network_type: survey.value?.pln_network_type ?? '',
     parking_slot: survey.value?.parking_slot ?? '',
     additional_info: survey.value?.additional_info ?? '',
+    ss_report_submission_date: survey.value?.ss_report_submission_date ?? '',
     photo_overall_site: null as File | null,
     photo_parking_evcs: null as File | null,
     photo_other_angle: null as File | null,
@@ -232,6 +233,8 @@ const adminPlnForm = useForm({
     kwh_meter_installation_date: pln.value?.kwh_meter_installation_date ?? '',
     id_pelanggan: pln.value?.id_pelanggan ?? '',
     catatan_progres: pln.value?.catatan_progres ?? '',
+    email_bpujl_req_date: pln.value?.email_bpujl_req_date ?? '',
+    bpujl_acquired_date: pln.value?.bpujl_acquired_date ?? '',
     file_slo: null as File | null,
     file_nidi: null as File | null,
     file_reg: null as File | null,
@@ -753,6 +756,11 @@ function storageUrl(path: string | null | undefined): string {
                                     class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
                                 <InputError :message="adminSurveyForm.errors.additional_info" />
                             </div>
+                            <div class="grid gap-1.5">
+                                <Label>SS Report Submission Date</Label>
+                                <Input v-model="adminSurveyForm.ss_report_submission_date" type="date" />
+                                <InputError :message="adminSurveyForm.errors.ss_report_submission_date" />
+                            </div>
                             <!-- Survey photos -->
                             <div class="grid gap-1.5 sm:col-span-2">
                                 <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Photos</Label>
@@ -978,6 +986,16 @@ function storageUrl(path: string | null | undefined): string {
                                 <textarea v-model="adminPlnForm.catatan_progres" rows="3"
                                     class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
                                 <InputError :message="adminPlnForm.errors.catatan_progres" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label>Email BPUJL Request Date</Label>
+                                <Input v-model="adminPlnForm.email_bpujl_req_date" type="date" />
+                                <InputError :message="adminPlnForm.errors.email_bpujl_req_date" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label>BPUJL Acquired Date</Label>
+                                <Input v-model="adminPlnForm.bpujl_acquired_date" type="date" />
+                                <InputError :message="adminPlnForm.errors.bpujl_acquired_date" />
                             </div>
                             <div class="grid gap-1.5 sm:col-span-2">
                                 <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</Label>

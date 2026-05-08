@@ -69,6 +69,7 @@ export interface AssignmentSurveyData {
     file_mockup_3d: string | null;
     file_ba_survey: string | null;
     parking_slot: string | null;
+    ss_report_submission_date: string | null;
 }
 
 export interface AssignmentPlnData {

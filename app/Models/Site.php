@@ -33,9 +33,7 @@ class Site extends Model
         'cable_length_to_panel',
         'cable_length_panel_to_charger',
         'charging_station_count',
-        'ss_report_submission_date',
         'ssr_url',
-        'bpujl_date_acquired',
         'nidi_slo_bpujl_url',
         'sik_url',
         'latest_remark',
@@ -59,8 +57,6 @@ class Site extends Model
             'cable_length_to_panel' => 'decimal:2',
             'cable_length_panel_to_charger' => 'decimal:2',
             'charging_station_count' => 'integer',
-            'ss_report_submission_date' => 'date',
-            'bpujl_date_acquired' => 'date',
             'invoice_submission_date' => 'date',
             'dp_35_date' => 'date',
             'invoice_60_submission_date' => 'date',
@@ -88,7 +84,7 @@ class Site extends Model
 
     /**
      * Alias for siteType to match frontend snake_case expectations.
-     * 
+     *
      * @return BelongsTo<SiteType, $this>
      */
     public function site_type(): BelongsTo
