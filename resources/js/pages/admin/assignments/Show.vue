@@ -204,6 +204,7 @@ const showSurveyEdit = ref(false);
 const showPlnEdit = ref(false);
 const showConstructionEdit = ref(false);
 const showBastEdit = ref(false);
+const isSaving = ref(false);
 
 // --- Admin survey edit form ---
 const adminSurveyForm = useForm({
@@ -228,9 +229,11 @@ const adminSurveyForm = useForm({
 });
 
 function submitAdminSurvey(): void {
+    isSaving.value = true;
     adminSurveyForm.patch(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
         preserveScroll: true,
         onSuccess: () => { showSurveyEdit.value = false; },
+        onFinish: () => { isSaving.value = false; },
     });
 }
 
@@ -250,9 +253,11 @@ const adminPlnForm = useForm({
 });
 
 function submitAdminPln(): void {
+    isSaving.value = true;
     adminPlnForm.patch(AdminAssignmentActions.updatePlnData(props.assignment).url, {
         preserveScroll: true,
         onSuccess: () => { showPlnEdit.value = false; },
+        onFinish: () => { isSaving.value = false; },
     });
 }
 
@@ -265,13 +270,14 @@ const adminConstructionForm = useForm({
 });
 
 function submitAdminConstruction(): void {
+    isSaving.value = true;
     router.visit(AdminAssignmentActions.updateConstructionSubconData(props.assignment).url, {
         method: 'patch',
         data: { ...adminConstructionForm.data() },
         preserveScroll: true,
         onError: (errors) => { adminConstructionForm.setError(errors); },
         onStart: () => { adminConstructionForm.processing = true; adminConstructionForm.clearErrors(); },
-        onFinish: () => { adminConstructionForm.processing = false; },
+        onFinish: () => { adminConstructionForm.processing = false; isSaving.value = false; },
         onSuccess: () => { showConstructionEdit.value = false; },
     });
 }
@@ -297,13 +303,14 @@ const adminBastForm = useForm({
 });
 
 function submitAdminBast(): void {
+    isSaving.value = true;
     router.visit(AdminAssignmentActions.updateBastData(props.assignment).url, {
         method: 'patch',
         data: { ...adminBastForm.data() },
         preserveScroll: true,
         onError: (errors) => { adminBastForm.setError(errors); },
         onStart: () => { adminBastForm.processing = true; adminBastForm.clearErrors(); },
-        onFinish: () => { adminBastForm.processing = false; },
+        onFinish: () => { adminBastForm.processing = false; isSaving.value = false; },
         onSuccess: () => { showBastEdit.value = false; },
     });
 }
@@ -465,6 +472,7 @@ function handleBeforeUnload(e: BeforeUnloadEvent): void {
 }
 
 const removeNavGuard = router.on('before', (e) => {
+    if (isSaving.value) return;
     if (e.detail.visit.method !== 'get') return;
     if (anyEditDirty.value && !window.confirm('You have unsaved changes. Leave anyway?')) {
         e.preventDefault();
