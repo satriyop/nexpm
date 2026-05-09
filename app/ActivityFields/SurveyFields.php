@@ -88,7 +88,7 @@ class SurveyFields
                 'reports' => ['ssr'],
             ],
             [
-                'key' => 'photo_other_angle', 'label' => 'Foto Lahan Sudut Pandang Lain',
+                'key' => 'photo_other_angle', 'label' => 'Foto Jalur Akses Menuju Lokasi',
                 'type' => 'image', 'required' => false, 'max' => 10240,
                 'section' => 'photos', 'reportable' => true, 'report_order' => 220,
                 'reports' => ['ssr'],

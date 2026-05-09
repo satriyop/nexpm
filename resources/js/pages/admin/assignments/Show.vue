@@ -465,6 +465,7 @@ function handleBeforeUnload(e: BeforeUnloadEvent): void {
 }
 
 const removeNavGuard = router.on('before', (e) => {
+    if (e.detail.visit.method !== 'get') return;
     if (anyEditDirty.value && !window.confirm('You have unsaved changes. Leave anyway?')) {
         e.preventDefault();
     }
@@ -886,7 +887,7 @@ onUnmounted(() => {
                                     <div v-for="([key, label]) in ([
                                         ['photo_overall_site', 'Tampak Keseluruhan Site'],
                                         ['photo_parking_evcs', 'Lahan Parkir EVCS/BSS'],
-                                        ['photo_other_angle', 'Sudut Pandang Lain'],
+                                        ['photo_other_angle', 'Jalur Akses Menuju Lokasi'],
                                         ['photo_pln_network', 'Jaringan PLN Terdekat'],
                                         ['photo_satellite_gmaps', 'Satelit GMaps'],
                                     ] as const)" :key="key" class="grid gap-1">

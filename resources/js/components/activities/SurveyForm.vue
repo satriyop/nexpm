@@ -54,7 +54,7 @@ function storageUrl(path: string) {
 const photoFields = computed(() => [
     { key: 'photo_overall_site', label: 'Foto Tampak Keseluruhan Site', isImage: true },
     { key: 'photo_parking_evcs', label: 'Foto Lahan Parkir EVCS / Lokasi BSS', isImage: true },
-    { key: 'photo_other_angle', label: 'Foto Lahan Sudut Pandang Lain', isImage: true },
+    { key: 'photo_other_angle', label: 'Foto Jalur Akses Menuju Lokasi', isImage: true },
     { key: 'photo_pln_network', label: 'Foto Jaringan PLN Terdekat', isImage: true },
     { key: 'photo_satellite_gmaps', label: 'Foto Satelit GMaps', isImage: true },
     { key: 'file_mockup_3d', label: 'Mock Up 3D', isImage: false },
