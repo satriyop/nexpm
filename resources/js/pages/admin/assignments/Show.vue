@@ -233,7 +233,7 @@ function submitAdminSurvey(): void {
     isSaving.value = true;
     adminSurveyForm.patch(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
         preserveScroll: true,
-        onSuccess: () => { adminSurveyForm.setDefaults(adminSurveyForm.data()); showSurveyEdit.value = false; },
+        onSuccess: () => { showSurveyEdit.value = false; },
         onFinish: () => { isSaving.value = false; },
     });
 }
@@ -257,7 +257,7 @@ function submitAdminPln(): void {
     isSaving.value = true;
     adminPlnForm.patch(AdminAssignmentActions.updatePlnData(props.assignment).url, {
         preserveScroll: true,
-        onSuccess: () => { adminPlnForm.setDefaults(adminPlnForm.data()); showPlnEdit.value = false; },
+        onSuccess: () => { showPlnEdit.value = false; },
         onFinish: () => { isSaving.value = false; },
     });
 }
@@ -279,7 +279,7 @@ function submitAdminConstruction(): void {
         onError: (errors) => { adminConstructionForm.setError(errors); },
         onStart: () => { adminConstructionForm.processing = true; adminConstructionForm.clearErrors(); },
         onFinish: () => { adminConstructionForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { adminConstructionForm.setDefaults(adminConstructionForm.data()); showConstructionEdit.value = false; },
+        onSuccess: () => { showConstructionEdit.value = false; },
     });
 }
 
@@ -312,7 +312,7 @@ function submitAdminBast(): void {
         onError: (errors) => { adminBastForm.setError(errors); },
         onStart: () => { adminBastForm.processing = true; adminBastForm.clearErrors(); },
         onFinish: () => { adminBastForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { adminBastForm.setDefaults(adminBastForm.data()); showBastEdit.value = false; },
+        onSuccess: () => { showBastEdit.value = false; },
     });
 }
 
@@ -459,23 +459,22 @@ function storageUrl(path: string | null | undefined): string {
     return `/storage/${path}`;
 }
 
-// --- Dirty form guard (admin edit forms + prereq) ---
-const anyEditDirty = computed(() =>
-    prereqForm.isDirty ||
-    adminSurveyForm.isDirty ||
-    adminPlnForm.isDirty ||
-    adminConstructionForm.isDirty ||
-    adminBastForm.isDirty,
+// --- Navigation guard (warn if any edit panel is open) ---
+const anyEditOpen = computed(() =>
+    showSurveyEdit.value ||
+    showPlnEdit.value ||
+    showConstructionEdit.value ||
+    showBastEdit.value,
 );
 
 function handleBeforeUnload(e: BeforeUnloadEvent): void {
-    if (anyEditDirty.value) { e.preventDefault(); e.returnValue = ''; }
+    if (anyEditOpen.value) { e.preventDefault(); e.returnValue = ''; }
 }
 
 const removeNavGuard = router.on('before', (e) => {
     if (isSaving.value) return;
     if (e.detail.visit.method !== 'get') return;
-    if (anyEditDirty.value && !window.confirm('You have unsaved changes. Leave anyway?')) {
+    if (anyEditOpen.value && !window.confirm('You have unsaved changes. Leave anyway?')) {
         e.preventDefault();
     }
 });
