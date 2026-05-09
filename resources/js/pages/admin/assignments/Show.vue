@@ -308,6 +308,89 @@ function submitAdminBast(): void {
     });
 }
 
+const BAST_SECTION_LABELS: Record<string, string> = {
+    device: 'EV Charger / Device',
+    sim_card: 'SIM Card',
+    grounding: 'Grounding System',
+    fire_extinguisher: 'Fire Extinguisher',
+    kwh_meter: 'KWH Meter',
+    ac_panel: 'AC Panel',
+    measurements: 'Measurements',
+    cables: 'Cables',
+};
+
+const BAST_CHECKPOINT_LABELS: Record<string, string> = {
+    device_front_view_open: 'Front View (Open)',
+    device_side_view_right: 'Side View (Right)',
+    device_front_view_close: 'Front View (Close)',
+    device_side_view_left: 'Side View (Left)',
+    device_foundation_depth: 'Foundation at 40cm Depth',
+    device_foundation_concrete: 'Concrete Foundation (8cm Depth from Ground)',
+    device_parking_space: 'Parking Space',
+    device_sticker: 'Sticker',
+    device_name_plate: 'Name Plate',
+    device_ac_cable_termination: 'AC Cable Termination',
+    device_emergency_button_cover: 'Emergency Button Cover',
+    device_grounding_termination: 'Grounding Termination (Cover)',
+    device_cable_entry_panel: 'AC/DC Cable Entry Termination Panel',
+    device_visible_safety_sign: 'Visible Safety Sign',
+    sim_kartu_perdana: 'Kartu Perdana',
+    sim_installed_sim_card: 'Installed SIM Card',
+    sim_signal_bar: 'Signal Bar',
+    sim_url: 'URL',
+    sim_start_charge_immediately: 'Start Charge Immediately (CE-LCD)',
+    sim_user_interface_lcd: 'User Interface (CE-LCD)',
+    grounding_rod_connection: 'Grounding Rod Connection',
+    grounding_rod_to_earth_1: 'Grounding Rod to Earth — Spot 1',
+    grounding_rod_to_earth_2: 'Grounding Rod to Earth — Spot 2',
+    grounding_busbar_panel: 'Grounding Rod Busbar (in Cable Route)',
+    grounding_cable_route: 'Grounding Test — Cable Route (OHM)',
+    grounding_test_ac_panel: 'Grounding Test AC Panel',
+    fire_ext_front_view: 'Front View',
+    fire_ext_pressure: 'Pressure',
+    fire_ext_placement: 'Placement',
+    fire_ext_specification: 'Specification',
+    kwh_kwh_meter: 'KWH Meter',
+    kwh_mcb_pln: 'MCB PLN',
+    ac_front_view_open: 'Front View (Open)',
+    ac_safety_sign: 'Safety Sign',
+    ac_front_view_close: 'Front View (Close)',
+    ac_pilot_lamps: 'Pilot Lamps',
+    ac_side_view_right: 'Side View (Right)',
+    ac_locking_system: 'Locking System',
+    ac_side_view_left: 'Side View (Left)',
+    ac_mcb: 'MCB',
+    ac_panel_wiring: 'Panel Wiring',
+    ac_phase_marking: 'Phase Marking',
+    measurement_voltage_rs: 'Voltage R-S',
+    measurement_voltage_rt: 'Voltage R-T',
+    measurement_voltage_st: 'Voltage S-T',
+    measurement_frequency: 'Frequency',
+    measurement_voltage_ng: 'Voltage N-G',
+    measurement_voltage_rn: 'Voltage R-N',
+    measurement_voltage_rg: 'Voltage R-G',
+    measurement_grounding_ac: 'Grounding to AC Panel',
+    cable_spec: 'Cable Spec',
+    cable_routing_1: 'Cable Routing (1)',
+    cable_routing_2: 'Cable Routing (2)',
+    cable_routing_3: 'Cable Routing (3)',
+};
+
+const BAST_SECTION_ORDER = [
+    'device', 'sim_card', 'grounding', 'fire_extinguisher',
+    'kwh_meter', 'ac_panel', 'measurements', 'cables',
+];
+
+const bastPhotosBySection = computed(() => {
+    const photos = bast.value?.bast_photos ?? [];
+    const map: Record<string, typeof photos> = {};
+    for (const photo of photos) {
+        if (!map[photo.section]) { map[photo.section] = []; }
+        map[photo.section].push(photo);
+    }
+    return map;
+});
+
 // --- Reassign dialog ---
 const reassignOpen = ref(false);
 const reassignForm = useForm({ subcontractor_id: '' });
@@ -1279,42 +1362,87 @@ onUnmounted(() => {
                         <div v-if="!bast" class="text-sm text-muted-foreground">
                             No BAST data submitted yet.
                         </div>
-                        <div v-else class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <p class="text-xs text-muted-foreground">Plant Name</p>
-                                <p class="font-medium">{{ bast.plant_name ?? '—' }}</p>
+                        <div v-else class="flex flex-col gap-6">
+                            <!-- Plant info summary -->
+                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <div>
+                                    <p class="text-xs text-muted-foreground">Plant Name</p>
+                                    <p class="font-medium">{{ bast.plant_name ?? '—' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">Customer</p>
+                                    <p class="font-medium">{{ bast.customer ?? '—' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">Charger Type</p>
+                                    <p class="font-medium">{{ bast.charger_type ?? '—' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">Serial Number</p>
+                                    <p class="font-medium">{{ bast.sn_unit ?? '—' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">ID PLN</p>
+                                    <p class="font-medium">{{ bast.id_pln ?? '—' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">SIM Provider</p>
+                                    <p class="font-medium">{{ bast.sim_provider ?? '—' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">Installation Date</p>
+                                    <p class="font-medium">{{ formatDateOnly(bast.installation_date) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">Commissioning Date</p>
+                                    <p class="font-medium">{{ formatDateOnly(bast.commissioning_date) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-muted-foreground">Photos uploaded</p>
+                                    <p class="font-medium">{{ bast.bast_photos?.length ?? 0 }}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">Customer</p>
-                                <p class="font-medium">{{ bast.customer ?? '—' }}</p>
+
+                            <!-- Photo gallery grouped by section -->
+                            <div
+                                v-for="sectionKey in BAST_SECTION_ORDER"
+                                v-show="bastPhotosBySection[sectionKey]?.length"
+                                :key="sectionKey"
+                                class="flex flex-col gap-3"
+                            >
+                                <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {{ BAST_SECTION_LABELS[sectionKey] ?? sectionKey }}
+                                </h3>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                    <div
+                                        v-for="photo in bastPhotosBySection[sectionKey]"
+                                        :key="photo.id"
+                                        class="flex flex-col gap-1"
+                                    >
+                                        <a
+                                            :href="storageUrl(photo.photo_path)"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="block overflow-hidden rounded-lg border border-sidebar-border/70 dark:border-sidebar-border"
+                                        >
+                                            <img
+                                                :src="storageUrl(photo.photo_path)"
+                                                :alt="BAST_CHECKPOINT_LABELS[photo.checkpoint_key] ?? photo.checkpoint_key"
+                                                class="aspect-square w-full object-cover transition-opacity hover:opacity-80"
+                                            />
+                                        </a>
+                                        <p class="text-[11px] leading-tight text-muted-foreground">
+                                            {{ BAST_CHECKPOINT_LABELS[photo.checkpoint_key] ?? photo.checkpoint_key }}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">Installation Date</p>
-                                <p class="font-medium">{{ formatDateOnly(bast.installation_date) }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">Commissioning Date</p>
-                                <p class="font-medium">{{ formatDateOnly(bast.commissioning_date) }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">Charger Type</p>
-                                <p class="font-medium">{{ bast.charger_type ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">Serial Number</p>
-                                <p class="font-medium">{{ bast.sn_unit ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">ID PLN</p>
-                                <p class="font-medium">{{ bast.id_pln ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">SIM Provider</p>
-                                <p class="font-medium">{{ bast.sim_provider ?? '—' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-muted-foreground">Photos uploaded</p>
-                                <p class="font-medium">{{ bast.bast_photos?.length ?? 0 }}</p>
+
+                            <div
+                                v-if="bast.bast_photos?.length === 0"
+                                class="rounded-lg border border-dashed border-sidebar-border/70 py-8 text-center text-sm text-muted-foreground dark:border-sidebar-border"
+                            >
+                                No photos submitted yet.
                             </div>
                         </div>
                         <Separator class="my-2" />
@@ -1636,7 +1764,7 @@ onUnmounted(() => {
                 <span v-if="auditLogs" class="ml-auto text-xs text-muted-foreground">{{ auditLogs.length }} event(s)</span>
             </div>
 
-            <template v-if="auditLogs !== null">
+            <template v-if="auditLogs != null">
                 <div v-if="auditLogs.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">
                     No audit events recorded.
                 </div>
