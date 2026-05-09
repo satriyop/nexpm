@@ -32,7 +32,6 @@ const bastForm = useForm({
     installation_date: props.assignment.bast_data?.installation_date ?? '',
     commissioning_date: props.assignment.bast_data?.commissioning_date ?? '',
     customer: props.assignment.bast_data?.customer ?? '',
-    measurements: props.assignment.bast_data?.measurements ?? {},
     nomor_simcard: props.assignment.bast_data?.nomor_simcard ?? '',
     go_live_date_pln_pass: props.assignment.bast_data?.go_live_date_pln_pass ?? '',
     go_live_date_pln: props.assignment.bast_data?.go_live_date_pln ?? '',
@@ -75,32 +74,32 @@ interface Checkpoint { key: string; label: string; optional?: boolean }
 const deviceCheckpoints = computed<Checkpoint[]>(() => isBss.value
     ? [
         { key: 'device_front_view_open', label: 'Front View (Open)' },
-        { key: 'device_front_view_close', label: 'Front View (Close)' },
         { key: 'device_side_view_right', label: 'Side View (Right)' },
+        { key: 'device_front_view_close', label: 'Front View (Close)' },
         { key: 'device_side_view_left', label: 'Side View (Left)' },
         { key: 'device_foundation_depth', label: 'Foundation at 40cm Depth', optional: true },
-        { key: 'device_foundation_concrete', label: 'Concrete Foundation 20cm', optional: true },
+        { key: 'device_foundation_concrete', label: 'Concrete Foundation (8cm Depth from Ground)', optional: true },
         { key: 'device_sticker', label: 'Sticker', optional: true },
         { key: 'device_name_plate', label: 'Name Plate' },
         { key: 'device_ac_cable_termination', label: 'AC Cable Termination' },
-        { key: 'device_grounding_termination', label: 'Grounding Termination' },
-        { key: 'device_cable_entry_panel', label: 'AC-DC Cable Entry to Panel' },
+        { key: 'device_grounding_termination', label: 'Grounding Termination (Cover)' },
+        { key: 'device_cable_entry_panel', label: 'AC/DC Cable Entry Termination Panel' },
         { key: 'device_visible_safety_sign', label: 'Visible Safety Sign' },
     ]
     : [
         { key: 'device_front_view_open', label: 'Front View (Open)' },
-        { key: 'device_front_view_close', label: 'Front View (Close)' },
         { key: 'device_side_view_right', label: 'Side View (Right)' },
+        { key: 'device_front_view_close', label: 'Front View (Close)' },
         { key: 'device_side_view_left', label: 'Side View (Left)' },
         { key: 'device_foundation_depth', label: 'Foundation at 40cm Depth' },
-        { key: 'device_foundation_concrete', label: 'Concrete Foundation 20cm' },
+        { key: 'device_foundation_concrete', label: 'Concrete Foundation (8cm Depth from Ground)' },
         { key: 'device_parking_space', label: 'Parking Space' },
         { key: 'device_sticker', label: 'Sticker' },
         { key: 'device_name_plate', label: 'Name Plate' },
         { key: 'device_ac_cable_termination', label: 'AC Cable Termination' },
         { key: 'device_emergency_button_cover', label: 'Emergency Button Cover' },
-        { key: 'device_grounding_termination', label: 'Grounding Termination' },
-        { key: 'device_cable_entry_panel', label: 'AC-DC Cable Entry to Panel' },
+        { key: 'device_grounding_termination', label: 'Grounding Termination (Cover)' },
+        { key: 'device_cable_entry_panel', label: 'AC/DC Cable Entry Termination Panel' },
         { key: 'device_visible_safety_sign', label: 'Visible Safety Sign' },
     ]
 );
@@ -110,17 +109,17 @@ const simCheckpoints = computed<Checkpoint[]>(() => [
     { key: 'sim_installed_sim_card', label: 'Installed SIM Card' },
     { key: 'sim_signal_bar', label: 'Signal Bar' },
     { key: 'sim_url', label: 'URL' },
-    ...(isBss.value ? [] : [{ key: 'sim_start_charge_immediately', label: 'Start Charge Immediately - OFF' }]),
-    { key: 'sim_user_interface_lcd', label: 'User Interface (LCD)' },
+    ...(isBss.value ? [] : [{ key: 'sim_start_charge_immediately', label: 'Start Charge Immediately (CE-LCD)' }]),
+    { key: 'sim_user_interface_lcd', label: 'User Interface (CE-LCD)' },
 ]);
 
 const groundingCheckpoints: Checkpoint[] = [
     { key: 'grounding_rod_connection', label: 'Grounding Rod Connection' },
-    { key: 'grounding_connected_to_device', label: 'Grounding Connected to Device' },
-    { key: 'grounding_rod_to_earth_1', label: 'Grounding Rod to Earth (Spot 1)' },
-    { key: 'grounding_rod_to_earth_2', label: 'Grounding Rod to Earth (Spot 2)', optional: true },
-    { key: 'grounding_busbar_panel', label: 'Grounding Busbar in Panel AC' },
-    { key: 'grounding_cable_route', label: 'Grounding Cable Route' },
+    { key: 'grounding_rod_to_earth_1', label: 'Grounding Rod to Earth — Spot 1 (Insert in Specific Spots)' },
+    { key: 'grounding_rod_to_earth_2', label: 'Grounding Rod to Earth — Spot 2 (Insert in Specific Spots)', optional: true },
+    { key: 'grounding_busbar_panel', label: 'Grounding Rod Busbar (in Cable Route)' },
+    { key: 'grounding_cable_route', label: 'Grounding Test — Cable Route (OHM)' },
+    { key: 'grounding_test_ac_panel', label: 'Grounding Test AC Panel' },
 ];
 
 const fireExtCheckpoints: Checkpoint[] = [
@@ -137,16 +136,34 @@ const kwhCheckpoints: Checkpoint[] = [
 
 const acPanelCheckpoints: Checkpoint[] = [
     { key: 'ac_front_view_open', label: 'Front View (Open)' },
-    { key: 'ac_front_view_close', label: 'Front View (Close)' },
-    { key: 'ac_side_view_right', label: 'Side View (Right)' },
-    { key: 'ac_side_view_left', label: 'Side View (Left)' },
     { key: 'ac_safety_sign', label: 'Safety Sign' },
+    { key: 'ac_front_view_close', label: 'Front View (Close)' },
     { key: 'ac_pilot_lamps', label: 'Pilot Lamps' },
+    { key: 'ac_side_view_right', label: 'Side View (Right)' },
     { key: 'ac_locking_system', label: 'Locking System' },
+    { key: 'ac_side_view_left', label: 'Side View (Left)' },
     { key: 'ac_mcb', label: 'MCB' },
     { key: 'ac_panel_wiring', label: 'Panel Wiring' },
     { key: 'ac_phase_marking', label: 'Phase Marking' },
 ];
+
+const measurementCheckpoints = computed<Checkpoint[]>(() => isBss.value
+    ? [
+        { key: 'measurement_voltage_rn', label: 'Voltage R-N (V)' },
+        { key: 'measurement_voltage_rg', label: 'Voltage R-G (V)' },
+        { key: 'measurement_voltage_ng', label: 'Voltage N-G (V)' },
+        { key: 'measurement_frequency', label: 'Frequency (Hz)' },
+        { key: 'measurement_grounding_ac', label: 'Grounding to AC Panel' },
+    ]
+    : [
+        { key: 'measurement_voltage_rs', label: 'Voltage R-S (V)' },
+        { key: 'measurement_voltage_rt', label: 'Voltage R-T (V)' },
+        { key: 'measurement_voltage_st', label: 'Voltage S-T (V)' },
+        { key: 'measurement_frequency', label: 'Frequency (Hz)' },
+        { key: 'measurement_voltage_ng', label: 'Voltage N-G (V)' },
+        { key: 'measurement_grounding_ac', label: 'Grounding to AC Panel' },
+    ]
+);
 
 const cableCheckpoints: Checkpoint[] = [
     { key: 'cable_spec', label: 'Cable Spec' },
@@ -249,62 +266,6 @@ const cableCheckpoints: Checkpoint[] = [
                     <div v-if="!isReadOnly" class="flex justify-end pt-2">
                         <Button type="submit" :disabled="bastForm.processing">
                             {{ bastForm.processing ? 'Saving…' : 'Save Plant Info' }}
-                        </Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
-
-        <!-- Measurements -->
-        <Card>
-            <CardHeader><CardTitle>Measurements</CardTitle></CardHeader>
-            <CardContent>
-                <form class="space-y-4" @submit.prevent="submitBast">
-                    <div class="grid gap-4 sm:grid-cols-3">
-                        <div class="grid gap-1.5">
-                            <Label>Grounding Resistance (Ω)</Label>
-                            <Input v-model="bastForm.measurements['grounding_resistance']" :disabled="isReadOnly" placeholder="e.g. 0.5" />
-                        </div>
-                        <template v-if="isBss">
-                            <div class="grid gap-1.5">
-                                <Label>Voltage R-N (V)</Label>
-                                <Input v-model="bastForm.measurements['voltage_rn']" :disabled="isReadOnly" placeholder="220" />
-                            </div>
-                            <div class="grid gap-1.5">
-                                <Label>Voltage R-G (V)</Label>
-                                <Input v-model="bastForm.measurements['voltage_rg']" :disabled="isReadOnly" placeholder="220" />
-                            </div>
-                            <div class="grid gap-1.5">
-                                <Label>Voltage N-G (V)</Label>
-                                <Input v-model="bastForm.measurements['voltage_ng']" :disabled="isReadOnly" placeholder="0" />
-                            </div>
-                        </template>
-                        <template v-else>
-                            <div class="grid gap-1.5">
-                                <Label>Voltage R-S (V)</Label>
-                                <Input v-model="bastForm.measurements['voltage_rs']" :disabled="isReadOnly" placeholder="380" />
-                            </div>
-                            <div class="grid gap-1.5">
-                                <Label>Voltage R-T (V)</Label>
-                                <Input v-model="bastForm.measurements['voltage_rt']" :disabled="isReadOnly" placeholder="380" />
-                            </div>
-                            <div class="grid gap-1.5">
-                                <Label>Voltage S-T (V)</Label>
-                                <Input v-model="bastForm.measurements['voltage_st']" :disabled="isReadOnly" placeholder="380" />
-                            </div>
-                            <div class="grid gap-1.5">
-                                <Label>Voltage N-G (V)</Label>
-                                <Input v-model="bastForm.measurements['voltage_ng']" :disabled="isReadOnly" placeholder="0" />
-                            </div>
-                        </template>
-                        <div class="grid gap-1.5">
-                            <Label>Frequency (Hz)</Label>
-                            <Input v-model="bastForm.measurements['frequency']" :disabled="isReadOnly" placeholder="50" />
-                        </div>
-                    </div>
-                    <div v-if="!isReadOnly" class="flex justify-end pt-2">
-                        <Button type="submit" :disabled="bastForm.processing">
-                            {{ bastForm.processing ? 'Saving…' : 'Save Measurements' }}
                         </Button>
                     </div>
                 </form>
@@ -445,9 +406,30 @@ const cableCheckpoints: Checkpoint[] = [
             </CardContent>
         </Card>
 
-        <!-- Cables -->
+        <!-- Section 7: Measurements (photo of meter reading) -->
         <Card>
-            <CardHeader><CardTitle>Cables — Visual Inspection</CardTitle></CardHeader>
+            <CardHeader><CardTitle>7. Measurements — Photo of Meter Reading</CardTitle></CardHeader>
+            <CardContent>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div v-for="cp in measurementCheckpoints" :key="cp.key" class="grid gap-1.5">
+                        <Label>{{ cp.label }}</Label>
+                        <PhotoUpload
+                            :model-value="null"
+                            :current-url="getPhoto(cp.key) ? storageUrl(getPhoto(cp.key)!.photo_path) : null"
+                            :uploading="uploadingCheckpoint === cp.key"
+                            :readonly="isReadOnly"
+                            :deletable="true"
+                            @update:model-value="(file) => file && uploadBastPhoto('measurements', cp.key, file)"
+                            @delete="destroyBastPhoto(getPhoto(cp.key)!.id)"
+                        />
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Section 8: Cables -->
+        <Card>
+            <CardHeader><CardTitle>8. Cables — Visual Inspection</CardTitle></CardHeader>
             <CardContent>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div v-for="cp in cableCheckpoints" :key="cp.key" class="grid gap-1.5">

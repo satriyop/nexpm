@@ -29,6 +29,7 @@ class AssignmentBastData extends Model
         'sim_installed_sim_card',
         'grounding_rod_connection',
         'grounding_cable_route',
+        'grounding_test_ac_panel',
         'kwh_kwh_meter',
         'ac_front_view_open',
         'cable_spec',
