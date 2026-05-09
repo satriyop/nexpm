@@ -286,7 +286,7 @@ class AssignmentController extends Controller
             'additional_info' => ['nullable', 'string'],
             'photo_overall_site' => ['nullable', 'file', 'image', 'max:10240'],
             'photo_parking_evcs' => ['nullable', 'file', 'image', 'max:10240'],
-            'photo_other_angle' => ['nullable', 'file', 'image', 'max:10240'],
+            'photo_access_route' => ['nullable', 'file', 'image', 'max:10240'],
             'photo_pln_network' => ['nullable', 'file', 'image', 'max:10240'],
             'photo_satellite_gmaps' => ['nullable', 'file', 'image', 'max:10240'],
             'file_mockup_3d' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,dwg', 'max:20480'],

@@ -220,7 +220,7 @@ const adminSurveyForm = useForm({
     ss_report_submission_date: survey.value?.ss_report_submission_date ?? '',
     photo_overall_site: null as File | null,
     photo_parking_evcs: null as File | null,
-    photo_other_angle: null as File | null,
+    photo_access_route: null as File | null,
     photo_pln_network: null as File | null,
     photo_satellite_gmaps: null as File | null,
     file_mockup_3d: null as File | null,
@@ -727,7 +727,7 @@ onUnmounted(() => {
                                                 'Overall Site',
                                             photo_parking_evcs:
                                                 'Parking / EVCS',
-                                            photo_other_angle: 'Other Angle',
+                                            photo_access_route: 'Jalur Akses Menuju Lokasi',
                                             photo_pln_network: 'PLN Network',
                                             photo_satellite_gmaps:
                                                 'Satellite / GMaps',
@@ -887,7 +887,7 @@ onUnmounted(() => {
                                     <div v-for="([key, label]) in ([
                                         ['photo_overall_site', 'Tampak Keseluruhan Site'],
                                         ['photo_parking_evcs', 'Lahan Parkir EVCS/BSS'],
-                                        ['photo_other_angle', 'Jalur Akses Menuju Lokasi'],
+                                        ['photo_access_route', 'Jalur Akses Menuju Lokasi'],
                                         ['photo_pln_network', 'Jaringan PLN Terdekat'],
                                         ['photo_satellite_gmaps', 'Satelit GMaps'],
                                     ] as const)" :key="key" class="grid gap-1">

@@ -63,7 +63,7 @@ export interface AssignmentSurveyData {
     additional_info: string | null;
     photo_overall_site: string | null;
     photo_parking_evcs: string | null;
-    photo_other_angle: string | null;
+    photo_access_route: string | null;
     photo_pln_network: string | null;
     photo_satellite_gmaps: string | null;
     file_mockup_3d: string | null;

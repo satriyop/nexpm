@@ -31,7 +31,7 @@ const surveyForm = useForm({
     additional_info: props.assignment.survey_data?.additional_info ?? '',
     photo_overall_site: null as File | null,
     photo_parking_evcs: null as File | null,
-    photo_other_angle: null as File | null,
+    photo_access_route: null as File | null,
     photo_pln_network: null as File | null,
     photo_satellite_gmaps: null as File | null,
     file_mockup_3d: null as File | null,
@@ -41,7 +41,7 @@ const surveyForm = useForm({
 function submitSurvey() {
     surveyForm.post(SubActions.updateSurveyData(props.assignment).url, {
         forceFormData: true,
-        onSuccess: () => surveyForm.reset('photo_overall_site', 'photo_parking_evcs', 'photo_other_angle', 'photo_pln_network', 'photo_satellite_gmaps', 'file_mockup_3d', 'file_ba_survey'),
+        onSuccess: () => surveyForm.reset('photo_overall_site', 'photo_parking_evcs', 'photo_access_route', 'photo_pln_network', 'photo_satellite_gmaps', 'file_mockup_3d', 'file_ba_survey'),
     });
 }
 
@@ -54,7 +54,7 @@ function storageUrl(path: string) {
 const photoFields = computed(() => [
     { key: 'photo_overall_site', label: 'Foto Tampak Keseluruhan Site', isImage: true },
     { key: 'photo_parking_evcs', label: 'Foto Lahan Parkir EVCS / Lokasi BSS', isImage: true },
-    { key: 'photo_other_angle', label: 'Foto Jalur Akses Menuju Lokasi', isImage: true },
+    { key: 'photo_access_route', label: 'Foto Jalur Akses Menuju Lokasi', isImage: true },
     { key: 'photo_pln_network', label: 'Foto Jaringan PLN Terdekat', isImage: true },
     { key: 'photo_satellite_gmaps', label: 'Foto Satelit GMaps', isImage: true },
     { key: 'file_mockup_3d', label: 'Mock Up 3D', isImage: false },

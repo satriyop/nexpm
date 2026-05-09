@@ -34,7 +34,7 @@ class AssignmentSurveyData extends Model
         'additional_info',
         'photo_overall_site',
         'photo_parking_evcs',
-        'photo_other_angle',
+        'photo_access_route',
         'photo_pln_network',
         'photo_satellite_gmaps',
         'file_mockup_3d',
@@ -60,7 +60,7 @@ class AssignmentSurveyData extends Model
         'parking_slot',
         'photo_overall_site',
         'photo_parking_evcs',
-        'photo_other_angle',
+        'photo_access_route',
         'photo_pln_network',
         'photo_satellite_gmaps',
     ];

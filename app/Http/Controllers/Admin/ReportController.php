@@ -273,7 +273,7 @@ class ReportController extends Controller
         $site = $assignment->site;
 
         $photoFields = [
-            'photo_overall_site', 'photo_parking_evcs', 'photo_other_angle',
+            'photo_overall_site', 'photo_parking_evcs', 'photo_access_route',
             'photo_pln_network', 'photo_satellite_gmaps',
         ];
 
