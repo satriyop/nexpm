@@ -417,7 +417,7 @@ function timeAgo(isoString: string): string {
 
         <!-- KPI Strip -->
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
-            <template v-if="statusCounts !== null">
+            <template v-if="statusCounts != null">
                 <div class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border">
                     <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Activity class="size-3.5" />
@@ -459,7 +459,7 @@ function timeAgo(isoString: string): string {
 
             <!-- Velocity card (5th) -->
             <div class="col-span-2 flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border md:col-span-4 xl:col-span-1">
-                <template v-if="velocityTrend !== null">
+                <template v-if="velocityTrend != null">
                     <div class="flex items-center justify-between">
                         <span class="text-xs text-muted-foreground">Velocity (12w)</span>
                         <span
@@ -498,7 +498,7 @@ function timeAgo(isoString: string): string {
                 <p class="text-xs text-muted-foreground">Actual completion pace vs expected pace — click a project to drill down</p>
             </div>
             <div class="overflow-x-auto">
-                <template v-if="deadlineRisk !== null">
+                <template v-if="deadlineRisk != null">
                     <table class="w-full text-sm">
                         <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                             <tr>
@@ -596,7 +596,7 @@ function timeAgo(isoString: string): string {
                 <p class="text-xs text-muted-foreground">Projected finish date per project based on 4-week rolling pace — update weekly to stay accurate</p>
             </div>
             <div class="overflow-x-auto">
-                <template v-if="completionForecast !== null">
+                <template v-if="completionForecast != null">
                     <table class="w-full text-sm">
                         <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                             <tr>
@@ -663,7 +663,7 @@ function timeAgo(isoString: string): string {
 
         <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
-            <template v-if="statusCounts !== null">
+            <template v-if="statusCounts != null">
                 <template v-for="stat in statuses" :key="stat.key">
                     <Link
                         v-if="getCount(props.statusCounts!, stat.key) > 0"
@@ -695,7 +695,7 @@ function timeAgo(isoString: string): string {
                 <p class="text-xs text-muted-foreground">Active assignments by status and time since last update — redder = older</p>
             </div>
 
-            <template v-if="agingHeatmap !== null">
+            <template v-if="agingHeatmap != null">
                 <!-- Stalled warning banner -->
                 <div
                     v-if="agingHeatmap.total_stalled > 0"
@@ -778,7 +778,7 @@ function timeAgo(isoString: string): string {
             </div>
 
             <div class="overflow-x-auto">
-                <template v-if="activityMatrix !== null">
+                <template v-if="activityMatrix != null">
                     <table class="w-full text-sm">
                         <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                             <tr>
@@ -850,7 +850,7 @@ function timeAgo(isoString: string): string {
             </div>
 
             <div class="overflow-x-auto">
-                <template v-if="projectBreakdowns !== null">
+                <template v-if="projectBreakdowns != null">
                     <table class="w-full text-sm">
                         <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                             <tr>
@@ -943,12 +943,12 @@ function timeAgo(isoString: string): string {
                 <p class="text-xs text-muted-foreground">Stacked bar chart of active assignments per activity type</p>
             </div>
             <div class="p-4">
-                <template v-if="activityChart !== null && activityChart.labels.length > 0">
+                <template v-if="activityChart != null && activityChart.labels.length > 0">
                     <div class="h-64">
                         <ActivityMatrixChart :labels="activityChart.labels" :datasets="activityChart.datasets" />
                     </div>
                 </template>
-                <div v-else-if="activityChart !== null" class="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                <div v-else-if="activityChart != null" class="flex h-32 items-center justify-center text-sm text-muted-foreground">
                     No data to display.
                 </div>
                 <div v-else class="h-64 animate-pulse rounded bg-muted" />
@@ -957,7 +957,7 @@ function timeAgo(isoString: string): string {
 
         <!-- Section: Subcontractor Leaderboard -->
         <div
-            v-if="subcontractorLeaderboard === null || subcontractorLeaderboard.length > 0"
+            v-if="subcontractorLeaderboard == null || subcontractorLeaderboard.length > 0"
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
@@ -965,7 +965,7 @@ function timeAgo(isoString: string): string {
                 <p class="text-xs text-muted-foreground">Ranked by score — cycle time, completion rate, and revision history</p>
             </div>
             <div class="overflow-x-auto">
-                <template v-if="subcontractorLeaderboard !== null">
+                <template v-if="subcontractorLeaderboard != null">
                     <table class="w-full text-sm">
                         <thead class="bg-muted/40 text-xs uppercase tracking-wide">
                             <tr>
@@ -1034,7 +1034,7 @@ function timeAgo(isoString: string): string {
 
         <!-- Section: Workload Distribution -->
         <div
-            v-if="workloadDistribution === null || workloadDistribution.length > 0"
+            v-if="workloadDistribution == null || workloadDistribution.length > 0"
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
@@ -1042,7 +1042,7 @@ function timeAgo(isoString: string): string {
                 <p class="text-xs text-muted-foreground">Active assignment load per subcontractor — top 20 by volume</p>
             </div>
             <div class="p-4">
-                <template v-if="workloadDistribution !== null">
+                <template v-if="workloadDistribution != null">
                     <WorkloadChart :items="workloadDistribution" />
                 </template>
                 <div v-else class="h-64 animate-pulse rounded bg-muted" />
@@ -1057,7 +1057,7 @@ function timeAgo(isoString: string): string {
             </div>
 
             <div class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                <template v-if="recentActivity !== null">
+                <template v-if="recentActivity != null">
                     <Link
                         v-for="item in props.recentActivity"
                         :key="item.id"
