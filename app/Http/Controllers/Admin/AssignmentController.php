@@ -432,11 +432,16 @@ class AssignmentController extends Controller
 
     public function reassign(Request $request, Assignment $assignment): RedirectResponse
     {
+        $user = $this->currentUser();
+        $mainContractorId = $user->isSuperAdmin()
+            ? $assignment->load('site.project')->site->project->main_contractor_id
+            : $user->main_contractor_id;
+
         $validated = $request->validate([
             'subcontractor_id' => [
                 'required',
                 Rule::exists('subcontractors', 'id')
-                    ->where('main_contractor_id', $this->currentUser()->main_contractor_id),
+                    ->where('main_contractor_id', $mainContractorId),
             ],
         ]);
 
@@ -496,12 +501,17 @@ class AssignmentController extends Controller
 
     public function storeForSite(Request $request, Site $site): RedirectResponse
     {
+        $user = $this->currentUser();
+        $mainContractorId = $user->isSuperAdmin()
+            ? $site->load('project')->project->main_contractor_id
+            : $user->main_contractor_id;
+
         $validated = $request->validate([
             'activity_type' => ['required', Rule::enum(ActivityType::class)],
             'subcontractor_id' => [
                 'required',
                 Rule::exists('subcontractors', 'id')
-                    ->where('main_contractor_id', $this->currentUser()->main_contractor_id),
+                    ->where('main_contractor_id', $mainContractorId),
             ],
         ]);
 

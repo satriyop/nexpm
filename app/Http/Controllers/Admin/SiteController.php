@@ -8,6 +8,7 @@ use App\Models\MachineType;
 use App\Models\Site;
 use App\Models\SiteType;
 use App\Models\Subcontractor;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,13 +25,20 @@ class SiteController extends Controller
             ->with(['subcontractor', 'surveyData', 'plnData', 'constructionData', 'bastData'])
             ->get();
 
+        /** @var User $user */
+        $user = auth()->user();
+
         return Inertia::render('admin/sites/Edit', [
             'site' => $site,
             'siteTypes' => SiteType::orderBy('name')->get(['id', 'name']),
             'machineTypes' => MachineType::orderBy('name')->get(['id', 'name']),
             'assignments' => $assignments,
             'subcontractors' => Subcontractor::query()
-                ->whereScopedToMainContractor()
+                ->when(
+                    $user->isSuperAdmin(),
+                    fn ($q) => $q->where('main_contractor_id', $site->project->main_contractor_id),
+                    fn ($q) => $q->whereScopedToMainContractor()
+                )
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
