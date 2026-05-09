@@ -225,6 +225,7 @@ const adminSurveyForm = useForm({
     photo_pln_network: null as File | null,
     photo_satellite_gmaps: null as File | null,
     file_mockup_3d: null as File | null,
+    file_site_plan: null as File | null,
     file_ba_survey: null as File | null,
 });
 
@@ -232,7 +233,7 @@ function submitAdminSurvey(): void {
     isSaving.value = true;
     adminSurveyForm.patch(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
         preserveScroll: true,
-        onSuccess: () => { showSurveyEdit.value = false; },
+        onSuccess: () => { adminSurveyForm.setDefaults(); showSurveyEdit.value = false; },
         onFinish: () => { isSaving.value = false; },
     });
 }
@@ -256,7 +257,7 @@ function submitAdminPln(): void {
     isSaving.value = true;
     adminPlnForm.patch(AdminAssignmentActions.updatePlnData(props.assignment).url, {
         preserveScroll: true,
-        onSuccess: () => { showPlnEdit.value = false; },
+        onSuccess: () => { adminPlnForm.setDefaults(); showPlnEdit.value = false; },
         onFinish: () => { isSaving.value = false; },
     });
 }
@@ -278,7 +279,7 @@ function submitAdminConstruction(): void {
         onError: (errors) => { adminConstructionForm.setError(errors); },
         onStart: () => { adminConstructionForm.processing = true; adminConstructionForm.clearErrors(); },
         onFinish: () => { adminConstructionForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { showConstructionEdit.value = false; },
+        onSuccess: () => { adminConstructionForm.setDefaults(); showConstructionEdit.value = false; },
     });
 }
 
@@ -311,7 +312,7 @@ function submitAdminBast(): void {
         onError: (errors) => { adminBastForm.setError(errors); },
         onStart: () => { adminBastForm.processing = true; adminBastForm.clearErrors(); },
         onFinish: () => { adminBastForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { showBastEdit.value = false; },
+        onSuccess: () => { adminBastForm.setDefaults(); showBastEdit.value = false; },
     });
 }
 
@@ -924,6 +925,7 @@ onUnmounted(() => {
                                 <div class="grid gap-3 sm:grid-cols-2">
                                     <div v-for="([key, label]) in ([
                                         ['file_mockup_3d', '3D Mockup'],
+                                        ['file_site_plan', 'Site Plan'],
                                         ['file_ba_survey', 'BA Survey'],
                                     ] as const)" :key="key" class="grid gap-1">
                                         <span class="text-xs font-medium">{{ label }}</span>

@@ -35,13 +35,14 @@ const surveyForm = useForm({
     photo_pln_network: null as File | null,
     photo_satellite_gmaps: null as File | null,
     file_mockup_3d: null as File | null,
+    file_site_plan: null as File | null,
     file_ba_survey: null as File | null,
 });
 
 function submitSurvey() {
     surveyForm.post(SubActions.updateSurveyData(props.assignment).url, {
         forceFormData: true,
-        onSuccess: () => surveyForm.reset('photo_overall_site', 'photo_parking_evcs', 'photo_access_route', 'photo_pln_network', 'photo_satellite_gmaps', 'file_mockup_3d', 'file_ba_survey'),
+        onSuccess: () => surveyForm.reset('photo_overall_site', 'photo_parking_evcs', 'photo_access_route', 'photo_pln_network', 'photo_satellite_gmaps', 'file_mockup_3d', 'file_site_plan', 'file_ba_survey'),
     });
 }
 
@@ -58,6 +59,7 @@ const photoFields = computed(() => [
     { key: 'photo_pln_network', label: 'Foto Jaringan PLN Terdekat', isImage: true },
     { key: 'photo_satellite_gmaps', label: 'Foto Satelit GMaps', isImage: true },
     { key: 'file_mockup_3d', label: 'Mock Up 3D', isImage: false },
+    { key: 'file_site_plan', label: 'Site Plan', isImage: false },
     { key: 'file_ba_survey', label: 'BA Survey', isImage: false },
 ]);
 </script>

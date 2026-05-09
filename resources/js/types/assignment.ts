@@ -67,6 +67,7 @@ export interface AssignmentSurveyData {
     photo_pln_network: string | null;
     photo_satellite_gmaps: string | null;
     file_mockup_3d: string | null;
+    file_site_plan: string | null;
     file_ba_survey: string | null;
     parking_slot: string | null;
     ss_report_submission_date: string | null;

@@ -119,6 +119,12 @@ class SurveyFields
                 'reports' => ['ssr'],
             ],
             [
+                'key' => 'file_site_plan', 'label' => 'Site Plan',
+                'type' => 'file', 'required' => false, 'max' => 20480,
+                'section' => 'documents', 'reportable' => true, 'report_order' => 308,
+                'reports' => ['ssr'],
+            ],
+            [
                 'key' => 'file_ba_survey', 'label' => 'BA Survey',
                 'type' => 'file', 'required' => false, 'max' => 20480,
                 'section' => 'documents', 'reportable' => true, 'report_order' => 310,

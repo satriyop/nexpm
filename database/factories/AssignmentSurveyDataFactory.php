@@ -39,6 +39,7 @@ class AssignmentSurveyDataFactory extends Factory
             'photo_pln_network' => 'survey/pln.jpg',
             'photo_satellite_gmaps' => 'survey/sat.jpg',
             'file_mockup_3d' => 'survey/mockup.pdf',
+            'file_site_plan' => 'survey/siteplan.pdf',
             'file_ba_survey' => 'survey/ba.pdf',
         ]);
     }
