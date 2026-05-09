@@ -233,7 +233,7 @@ function submitAdminSurvey(): void {
     isSaving.value = true;
     adminSurveyForm.patch(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
         preserveScroll: true,
-        onSuccess: () => { adminSurveyForm.setDefaults(); showSurveyEdit.value = false; },
+        onSuccess: () => { adminSurveyForm.setDefaults(adminSurveyForm.data()); showSurveyEdit.value = false; },
         onFinish: () => { isSaving.value = false; },
     });
 }
@@ -257,7 +257,7 @@ function submitAdminPln(): void {
     isSaving.value = true;
     adminPlnForm.patch(AdminAssignmentActions.updatePlnData(props.assignment).url, {
         preserveScroll: true,
-        onSuccess: () => { adminPlnForm.setDefaults(); showPlnEdit.value = false; },
+        onSuccess: () => { adminPlnForm.setDefaults(adminPlnForm.data()); showPlnEdit.value = false; },
         onFinish: () => { isSaving.value = false; },
     });
 }
@@ -279,7 +279,7 @@ function submitAdminConstruction(): void {
         onError: (errors) => { adminConstructionForm.setError(errors); },
         onStart: () => { adminConstructionForm.processing = true; adminConstructionForm.clearErrors(); },
         onFinish: () => { adminConstructionForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { adminConstructionForm.setDefaults(); showConstructionEdit.value = false; },
+        onSuccess: () => { adminConstructionForm.setDefaults(adminConstructionForm.data()); showConstructionEdit.value = false; },
     });
 }
 
@@ -312,7 +312,7 @@ function submitAdminBast(): void {
         onError: (errors) => { adminBastForm.setError(errors); },
         onStart: () => { adminBastForm.processing = true; adminBastForm.clearErrors(); },
         onFinish: () => { adminBastForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { adminBastForm.setDefaults(); showBastEdit.value = false; },
+        onSuccess: () => { adminBastForm.setDefaults(adminBastForm.data()); showBastEdit.value = false; },
     });
 }
 

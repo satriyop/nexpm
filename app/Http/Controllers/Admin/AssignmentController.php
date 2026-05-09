@@ -295,15 +295,22 @@ class AssignmentController extends Controller
             'ss_report_submission_date' => ['nullable', 'date'],
         ]);
 
+        $fileFields = [
+            'photo_overall_site', 'photo_parking_evcs', 'photo_access_route',
+            'photo_pln_network', 'photo_satellite_gmaps',
+            'file_mockup_3d', 'file_site_plan', 'file_ba_survey',
+        ];
+
         $survey = $assignment->surveyData()->firstOrNew([]);
         $survey->assignment_id = $assignment->id;
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
                 $survey->{$key} = $request->file($key)->store('survey', 'public');
-            } else {
+            } elseif (! in_array($key, $fileFields)) {
                 $survey->{$key} = $value;
             }
+            // File fields with no upload are skipped — existing paths preserved
         }
 
         $survey->saveQuietly();
