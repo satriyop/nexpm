@@ -313,7 +313,7 @@ class AssignmentController extends Controller
             // File fields with no upload are skipped — existing paths preserved
         }
 
-        $survey->saveQuietly();
+        $survey->save();
 
         AssignmentAuditLog::create([
             'assignment_id' => $assignment->id,
@@ -343,18 +343,21 @@ class AssignmentController extends Controller
             'foto_kwh' => ['nullable', 'file', 'image', 'max:10240'],
         ]);
 
+        $plnFileFields = ['file_slo', 'file_nidi', 'file_reg', 'file_pk', 'foto_kwh'];
+
         $pln = $assignment->plnData()->firstOrNew([]);
         $pln->assignment_id = $assignment->id;
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
                 $pln->{$key} = $request->file($key)->store('pln', 'public');
-            } else {
+            } elseif (! in_array($key, $plnFileFields)) {
                 $pln->{$key} = $value;
             }
+            // File fields with no upload are skipped — existing paths preserved
         }
 
-        $pln->saveQuietly();
+        $pln->save();
 
         AssignmentAuditLog::create([
             'assignment_id' => $assignment->id,
@@ -383,12 +386,13 @@ class AssignmentController extends Controller
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
                 $construction->{$key} = $request->file($key)->store('construction', 'public');
-            } else {
+            } elseif ($key !== 'foto_machine_sn') {
                 $construction->{$key} = $value;
             }
+            // foto_machine_sn with no upload is skipped — existing path preserved
         }
 
-        $construction->saveQuietly();
+        $construction->save();
 
         AssignmentAuditLog::create([
             'assignment_id' => $assignment->id,
@@ -426,7 +430,7 @@ class AssignmentController extends Controller
         $bast = $assignment->bastData()->firstOrNew([]);
         $bast->assignment_id = $assignment->id;
         $bast->fill($validated);
-        $bast->saveQuietly();
+        $bast->save();
 
         AssignmentAuditLog::create([
             'assignment_id' => $assignment->id,

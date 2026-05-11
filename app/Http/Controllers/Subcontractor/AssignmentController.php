@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Subcontractor;
 
+use App\ActivityFields\PlnFields;
 use App\ActivityFields\SurveyFields;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
@@ -111,14 +112,20 @@ class AssignmentController extends Controller
 
         $validated = $request->validated();
 
+        $fileFields = collect(PlnFields::all())
+            ->filter(fn (array $f) => in_array($f['type'], ['image', 'file'], true))
+            ->pluck('key')
+            ->all();
+
         $pln = AssignmentPlnData::query()->firstOrNew(['assignment_id' => $assignment->id]);
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
                 $pln->{$key} = $request->file($key)->store('pln', 'public');
-            } else {
+            } elseif (! in_array($key, $fileFields)) {
                 $pln->{$key} = $value;
             }
+            // File fields with no upload are skipped — existing paths preserved
         }
 
         $pln->assignment_id = $assignment->id;
