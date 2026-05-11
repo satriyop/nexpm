@@ -19,7 +19,7 @@ class SubcontractorController extends Controller
         $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 15;
 
         return Inertia::render('admin/subcontractors/Index', [
-            'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractor')->latest('id')->paginate($perPage)->withQueryString(),
+            'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractors')->latest('id')->paginate($perPage)->withQueryString(),
             'per_page' => $perPage,
             'mainContractors' => MainContractor::query()
                 ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
@@ -31,29 +31,40 @@ class SubcontractorController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = $this->currentUser();
-        $mainContractorId = $user->isSuperAdmin()
-            ? $request->integer('main_contractor_id')
-            : $user->main_contractor_id;
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', 'unique:subcontractors,code'],
-            'main_contractor_id' => [$user->isSuperAdmin() ? 'required' : 'nullable', Rule::exists('main_contractors', 'id')],
+            'main_contractor_ids' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'array', 'min:1'],
+            'main_contractor_ids.*' => ['required', 'integer', Rule::exists('main_contractors', 'id')],
             'pic' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
         ]);
 
-        $validated['main_contractor_id'] = $mainContractorId;
+        $mainContractorIds = $user->isSuperAdmin()
+            ? $validated['main_contractor_ids']
+            : [$user->main_contractor_id];
 
-        Subcontractor::query()->create($validated);
+        $subcontractor = Subcontractor::query()->create([
+            'name' => $validated['name'],
+            'code' => $validated['code'],
+            'pic' => $validated['pic'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'email' => $validated['email'] ?? null,
+        ]);
+        $subcontractor->mainContractors()->attach($mainContractorIds);
 
         return back()->with('success', 'Subcontractor created.');
     }
 
     public function destroy(Subcontractor $subcontractor): RedirectResponse
     {
-        $this->ensureCanAccessMainContractor($subcontractor->main_contractor_id);
+        abort_if(
+            ! $this->currentUser()->isSuperAdmin()
+            && ! $subcontractor->mainContractors()->whereKey($this->currentUser()->main_contractor_id)->exists(),
+            403
+        );
 
         // Prevent deletion if related assignments exist
         if ($subcontractor->assignments()->exists()) {

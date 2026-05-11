@@ -25,7 +25,7 @@ class UserController extends Controller
         return Inertia::render('admin/users/Index', [
             'users' => User::query()->whereScopedToMainContractor()->with('subcontractor', 'mainContractor')->latest('id')->paginate($perPage)->withQueryString(),
             'per_page' => $perPage,
-            'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->orderBy('name')->get(['id', 'name', 'main_contractor_id']),
+            'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractors:id')->orderBy('name')->get(['id', 'name']),
             'mainContractors' => MainContractor::query()
                 ->when(! $currentUser->isSuperAdmin(), fn ($query) => $query->whereKey($currentUser->main_contractor_id))
                 ->orderBy('name')
@@ -40,10 +40,10 @@ class UserController extends Controller
             ? $request->integer('main_contractor_id')
             : $currentUser->main_contractor_id;
 
-        $subcontractorRule = Rule::exists('subcontractors', 'id');
-        if (! $currentUser->isSuperAdmin()) {
-            $subcontractorRule->where('main_contractor_id', $mainContractorId);
-        }
+        $subcontractorRule = $currentUser->isSuperAdmin()
+            ? Rule::exists('subcontractors', 'id')
+            : Rule::exists('main_contractor_subcontractor', 'subcontractor_id')
+                ->where('main_contractor_id', $mainContractorId);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

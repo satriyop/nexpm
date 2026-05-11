@@ -7,6 +7,7 @@ import InputError from '@/components/InputError.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -16,13 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 
 import { dashboard } from '@/routes';
 import type { PaginatedData } from '@/types';
@@ -38,7 +32,7 @@ interface Subcontractor {
     pic: string | null;
     phone: string | null;
     email: string | null;
-    main_contractor: MainContractor | null;
+    main_contractors: MainContractor[];
 }
 
 const props = defineProps<{
@@ -60,17 +54,36 @@ const open = ref(false);
 const form = useForm({
     name: '',
     code: '',
-    main_contractor_id: '',
+    main_contractor_ids:
+        props.mainContractors.length === 1 ? [props.mainContractors[0].id] : [],
     pic: '',
     phone: '',
     email: '',
 });
 
+function toggleMainContractor(id: number) {
+    const current = [...form.main_contractor_ids];
+    const index = current.indexOf(id);
+
+    if (index === -1) {
+        current.push(id);
+    } else {
+        current.splice(index, 1);
+    }
+
+    form.main_contractor_ids = current;
+    form.clearErrors('main_contractor_ids');
+}
+
 function submit() {
     form.post(Actions.store().url, {
         onSuccess: () => {
             open.value = false;
-            form.reset();
+            form.reset('name', 'code', 'pic', 'phone', 'email');
+            form.main_contractor_ids =
+                props.mainContractors.length === 1
+                    ? [props.mainContractors[0].id]
+                    : [];
         },
     });
 }
@@ -87,7 +100,9 @@ function openDelete(sc: Subcontractor) {
 }
 
 function submitDelete() {
-    if (!deletingSubcontractor.value) return;
+    if (!deletingSubcontractor.value) {
+        return;
+    }
 
     deleteForm.delete(Actions.destroy(deletingSubcontractor.value.id).url, {
         onSuccess: () => {
@@ -148,7 +163,20 @@ function submitDelete() {
                                 {{ sc.code }}
                             </td>
                             <td class="px-4 py-3 text-muted-foreground">
-                                {{ sc.main_contractor?.name ?? '—' }}
+                                <div class="flex flex-wrap gap-1">
+                                    <span
+                                        v-for="mc in sc.main_contractors"
+                                        :key="mc.id"
+                                        class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                    >
+                                        {{ mc.name }}
+                                    </span>
+                                    <span
+                                        v-if="!sc.main_contractors.length"
+                                        class="text-muted-foreground"
+                                        >—</span
+                                    >
+                                </div>
                             </td>
                             <td class="px-4 py-3 text-muted-foreground">
                                 {{ sc.pic ?? '—' }}
@@ -230,20 +258,32 @@ function submitDelete() {
                         >Main Contractor
                         <span class="text-destructive">*</span></Label
                     >
-                    <Select v-model="form.main_contractor_id">
-                        <SelectTrigger
-                            ><SelectValue placeholder="Select contractor"
-                        /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="mc in mainContractors"
-                                :key="mc.id"
-                                :value="String(mc.id)"
-                                >{{ mc.name }}</SelectItem
+                    <div
+                        class="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2"
+                    >
+                        <div
+                            v-for="mc in mainContractors"
+                            :key="mc.id"
+                            class="flex items-center gap-2"
+                        >
+                            <Checkbox
+                                :id="'subcon-mc-' + mc.id"
+                                :checked="
+                                    form.main_contractor_ids.includes(mc.id)
+                                "
+                                @update:model-value="
+                                    toggleMainContractor(mc.id)
+                                "
+                            />
+                            <Label
+                                :for="'subcon-mc-' + mc.id"
+                                class="cursor-pointer font-normal"
                             >
-                        </SelectContent>
-                    </Select>
-                    <InputError :message="form.errors.main_contractor_id" />
+                                {{ mc.name }}
+                            </Label>
+                        </div>
+                    </div>
+                    <InputError :message="form.errors.main_contractor_ids" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label>PIC</Label>
@@ -282,11 +322,15 @@ function submitDelete() {
             </DialogHeader>
             <p class="text-sm text-muted-foreground">
                 Are you sure you want to delete
-                <span class="font-medium text-foreground">{{ deletingSubcontractor?.name }}</span
+                <span class="font-medium text-foreground">{{
+                    deletingSubcontractor?.name
+                }}</span
                 >? This action cannot be undone.
             </p>
             <DialogFooter>
-                <Button variant="outline" @click="deleteOpen = false">Cancel</Button>
+                <Button variant="outline" @click="deleteOpen = false"
+                    >Cancel</Button
+                >
                 <Button
                     variant="destructive"
                     :disabled="deleteForm.processing"

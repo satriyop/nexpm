@@ -31,7 +31,7 @@ class AssignmentController extends Controller
 
         $query = Assignment::query()
             ->where('subcontractor_id', $user->subcontractor_id)
-            ->with(['site', 'surveyData', 'plnData', 'constructionData', 'bastData']);
+            ->with(['site.project.mainContractor', 'surveyData', 'plnData', 'constructionData', 'bastData']);
 
         if ($request->filled('search')) {
             $search = $request->string('search');
@@ -61,6 +61,7 @@ class AssignmentController extends Controller
 
         $assignment->load([
             'site.siteType',
+            'site.project.mainContractor',
             'surveyData',
             'plnData',
             'constructionData.constructionPhotos',

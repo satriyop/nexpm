@@ -43,9 +43,12 @@ test('main contractor has clients projects subcontractors and users', function (
         ->for($contractor, 'mainContractor')
         ->for($client)
         ->create();
+    $subcontractor = Subcontractor::factory()->forMainContractor($contractor)->create();
 
     expect($contractor->clients)->toHaveCount(1)
         ->and($contractor->projects)->toHaveCount(1)
+        ->and($contractor->subcontractors)->toHaveCount(1)
+        ->and($contractor->subcontractors->first()->is($subcontractor))->toBeTrue()
         ->and($project->client->is($client))->toBeTrue()
         ->and($project->mainContractor->is($contractor))->toBeTrue();
 });
@@ -66,7 +69,7 @@ test('site belongs to project site type and machine type and has photos', functi
 test('subcontractor user can be linked to subcontractor and main contractor', function () {
     $contractor = MainContractor::factory()->create();
     $subcontractor = Subcontractor::factory()
-        ->for($contractor, 'mainContractor')
+        ->forMainContractor($contractor)
         ->create();
 
     $user = User::factory()->create([
@@ -78,6 +81,7 @@ test('subcontractor user can be linked to subcontractor and main contractor', fu
     expect($user->isSubcontractor())->toBeTrue()
         ->and($user->mainContractor->is($contractor))->toBeTrue()
         ->and($user->subcontractor->is($subcontractor))->toBeTrue()
+        ->and($subcontractor->mainContractors->first()->is($contractor))->toBeTrue()
         ->and($subcontractor->user->is($user))->toBeTrue();
 });
 

@@ -7,21 +7,30 @@ use Database\Factories\SubcontractorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['main_contractor_id', 'name', 'phone', 'email', 'pic', 'code'])]
+#[Fillable(['name', 'phone', 'email', 'pic', 'code'])]
 class Subcontractor extends Model
 {
     /** @use HasFactory<SubcontractorFactory> */
     use HasFactory, ScopedToMainContractor;
 
     /**
-     * @return BelongsTo<MainContractor, $this>
+     * @return BelongsToMany<MainContractor, $this>
      */
-    public function mainContractor(): BelongsTo
+    public function mainContractors(): BelongsToMany
     {
-        return $this->belongsTo(MainContractor::class);
+        return $this->belongsToMany(MainContractor::class, 'main_contractor_subcontractor');
+    }
+
+    /**
+     * @return HasMany<Assignment, $this>
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(Assignment::class);
     }
 
     /**

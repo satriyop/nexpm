@@ -90,7 +90,7 @@ class AssignmentController extends Controller
             : null;
 
         $subcontractors = Subcontractor::query()
-            ->when($mainContractorFilter, fn ($q) => $q->where('main_contractor_id', $mainContractorFilter))
+            ->when($mainContractorFilter, fn ($q) => $q->whereHas('mainContractors', fn ($query) => $query->whereKey($mainContractorFilter)))
             ->when(! $user->isSuperAdmin(), fn ($q) => $q->whereScopedToMainContractor())
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
@@ -134,7 +134,7 @@ class AssignmentController extends Controller
             'site' => $site,
             'assignments' => $assignments,
             'subcontractors' => Subcontractor::query()
-                ->whereScopedToMainContractor()
+                ->whereHas('mainContractors', fn ($query) => $query->whereKey($site->project->main_contractor_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
@@ -154,10 +154,12 @@ class AssignmentController extends Controller
             'bastData.bastPhotos',
         ]);
 
+        $mainContractorId = $assignment->site->project->main_contractor_id;
+
         return Inertia::render('admin/assignments/Show', [
             'assignment' => $assignment,
             'subcontractors' => Subcontractor::query()
-                ->whereScopedToMainContractor()
+                ->whereHas('mainContractors', fn ($query) => $query->whereKey($mainContractorId))
                 ->orderBy('name')
                 ->get(['id', 'name', 'code']),
             'auditLogs' => Inertia::defer(fn () => AssignmentAuditLog::where('assignment_id', $assignment->id)
@@ -475,7 +477,7 @@ class AssignmentController extends Controller
         $validated = $request->validate([
             'subcontractor_id' => [
                 'required',
-                Rule::exists('subcontractors', 'id')
+                Rule::exists('main_contractor_subcontractor', 'subcontractor_id')
                     ->where('main_contractor_id', $mainContractorId),
             ],
         ]);
@@ -549,7 +551,7 @@ class AssignmentController extends Controller
             'activity_type' => ['required', Rule::enum(ActivityType::class)],
             'subcontractor_id' => [
                 'required',
-                Rule::exists('subcontractors', 'id')
+                Rule::exists('main_contractor_subcontractor', 'subcontractor_id')
                     ->where('main_contractor_id', $mainContractorId),
             ],
         ]);

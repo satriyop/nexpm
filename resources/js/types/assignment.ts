@@ -34,6 +34,17 @@ export interface SiteType {
     name: string;
 }
 
+export interface MainContractor {
+    id: number;
+    name: string;
+}
+
+export interface Project {
+    id: number;
+    name: string;
+    main_contractor: MainContractor | null;
+}
+
 export interface Site {
     id: number;
     site_code: string;
@@ -43,6 +54,7 @@ export interface Site {
     city: string;
     google_map_url: string | null;
     site_type: SiteType | null;
+    project: Project | null;
 }
 
 export interface Subcontractor {

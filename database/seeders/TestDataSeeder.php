@@ -59,9 +59,10 @@ class TestDataSeeder extends Seeder
 
         // ── Client & Project ───────────────────────────────────────────────────
         $client = Client::firstOrCreate(
-            ['name' => 'vGreen Indonesia', 'main_contractor_id' => $mc->id],
+            ['name' => 'vGreen Indonesia'],
             ['pic' => 'Andi Wijaya', 'phone' => '+62 812 000 0001', 'email' => 'andi@vgreen.id'],
         );
+        $client->mainContractors()->syncWithoutDetaching($mc->id);
 
         $project = Project::firstOrCreate(
             ['name' => 'EVCS Rollout Phase 1', 'main_contractor_id' => $mc->id],
@@ -78,7 +79,6 @@ class TestDataSeeder extends Seeder
             ['code' => 'SC-CONS-01'],
             [
                 'name' => 'PT Bangun Karya Mandiri',
-                'main_contractor_id' => $mc->id,
                 'phone' => '+62 811 000 0001',
                 'email' => 'construction1@test.com',
                 'pic' => 'Dodi Prasetyo',
@@ -89,7 +89,6 @@ class TestDataSeeder extends Seeder
             ['code' => 'SC-CONS-02'],
             [
                 'name' => 'PT Multi Teknik Mandiri',
-                'main_contractor_id' => $mc->id,
                 'phone' => '+62 811 000 0002',
                 'email' => 'construction2@test.com',
                 'pic' => 'Irfan Hakim',
@@ -100,12 +99,15 @@ class TestDataSeeder extends Seeder
             ['code' => 'SC-PLN-01'],
             [
                 'name' => 'CV Listrik Prima',
-                'main_contractor_id' => $mc->id,
                 'phone' => '+62 811 000 0003',
                 'email' => 'pln@test.com',
                 'pic' => 'Hendra Kurniawan',
             ],
         );
+
+        foreach ([$scCons1, $scCons2, $scPln] as $subcontractor) {
+            $subcontractor->mainContractors()->syncWithoutDetaching($mc->id);
+        }
 
         foreach ([
             ['email' => 'construction1@test.com', 'name' => 'User Construction 1', 'sc' => $scCons1],
@@ -372,9 +374,10 @@ class TestDataSeeder extends Seeder
         );
 
         $clientSgt = Client::firstOrCreate(
-            ['name' => 'PLN Mobile', 'main_contractor_id' => $mcSgt->id],
+            ['name' => 'PLN Mobile'],
             ['pic' => 'Rudi Setiawan', 'phone' => '+62 812 000 0099', 'email' => 'rudi@plnmobile.id'],
         );
+        $clientSgt->mainContractors()->syncWithoutDetaching($mcSgt->id);
 
         $projectSgt = Project::firstOrCreate(
             ['name' => 'BSS Rollout Phase 1', 'main_contractor_id' => $mcSgt->id],
@@ -390,7 +393,6 @@ class TestDataSeeder extends Seeder
             ['code' => 'SGT-CONS-01'],
             [
                 'name' => 'PT Graha Teknik Sentosa',
-                'main_contractor_id' => $mcSgt->id,
                 'phone' => '+62 811 000 0011',
                 'email' => 'sgt-construction1@test.com',
                 'pic' => 'Agus Salim',
@@ -401,7 +403,6 @@ class TestDataSeeder extends Seeder
             ['code' => 'SGT-CONS-02'],
             [
                 'name' => 'CV Karya Prima Utama',
-                'main_contractor_id' => $mcSgt->id,
                 'phone' => '+62 811 000 0012',
                 'email' => 'sgt-construction2@test.com',
                 'pic' => 'Wahyu Nugroho',
@@ -412,12 +413,15 @@ class TestDataSeeder extends Seeder
             ['code' => 'SGT-PLN-01'],
             [
                 'name' => 'PT Daya Listrik Abadi',
-                'main_contractor_id' => $mcSgt->id,
                 'phone' => '+62 811 000 0013',
                 'email' => 'sgt-pln@test.com',
                 'pic' => 'Bambang Sutrisno',
             ],
         );
+
+        foreach ([$scConsSgt1, $scConsSgt2, $scPlnSgt] as $subcontractor) {
+            $subcontractor->mainContractors()->syncWithoutDetaching($mcSgt->id);
+        }
 
         foreach ([
             ['email' => 'sgt-construction1@test.com', 'name' => 'SGT Construction 1', 'sc' => $scConsSgt1],

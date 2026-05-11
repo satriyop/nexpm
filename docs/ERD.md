@@ -55,6 +55,11 @@ erDiagram
         bigint main_contractor_id FK
     }
 
+    MAIN_CONTRACTOR_SUBCONTRACTOR {
+        bigint main_contractor_id FK
+        bigint subcontractor_id FK
+    }
+
     PROJECTS {
         bigint id PK
         bigint main_contractor_id FK
@@ -114,7 +119,6 @@ erDiagram
 
     SUBCONTRACTORS {
         bigint id PK
-        bigint main_contractor_id FK
         string name
         string phone
         string email
@@ -313,8 +317,10 @@ erDiagram
 
     %% ── Relationships ───────────────────────────────────────────────
 
-MAIN_CONTRACTORS ||--o{ CLIENT_MAIN_CONTRACTOR : ""
+    MAIN_CONTRACTORS ||--o{ CLIENT_MAIN_CONTRACTOR : ""
     CLIENTS ||--o{ CLIENT_MAIN_CONTRACTOR : ""
+    MAIN_CONTRACTORS ||--o{ MAIN_CONTRACTOR_SUBCONTRACTOR : ""
+    SUBCONTRACTORS ||--o{ MAIN_CONTRACTOR_SUBCONTRACTOR : ""
 
     CLIENTS ||--o{ PROJECTS : "has many"
 
@@ -349,36 +355,43 @@ MAIN_CONTRACTORS ||--o{ CLIENT_MAIN_CONTRACTOR : ""
 ## Key Design Decisions
 
 ### 1. Activity Data in Separate Tables
+
 Each activity type (Survey, PLN, Construction, BAST) stores its form data in a dedicated table (`assignment_survey_data`, `assignment_pln_data`, etc.), linked 1-to-1 with `assignments`.
 
 **Why:** BAST and the other activities have distinct data shapes. Merging all activity fields into one table would create a sparse table. Separate tables let each activity schema evolve independently without impacting others.
 
 ### 2. MainContractor as Tenant
-Tenant ownership is anchored on `main_contractor_id`. Projects, Clients, Subcontractors, and Users carry it directly; Sites inherit tenant scope through their Project. Queries are scoped to the authenticated user's Main Contractor, with Super Admin allowed cross-tenant access.
+
+Tenant ownership is anchored on `main_contractor_id`. Projects and Admin users carry it directly; Sites inherit tenant scope through their Project. Clients and Subcontractors are shared through pivot tables (`client_main_contractor` and `main_contractor_subcontractor`) so a shared external company can serve more than one Main Contractor. Queries are scoped to the authenticated user's Main Contractor, with Super Admin allowed cross-tenant access.
 
 **Why:** Super Admin manages nex, VGT, and future Main Contractors in one system — but each company's data must stay isolated.
 
 ### 3. Configurable Type Tables
+
 `site_types` and `machine_types` are database-driven lookup tables, not hardcoded enums.
 
 **Why:** Site and machine classifications need to be adjusted without a code deployment. `subcontractor_types` has been removed in the current implementation.
 
 ### 4. Assignment Status as Enum on Assignments Table
+
 Status lives directly on the `assignments` row rather than in a separate status-history table.
 
 **Why:** Current screens mostly need the current state, while `assignment_audit_logs` records major admin events such as verification, revision, drop, restore, reassignment, and edits.
 
 ### 5. Construction Assignment Prerequisite Lock
+
 The `cons_wo_number` field in `assignment_construction_data` being null means the assignment is locked for the sub-con. Admin fills it first.
 
 **Why:** Construction cannot begin without a Work Order number issued by the admin — this is a real-world dependency encoded in the schema.
 
 ### 6. Activity Scope is Implicit, Not Configured
+
 A site's activity scope is defined by which assignments exist on it — not by a configuration field on Project or MainContractor. A site may have 1–4 assignments covering any combination of activity types. This means "site complete" = all existing active assignments are verified or reported, not all 4 types.
 
-The current implementation scopes selectable subcontractors by Main Contractor. It does not enforce activity compatibility by subcontractor type because that table/column no longer exists.
+The current implementation scopes selectable subcontractors through `main_contractor_subcontractor`. It does not enforce activity compatibility by subcontractor type because that table/column no longer exists.
 
 ### 7. Reports via Junction Table
+
 `report_assignments` is a many-to-many join between a Report and the Assignments it includes.
 
 **Why:** Admin selects specific verified assignments per export. One assignment could theoretically appear in multiple historical reports.

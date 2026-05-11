@@ -31,6 +31,8 @@ class AssignmentImportController extends Controller
             'project_id' => $project->id,
             'created' => $result['created'],
             'updated' => $result['updated'],
+            'skipped' => $result['skipped'],
+            'warnings' => $result['warnings'],
             'errors' => $result['errors'],
         ]);
     }
@@ -41,7 +43,7 @@ class AssignmentImportController extends Controller
 
         $siteCodes = $project->sites()->orderBy('site_code')->pluck('site_code');
         $subcontractors = Subcontractor::query()
-            ->where('main_contractor_id', $project->main_contractor_id)
+            ->whereHas('mainContractors', fn ($query) => $query->whereKey($project->main_contractor_id))
             ->orderBy('name')
             ->get(['name', 'code']);
 

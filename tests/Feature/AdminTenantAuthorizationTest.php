@@ -27,7 +27,7 @@ function tenantRecords(): array
     $otherProject = Project::factory()->create(['main_contractor_id' => $otherMainContractor->id]);
 
     $otherSite = Site::factory()->create(['project_id' => $otherProject->id]);
-    $otherSubcontractor = Subcontractor::factory()->create(['main_contractor_id' => $otherMainContractor->id]);
+    $otherSubcontractor = Subcontractor::factory()->forMainContractor($otherMainContractor)->create();
     $otherAssignment = Assignment::factory()->create([
         'site_id' => $otherSite->id,
         'subcontractor_id' => $otherSubcontractor->id,
@@ -105,7 +105,7 @@ test('assignment import rejects subcontractor from another main contractor', fun
     $otherMainContractor = MainContractor::factory()->create();
     $project = Project::factory()->create(['main_contractor_id' => $mainContractor->id]);
     $site = Site::factory()->create(['project_id' => $project->id]);
-    $otherSubcontractor = Subcontractor::factory()->create(['main_contractor_id' => $otherMainContractor->id]);
+    $otherSubcontractor = Subcontractor::factory()->forMainContractor($otherMainContractor)->create();
 
     $path = tempnam(sys_get_temp_dir(), 'assignment-import-');
     file_put_contents($path, "site_code,activity_type,subcontractor_code\n{$site->site_code},SURVEY,{$otherSubcontractor->code}\n");
@@ -120,6 +120,47 @@ test('assignment import rejects subcontractor from another main contractor', fun
         ->and($result['updated'])->toBe(0)
         ->and($result['errors'])->not->toBeEmpty()
         ->and(Assignment::query()->where('site_id', $site->id)->exists())->toBeFalse();
+});
+
+test('super admin can create subcontractor for multiple main contractors', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $mainContractorA = MainContractor::factory()->create();
+    $mainContractorB = MainContractor::factory()->create();
+
+    $this->actingAs($superAdmin)
+        ->post(route('admin.subcontractors.store'), [
+            'name' => 'Shared Subcontractor',
+            'code' => 'SHARED-SUB',
+            'main_contractor_ids' => [$mainContractorA->id, $mainContractorB->id],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $subcontractor = Subcontractor::query()->where('code', 'SHARED-SUB')->firstOrFail();
+
+    expect($subcontractor->mainContractors()->pluck('main_contractors.id')->sort()->values()->all())
+        ->toBe([$mainContractorA->id, $mainContractorB->id]);
+});
+
+test('admin-created subcontractor is attached only to their main contractor', function () {
+    $mainContractor = MainContractor::factory()->create();
+    $otherMainContractor = MainContractor::factory()->create();
+    $admin = User::factory()->create([
+        'role' => Role::Admin,
+        'main_contractor_id' => $mainContractor->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.subcontractors.store'), [
+            'name' => 'Tenant Subcontractor',
+            'code' => 'TENANT-SUB',
+            'main_contractor_ids' => [$otherMainContractor->id],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $subcontractor = Subcontractor::query()->where('code', 'TENANT-SUB')->firstOrFail();
+
+    expect($subcontractor->mainContractors()->pluck('main_contractors.id')->all())
+        ->toBe([$mainContractor->id]);
 });
 
 test('admin cannot download or regenerate report from another main contractor', function () {

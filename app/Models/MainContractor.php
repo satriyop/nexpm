@@ -41,11 +41,11 @@ class MainContractor extends Model
     }
 
     /**
-     * @return HasMany<Subcontractor, $this>
+     * @return BelongsToMany<Subcontractor, $this>
      */
-    public function subcontractors(): HasMany
+    public function subcontractors(): BelongsToMany
     {
-        return $this->hasMany(Subcontractor::class);
+        return $this->belongsToMany(Subcontractor::class, 'main_contractor_subcontractor');
     }
 
     /**

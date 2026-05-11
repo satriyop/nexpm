@@ -257,6 +257,11 @@ function daysStalled(assignment: Assignment): number | null {
                             <th
                                 class="px-4 py-3 text-left font-medium text-muted-foreground"
                             >
+                                Project
+                            </th>
+                            <th
+                                class="px-4 py-3 text-left font-medium text-muted-foreground"
+                            >
                                 Activity
                             </th>
                             <th
@@ -293,6 +298,22 @@ function daysStalled(assignment: Assignment): number | null {
                                     <span class="text-xs text-muted-foreground">
                                         {{ assignment.site?.city }},
                                         {{ assignment.site?.province }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex flex-col">
+                                    <span>
+                                        {{
+                                            assignment.site?.project?.name ??
+                                            '—'
+                                        }}
+                                    </span>
+                                    <span class="text-xs text-muted-foreground">
+                                        {{
+                                            assignment.site?.project
+                                                ?.main_contractor?.name ?? '—'
+                                        }}
                                     </span>
                                 </div>
                             </td>
@@ -374,7 +395,7 @@ function daysStalled(assignment: Assignment): number | null {
 
                         <tr v-if="assignments.data.length === 0">
                             <td
-                                colspan="6"
+                                colspan="7"
                                 class="px-4 py-12 text-center text-sm text-muted-foreground"
                             >
                                 <div

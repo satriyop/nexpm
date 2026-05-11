@@ -19,12 +19,18 @@ class SubcontractorFactory extends Factory
     public function definition(): array
     {
         return [
-            'main_contractor_id' => MainContractor::factory(),
             'name' => fake()->company(),
             'phone' => fake()->phoneNumber(),
             'email' => fake()->unique()->companyEmail(),
             'pic' => fake()->name(),
             'code' => fake()->unique()->bothify('SUB-####'),
         ];
+    }
+
+    public function forMainContractor(MainContractor $mainContractor): static
+    {
+        return $this->afterCreating(function (Subcontractor $subcontractor) use ($mainContractor): void {
+            $subcontractor->mainContractors()->syncWithoutDetaching($mainContractor->id);
+        });
     }
 }

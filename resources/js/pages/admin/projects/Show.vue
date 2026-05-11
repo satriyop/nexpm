@@ -75,6 +75,8 @@ interface ImportResult {
     project_id: number;
     created: number;
     updated: number;
+    skipped?: number;
+    warnings?: string[];
     errors: string[];
 }
 
@@ -84,6 +86,26 @@ const props = defineProps<{
     import: ImportResult | null;
 }>();
 const importResult = computed(() => props.import);
+const importWarnings = computed(() => importResult.value?.warnings ?? []);
+const skippedImportRows = computed(() => importResult.value?.skipped ?? 0);
+const importHasErrors = computed(
+    () => (importResult.value?.errors.length ?? 0) > 0,
+);
+const importHasWarnings = computed(() => importWarnings.value.length > 0);
+const importResultTitle = computed(() => {
+    const importType =
+        importResult.value?.type === 'sites' ? 'Sites' : 'Assignments';
+
+    if (importHasErrors.value) {
+        return `${importType} Import Completed With Errors`;
+    }
+
+    if (importHasWarnings.value) {
+        return `${importType} Import Completed With Warnings`;
+    }
+
+    return `${importType} Import Complete`;
+});
 
 defineOptions({
     layout: {
@@ -247,25 +269,36 @@ const formatBudget = (val: string | null) =>
         <!-- Import result alert -->
         <Alert
             v-if="importResult"
-            :variant="importResult.errors.length ? 'destructive' : 'default'"
+            :variant="importHasErrors ? 'destructive' : 'default'"
+            :class="
+                importHasWarnings && !importHasErrors
+                    ? 'border-amber-300 bg-amber-50 text-amber-950'
+                    : ''
+            "
         >
-            <CheckCircle2 v-if="!importResult.errors.length" class="h-4 w-4" />
+            <CheckCircle2
+                v-if="!importHasErrors && !importHasWarnings"
+                class="h-4 w-4"
+            />
             <AlertCircle v-else class="h-4 w-4" />
-            <AlertTitle
-                >{{
-                    importResult.type === 'sites' ? 'Sites' : 'Assignments'
-                }}
-                Import Complete</AlertTitle
-            >
+            <AlertTitle>{{ importResultTitle }}</AlertTitle>
             <AlertDescription>
                 <p>
                     Created: {{ importResult.created }}, Updated:
                     {{ importResult.updated }}
+                    <template v-if="skippedImportRows > 0">
+                        , Skipped: {{ skippedImportRows }}
+                    </template>
                 </p>
                 <ul
-                    v-if="importResult.errors.length"
-                    class="mt-1 list-disc pl-4 text-xs"
+                    v-if="importWarnings.length"
+                    class="mt-2 list-disc pl-4 text-xs text-amber-800"
                 >
+                    <li v-for="(warning, i) in importWarnings" :key="i">
+                        {{ warning }}
+                    </li>
+                </ul>
+                <ul v-if="importHasErrors" class="mt-1 list-disc pl-4 text-xs">
                     <li v-for="(err, i) in importResult.errors" :key="i">
                         {{ err }}
                     </li>

@@ -109,7 +109,9 @@ function openDelete(mc: MainContractor) {
 }
 
 function submitDelete() {
-    if (!deletingContractor.value) return;
+    if (!deletingContractor.value) {
+        return;
+    }
 
     deleteForm.delete(Actions.destroy(deletingContractor.value.id).url, {
         onSuccess: () => {
@@ -352,11 +354,15 @@ function submitDelete() {
             </DialogHeader>
             <p class="text-sm text-muted-foreground">
                 Are you sure you want to delete
-                <span class="font-medium text-foreground">{{ deletingContractor?.name }}</span
+                <span class="font-medium text-foreground">{{
+                    deletingContractor?.name
+                }}</span
                 >? This action cannot be undone.
             </p>
             <DialogFooter>
-                <Button variant="outline" @click="deleteOpen = false">Cancel</Button>
+                <Button variant="outline" @click="deleteOpen = false"
+                    >Cancel</Button
+                >
                 <Button
                     variant="destructive"
                     :disabled="deleteForm.processing"

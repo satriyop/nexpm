@@ -46,6 +46,10 @@ const isReadOnly = computed(() =>
                     {{ assignment.site.site_code }} ·
                     {{ assignment.site.city }}, {{ assignment.site.province }}
                 </p>
+                <p class="mt-1 text-sm text-muted-foreground">
+                    {{ assignment.site.project?.name ?? '—' }} ·
+                    {{ assignment.site.project?.main_contractor?.name ?? '—' }}
+                </p>
             </div>
             <div class="flex items-center gap-2">
                 <ActivityTypeBadge :activity-type="assignment.activity_type" />

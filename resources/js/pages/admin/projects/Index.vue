@@ -34,7 +34,7 @@ interface MainContractor {
 interface Client {
     id: number;
     name: string;
-    main_contractor_id: number;
+    main_contractors: MainContractor[];
 }
 interface Project {
     id: number;
@@ -66,8 +66,11 @@ const open = ref(false);
 const selectedMcId = ref('');
 const filteredClients = computed(() =>
     selectedMcId.value
-        ? props.clients.filter(
-              (c) => c.main_contractors?.some(mc => String(mc.id) === selectedMcId.value),
+        ? props.clients.filter((client) =>
+              client.main_contractors.some(
+                  (mainContractor) =>
+                      String(mainContractor.id) === selectedMcId.value,
+              ),
           )
         : props.clients,
 );

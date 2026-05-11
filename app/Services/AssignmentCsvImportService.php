@@ -20,18 +20,26 @@ class AssignmentCsvImportService
      * Expected columns (with header row):
      *  site_code, activity_type, subcontractor_code
      *
-     * @return array{created: int, updated: int, errors: array<int, string>}
+     * @return array{created: int, updated: int, skipped: int, warnings: array<int, string>, errors: array<int, string>}
      */
     public function import(string $filePath, int $projectId): array
     {
         $created = 0;
         $updated = 0;
+        $skipped = 0;
+        $warnings = [];
         $errors = [];
 
         $handle = fopen($filePath, 'r');
 
         if ($handle === false) {
-            return ['created' => 0, 'updated' => 0, 'errors' => ['Unable to open CSV file.']];
+            return [
+                'created' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'warnings' => [],
+                'errors' => ['Unable to open CSV file.'],
+            ];
         }
 
         // Pre-load lookup maps to avoid N+1 queries.
@@ -41,9 +49,10 @@ class AssignmentCsvImportService
             ->keyBy('site_code');
 
         $subcontractors = Subcontractor::query()
-            ->whereHas('mainContractor.projects', fn ($query) => $query->whereKey($projectId))
-            ->get()
-            ->keyBy('code');
+            ->whereHas('mainContractors.projects', fn ($query) => $query->whereKey($projectId))
+            ->get();
+        $subcontractorsByCode = $subcontractors->keyBy('code');
+        $subcontractorsById = $subcontractors->keyBy('id');
 
         try {
             // Detect delimiter — skip comment rows (#) to find the actual header line.
@@ -74,8 +83,18 @@ class AssignmentCsvImportService
                 $activityRaw = isset($data[1]) ? trim((string) $data[1]) : '';
                 $subcontractorCode = isset($data[2]) ? trim((string) $data[2]) : '';
 
-                if ($siteCode === '' || $activityRaw === '' || $subcontractorCode === '') {
-                    $errors[] = "Row {$rowNumber}: site_code, activity_type, and subcontractor_code are required.";
+                if ($siteCode === '' && $activityRaw === '' && $subcontractorCode === '') {
+                    continue;
+                }
+
+                if ($siteCode === '' || $activityRaw === '') {
+                    $errors[] = "Row {$rowNumber}: site_code and activity_type are required.";
+
+                    continue;
+                }
+
+                if ($subcontractorCode === '') {
+                    $skipped++;
 
                     continue;
                 }
@@ -95,7 +114,7 @@ class AssignmentCsvImportService
                     continue;
                 }
 
-                $subcontractor = $subcontractors->get($subcontractorCode);
+                $subcontractor = $subcontractorsByCode->get($subcontractorCode);
                 if ($subcontractor === null) {
                     $errors[] = "Row {$rowNumber}: subcontractor '{$subcontractorCode}' not found.";
 
@@ -108,6 +127,18 @@ class AssignmentCsvImportService
                     ->first();
 
                 if ($existing !== null) {
+                    if ($existing->subcontractor_id !== $subcontractor->id) {
+                        $currentSubcontractor = $subcontractorsById->get($existing->subcontractor_id);
+                        $warnings[] = sprintf(
+                            'Row %d: %s %s reassigned from %s to %s.',
+                            $rowNumber,
+                            $siteCode,
+                            $activityType->value,
+                            $this->subcontractorLabel($currentSubcontractor, $existing->subcontractor_id),
+                            $this->subcontractorLabel($subcontractor, $subcontractor->id),
+                        );
+                    }
+
                     $existing->subcontractor_id = $subcontractor->id;
                     $existing->save();
                     $updated++;
@@ -135,8 +166,19 @@ class AssignmentCsvImportService
         return [
             'created' => $created,
             'updated' => $updated,
+            'skipped' => $skipped,
+            'warnings' => $warnings,
             'errors' => $errors,
         ];
+    }
+
+    private function subcontractorLabel(?Subcontractor $subcontractor, int $subcontractorId): string
+    {
+        if ($subcontractor === null) {
+            return "subcontractor #{$subcontractorId}";
+        }
+
+        return "{$subcontractor->name} ({$subcontractor->code})";
     }
 
     private function ensureActivityDataRecord(Assignment $assignment, ActivityType $activityType): void
