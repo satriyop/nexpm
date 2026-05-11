@@ -65,4 +65,35 @@ class MainContractorController extends Controller
 
         return back()->with('success', 'Main contractor updated.');
     }
+
+    public function destroy(MainContractor $mainContractor): RedirectResponse
+    {
+        abort_unless($this->currentUser()->isSuperAdmin(), 403);
+
+        // Prevent deletion if related data exists
+        if ($mainContractor->projects()->exists()) {
+            return back()->with('error', 'Cannot delete. Main contractor has associated projects.');
+        }
+
+        if ($mainContractor->subcontractors()->exists()) {
+            return back()->with('error', 'Cannot delete. Main contractor has associated subcontractors.');
+        }
+
+        if ($mainContractor->clients()->exists()) {
+            return back()->with('error', 'Cannot delete. Main contractor has associated clients.');
+        }
+
+        if ($mainContractor->users()->exists()) {
+            return back()->with('error', 'Cannot delete. Main contractor has associated users.');
+        }
+
+        // Delete logo if exists
+        if ($mainContractor->logo) {
+            Storage::disk('public')->delete($mainContractor->logo);
+        }
+
+        $mainContractor->delete();
+
+        return back()->with('success', 'Main contractor deleted.');
+    }
 }

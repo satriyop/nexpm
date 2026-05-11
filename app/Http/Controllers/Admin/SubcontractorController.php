@@ -50,4 +50,18 @@ class SubcontractorController extends Controller
 
         return back()->with('success', 'Subcontractor created.');
     }
+
+    public function destroy(Subcontractor $subcontractor): RedirectResponse
+    {
+        $this->ensureCanAccessMainContractor($subcontractor->main_contractor_id);
+
+        // Prevent deletion if related assignments exist
+        if ($subcontractor->assignments()->exists()) {
+            return back()->with('error', 'Cannot delete. Subcontractor has associated assignments.');
+        }
+
+        $subcontractor->delete();
+
+        return back()->with('success', 'Subcontractor deleted.');
+    }
 }

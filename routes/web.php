@@ -25,10 +25,12 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::get('main-contractors', [Admin\MainContractorController::class, 'index'])->name('main-contractors.index');
     Route::post('main-contractors', [Admin\MainContractorController::class, 'store'])->name('main-contractors.store');
     Route::post('main-contractors/{main_contractor}', [Admin\MainContractorController::class, 'update'])->name('main-contractors.update');
+    Route::delete('main-contractors/{main_contractor}', [Admin\MainContractorController::class, 'destroy'])->name('main-contractors.destroy');
 
     Route::get('clients', [Admin\ClientController::class, 'index'])->name('clients.index');
     Route::post('clients', [Admin\ClientController::class, 'store'])->name('clients.store');
     Route::post('clients/{client}', [Admin\ClientController::class, 'update'])->name('clients.update');
+    Route::delete('clients/{client}', [Admin\ClientController::class, 'destroy'])->name('clients.destroy');
 
     Route::get('projects', [Admin\ProjectController::class, 'index'])->name('projects.index');
     Route::post('projects', [Admin\ProjectController::class, 'store'])->name('projects.store');
@@ -36,6 +38,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
 
     Route::get('subcontractors', [Admin\SubcontractorController::class, 'index'])->name('subcontractors.index');
     Route::post('subcontractors', [Admin\SubcontractorController::class, 'store'])->name('subcontractors.store');
+    Route::delete('subcontractors/{subcontractor}', [Admin\SubcontractorController::class, 'destroy'])->name('subcontractors.destroy');
 
     Route::get('users', [Admin\UserController::class, 'index'])->name('users.index');
     Route::post('users', [Admin\UserController::class, 'store'])->name('users.store');

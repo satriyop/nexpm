@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Plus, Wrench } from 'lucide-vue-next';
+import { Plus, Trash2, Wrench } from 'lucide-vue-next';
 import { ref } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/SubcontractorController';
 import InputError from '@/components/InputError.vue';
@@ -23,6 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+
 import { dashboard } from '@/routes';
 import type { PaginatedData } from '@/types';
 
@@ -73,6 +74,28 @@ function submit() {
         },
     });
 }
+
+// ── Delete modal ─────────────────────────────────────────────────
+const deleteOpen = ref(false);
+const deletingSubcontractor = ref<Subcontractor | null>(null);
+const deleteForm = useForm<{ id: number }>({ id: 0 });
+
+function openDelete(sc: Subcontractor) {
+    deletingSubcontractor.value = sc;
+    deleteForm.id = sc.id;
+    deleteOpen.value = true;
+}
+
+function submitDelete() {
+    if (!deletingSubcontractor.value) return;
+
+    deleteForm.delete(Actions.destroy(deletingSubcontractor.value.id).url, {
+        onSuccess: () => {
+            deleteOpen.value = false;
+            deletingSubcontractor.value = null;
+        },
+    });
+}
 </script>
 
 <template>
@@ -109,6 +132,7 @@ function submit() {
                             <th class="px-4 py-3 text-left font-medium">
                                 Phone
                             </th>
+                            <th class="px-4 py-3 text-left font-medium"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y">
@@ -131,6 +155,16 @@ function submit() {
                             </td>
                             <td class="px-4 py-3 text-muted-foreground">
                                 {{ sc.phone ?? '—' }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="text-destructive hover:text-destructive"
+                                    @click="openDelete(sc)"
+                                >
+                                    <Trash2 class="h-4 w-4" />
+                                </Button>
                             </td>
                         </tr>
                         <tr v-if="!subcontractors.data.length">
@@ -237,6 +271,30 @@ function submit() {
                     >
                 </DialogFooter>
             </form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Delete confirmation dialog -->
+    <Dialog v-model:open="deleteOpen">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Delete Subcontractor</DialogTitle>
+            </DialogHeader>
+            <p class="text-sm text-muted-foreground">
+                Are you sure you want to delete
+                <span class="font-medium text-foreground">{{ deletingSubcontractor?.name }}</span
+                >? This action cannot be undone.
+            </p>
+            <DialogFooter>
+                <Button variant="outline" @click="deleteOpen = false">Cancel</Button>
+                <Button
+                    variant="destructive"
+                    :disabled="deleteForm.processing"
+                    @click="submitDelete"
+                >
+                    Delete
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 </template>

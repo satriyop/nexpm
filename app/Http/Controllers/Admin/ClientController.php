@@ -109,4 +109,25 @@ class ClientController extends Controller
 
         abort_unless($hasAccess, 403, 'You do not have access to this client.');
     }
+
+    public function destroy(Client $client): RedirectResponse
+    {
+        $this->ensureCanAccessClient($client);
+
+        // Prevent deletion if related data exists
+        if ($client->projects()->exists()) {
+            return back()->with('error', 'Cannot delete client. It has associated projects.');
+        }
+
+        // Delete logo if exists
+        if ($client->logo) {
+            Storage::disk('public')->delete($client->logo);
+        }
+
+        // Detach from main contractors and delete
+        $client->mainContractors()->detach();
+        $client->delete();
+
+        return back()->with('success', 'Client deleted.');
+    }
 }
