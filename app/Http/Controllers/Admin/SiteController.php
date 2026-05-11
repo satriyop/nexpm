@@ -55,6 +55,7 @@ class SiteController extends Controller
             'cable_length_to_panel' => ['nullable', 'numeric', 'min:0'],
             'cable_length_panel_to_charger' => ['nullable', 'numeric', 'min:0'],
             'charging_station_count' => ['nullable', 'integer', 'min:0'],
+            'power_kva' => ['nullable', 'string', 'max:255'],
             'ssr_url' => ['nullable', 'string', 'max:500'],
             'nidi_slo_bpujl_url' => ['nullable', 'string', 'max:500'],
             'sik_url' => ['nullable', 'string', 'max:500'],

@@ -55,6 +55,7 @@ export interface Site {
     google_map_url: string | null;
     site_type: SiteType | null;
     project: Project | null;
+    power_kva: string | null;
 }
 
 export interface Subcontractor {

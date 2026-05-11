@@ -61,6 +61,7 @@ interface Site {
     cable_length_to_panel: string | null;
     cable_length_panel_to_charger: string | null;
     charging_station_count: number | null;
+    power_kva: string | null;
     ssr_url: string | null;
     nidi_slo_bpujl_url: string | null;
     sik_url: string | null;
@@ -142,6 +143,7 @@ const form = useForm({
     cable_length_panel_to_charger:
         props.site.cable_length_panel_to_charger ?? '',
     charging_station_count: props.site.charging_station_count ?? '',
+    power_kva: props.site.power_kva ?? '',
     ssr_url: props.site.ssr_url ?? '',
     nidi_slo_bpujl_url: props.site.nidi_slo_bpujl_url ?? '',
     sik_url: props.site.sik_url ?? '',

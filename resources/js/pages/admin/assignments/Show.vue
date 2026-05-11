@@ -221,7 +221,6 @@ const adminSurveyForm = useForm({
     charger_type: survey.value?.charger_type ?? '',
     ss_schedule_date: survey.value?.ss_schedule_date ?? '',
     cable_pulling_type: survey.value?.cable_pulling_type ?? '',
-    power_kva: survey.value?.power_kva ?? '',
     pln_network_type: survey.value?.pln_network_type ?? '',
     parking_slot: survey.value?.parking_slot ?? '',
     additional_info: survey.value?.additional_info ?? '',
@@ -787,10 +786,10 @@ onUnmounted(() => {
                             </div>
                             <div>
                                 <p class="text-xs text-muted-foreground">
-                                    Power kVA
+                                    Required Power (kVA)
                                 </p>
                                 <p class="font-medium">
-                                    {{ survey.power_kva ?? '—' }}
+                                    {{ assignment.site.power_kva ?? '—' }}
                                 </p>
                             </div>
                             <div>
@@ -1016,11 +1015,10 @@ onUnmounted(() => {
                                 />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label>Power kVA</Label>
-                                <Input v-model="adminSurveyForm.power_kva" />
-                                <InputError
-                                    :message="adminSurveyForm.errors.power_kva"
-                                />
+                                <Label>Required Power (kVA)</Label>
+                                <div class="rounded-md border bg-muted/50 px-3 py-2 text-sm font-medium">
+                                    {{ assignment.site.power_kva ?? '—' }}
+                                </div>
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Available PLN Network Type</Label>

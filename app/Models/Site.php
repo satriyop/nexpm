@@ -28,6 +28,7 @@ class Site extends Model
         'google_map_url',
         'latitude',
         'longitude',
+        'power_kva',
         'bd_pic',
         'ss_wo_number',
         'cable_length_to_panel',

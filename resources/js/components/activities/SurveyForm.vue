@@ -31,7 +31,6 @@ const surveyForm = useForm({
     charger_type: props.assignment.survey_data?.charger_type ?? '',
     ss_schedule_date: props.assignment.survey_data?.ss_schedule_date ?? '',
     cable_pulling_type: props.assignment.survey_data?.cable_pulling_type ?? '',
-    power_kva: props.assignment.survey_data?.power_kva ?? '',
     pln_network_type: props.assignment.survey_data?.pln_network_type ?? '',
     parking_slot: props.assignment.survey_data?.parking_slot ?? '',
     additional_info: props.assignment.survey_data?.additional_info ?? '',
