@@ -42,7 +42,7 @@ class ProjectController extends Controller
             'main_contractor_id' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'exists:main_contractors,id'],
             'client_id' => [
                 'required',
-                Rule::exists('clients', 'id')
+                Rule::exists('client_main_contractor', 'client_id')
                     ->where('main_contractor_id', $mainContractorId),
             ],
             'start_date' => ['nullable', 'date'],

@@ -62,10 +62,14 @@ const addForm = useForm({
 });
 
 function submitAdd() {
-    if (addForm.main_contractor_ids.length === 0) {
+    // Normalize and filter
+    const selectedIds = addForm.main_contractor_ids.filter(id => id > 0);
+    
+    if (selectedIds.length === 0) {
         addForm.setError('main_contractor_ids', 'Select at least one main contractor');
         return;
     }
+    
     addForm.post(Actions.store().url, {
         onSuccess: () => {
             addOpen.value = false;
@@ -75,12 +79,14 @@ function submitAdd() {
 }
 
 function toggleMainContractor(id: number) {
-    const idx = addForm.main_contractor_ids.indexOf(id);
+    const current = [...addForm.main_contractor_ids];
+    const idx = current.indexOf(id);
     if (idx === -1) {
-        addForm.main_contractor_ids.push(id);
+        current.push(id);
     } else {
-        addForm.main_contractor_ids.splice(idx, 1);
+        current.splice(idx, 1);
     }
+    addForm.main_contractor_ids = current;
     addForm.clearErrors('main_contractor_ids');
 }
 
@@ -99,8 +105,11 @@ const logoPreview = ref<string | null>(null);
 
 function openEdit(client: Client) {
     editingClient.value = client;
+    editForm.clearErrors();
     editForm.name = client.name;
-    editForm.main_contractor_ids = client.main_contractors.map(mc => mc.id);
+    editForm.main_contractor_ids = Array.isArray(client.main_contractors) 
+        ? client.main_contractors.map(mc => Number(mc.id)) 
+        : [];
     editForm.phone = client.phone ?? '';
     editForm.email = client.email ?? '';
     editForm.pic = client.pic ?? '';
@@ -118,12 +127,14 @@ function onLogoChange(e: Event) {
 }
 
 function toggleEditMainContractor(id: number) {
-    const idx = editForm.main_contractor_ids.indexOf(id);
+    const current = [...editForm.main_contractor_ids];
+    const idx = current.indexOf(id);
     if (idx === -1) {
-        editForm.main_contractor_ids.push(id);
+        current.push(id);
     } else {
-        editForm.main_contractor_ids.splice(idx, 1);
+        current.splice(idx, 1);
     }
+    editForm.main_contractor_ids = current;
     editForm.clearErrors('main_contractor_ids');
 }
 
@@ -131,7 +142,11 @@ function submitEdit() {
     if (!editingClient.value) {
         return;
     }
-    if (editForm.main_contractor_ids.length === 0) {
+    
+    // Normalize and filter
+    const selectedIds = editForm.main_contractor_ids.filter(id => id > 0);
+    
+    if (selectedIds.length === 0) {
         editForm.setError('main_contractor_ids', 'Select at least one main contractor');
         return;
     }
@@ -322,7 +337,7 @@ function submitDelete() {
                             <Checkbox
                                 :id="'add-mc-' + mc.id"
                                 :checked="addForm.main_contractor_ids.includes(mc.id)"
-                                @update:checked="toggleMainContractor(mc.id)"
+                                @update:model-value="toggleMainContractor(mc.id)"
                             />
                             <Label
                                 :for="'add-mc-' + mc.id"
@@ -387,7 +402,7 @@ function submitDelete() {
                             <Checkbox
                                 :id="'edit-mc-' + mc.id"
                                 :checked="editForm.main_contractor_ids.includes(mc.id)"
-                                @update:checked="toggleEditMainContractor(mc.id)"
+                                @update:model-value="toggleEditMainContractor(mc.id)"
                             />
                             <Label
                                 :for="'edit-mc-' + mc.id"
