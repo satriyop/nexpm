@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -41,7 +42,8 @@ class ReportController extends Controller
             ->with(['site.siteType', 'subcontractor'])
             ->latest('verified_at');
 
-        $reportIds = DB::table('reports')
+        $reportIds = Report::query()
+            ->whereHas('assignments.site.project', fn ($query) => $query->whereScopedToMainContractor())
             ->orderByDesc('created_at')
             ->limit(15)
             ->pluck('id');
@@ -106,11 +108,31 @@ class ReportController extends Controller
 
         $assignmentIds = $validated['assignment_ids'];
 
-        $verifiedCount = Assignment::whereIn('id', $assignmentIds)
+        $assignments = Assignment::query()
+            ->whereIn('id', $assignmentIds)
+            ->whereHas('site.project', fn ($query) => $query->whereScopedToMainContractor())
+            ->get();
+
+        abort_unless($assignments->count() === count($assignmentIds), 403, 'One or more assignments are outside your tenant.');
+
+        $verifiedCount = $assignments
             ->where('status', AssignmentStatus::Verified)
             ->count();
 
         abort_unless($verifiedCount === count($assignmentIds), 422, 'All selected assignments must have VERIFIED status.');
+
+        $allowedActivityType = match ($validated['report_type']) {
+            'SSR' => ActivityType::Survey,
+            'BAST' => ActivityType::Bast,
+            default => null,
+        };
+
+        abort_if(
+            $allowedActivityType !== null
+            && $assignments->contains(fn (Assignment $assignment) => $assignment->activity_type !== $allowedActivityType),
+            422,
+            'Selected assignments do not match the requested report type.'
+        );
 
         /** @var User $user */
         $user = auth()->user();
@@ -128,14 +150,14 @@ class ReportController extends Controller
             'exported_by' => $user->id,
         ]);
 
-        $report->assignments()->attach($assignmentIds);
+        $report->assignments()->attach($assignments->modelKeys());
 
-        Assignment::whereIn('id', $assignmentIds)->each(fn (Assignment $a) => $a->markReported());
+        $assignments->each(fn (Assignment $assignment) => $assignment->markReported());
 
         if ($validated['report_type'] === 'SSR') {
-            $surveyAssignmentIds = Assignment::whereIn('id', $assignmentIds)
+            $surveyAssignmentIds = $assignments
                 ->where('activity_type', ActivityType::Survey)
-                ->pluck('id');
+                ->modelKeys();
             AssignmentSurveyData::whereIn('assignment_id', $surveyAssignmentIds)
                 ->update(['ss_report_submission_date' => today()]);
         }
@@ -147,6 +169,8 @@ class ReportController extends Controller
 
     public function download(Report $report, BastReportExportService $bastService): StreamedResponse
     {
+        $this->ensureCanAccessReport($report);
+
         return match ($report->report_type) {
             'BAST', 'BAST_EVCS', 'BAST_BSS' => $this->downloadBast($report, $bastService),
             'SSR' => $this->downloadSsr($report),
@@ -156,6 +180,8 @@ class ReportController extends Controller
 
     public function regenerate(Report $report): RedirectResponse
     {
+        $this->ensureCanAccessReport($report);
+
         $assignmentIds = $report->assignments()->pluck('assignments.id')->toArray();
 
         $typeLabel = match ($report->report_type) {
@@ -402,7 +428,7 @@ class ReportController extends Controller
         $headers = array_merge($hardcodedHeaders, $extraHeaders);
 
         foreach ($headers as $col => $header) {
-            $cell = $sheet->getCellByColumnAndRow($col + 1, 1);
+            $cell = $sheet->getCell(Coordinate::stringFromColumnIndex($col + 1).'1');
             $cell->setValue($header);
             $cell->getStyle()->getFont()->setBold(true);
             $cell->getStyle()->getFill()
@@ -481,7 +507,7 @@ class ReportController extends Controller
             $values = array_merge($hardcodedValues, $extraValues);
 
             foreach ($values as $col => $value) {
-                $sheet->getCellByColumnAndRow($col + 1, $rowNum)->setValue($value);
+                $sheet->getCell(Coordinate::stringFromColumnIndex($col + 1).$rowNum)->setValue($value);
             }
 
             $rowNum++;

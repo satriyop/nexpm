@@ -7,6 +7,7 @@ use App\Models\MainContractor;
 use App\Models\Subcontractor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,20 +21,30 @@ class SubcontractorController extends Controller
         return Inertia::render('admin/subcontractors/Index', [
             'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractor')->latest('id')->paginate($perPage)->withQueryString(),
             'per_page' => $perPage,
-            'mainContractors' => MainContractor::query()->orderBy('name')->get(['id', 'name']),
+            'mainContractors' => MainContractor::query()
+                ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $user = $this->currentUser();
+        $mainContractorId = $user->isSuperAdmin()
+            ? $request->integer('main_contractor_id')
+            : $user->main_contractor_id;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', 'unique:subcontractors,code'],
-            'main_contractor_id' => ['required', 'exists:main_contractors,id'],
+            'main_contractor_id' => [$user->isSuperAdmin() ? 'required' : 'nullable', Rule::exists('main_contractors', 'id')],
             'pic' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
         ]);
+
+        $validated['main_contractor_id'] = $mainContractorId;
 
         Subcontractor::query()->create($validated);
 

@@ -16,7 +16,6 @@ use App\Models\MainContractor;
 use App\Models\Project;
 use App\Models\Site;
 use App\Models\Subcontractor;
-use App\Models\User;
 use App\Services\BastReportExportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -116,6 +115,8 @@ class AssignmentController extends Controller
 
     public function siteAssignments(Site $site): Response
     {
+        $this->ensureCanAccessSite($site);
+
         $site->load(['siteType', 'project.client', 'project.mainContractor']);
 
         $assignments = Assignment::query()
@@ -141,6 +142,8 @@ class AssignmentController extends Controller
 
     public function show(Assignment $assignment): Response
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         $assignment->load([
             'site.siteType',
             'subcontractor',
@@ -175,6 +178,8 @@ class AssignmentController extends Controller
 
     public function verify(Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         abort_unless(
             in_array($assignment->status, AssignmentStatus::verifiableStatuses(), true),
             422,
@@ -195,6 +200,8 @@ class AssignmentController extends Controller
 
     public function revise(Request $request, Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         abort_unless(
             $assignment->activity_type === ActivityType::Bast
             && $assignment->status === AssignmentStatus::Completed,
@@ -220,6 +227,8 @@ class AssignmentController extends Controller
 
     public function drop(Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         abort_unless(
             ! in_array($assignment->status, [AssignmentStatus::Drop, AssignmentStatus::Reported], true),
             422,
@@ -240,6 +249,8 @@ class AssignmentController extends Controller
 
     public function restore(Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         abort_unless($assignment->status === AssignmentStatus::Drop, 422, 'Only dropped assignments can be restored.');
 
         $assignment->status = AssignmentStatus::Pending;
@@ -257,6 +268,8 @@ class AssignmentController extends Controller
 
     public function updateConstructionPrerequisite(Request $request, Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         abort_unless($assignment->activity_type === ActivityType::Construction, 422, 'Only Construction assignments accept this prerequisite.');
 
         $validated = $request->validate([
@@ -273,6 +286,8 @@ class AssignmentController extends Controller
 
     public function updateSurveyData(Request $request, Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         $validated = $request->validate([
             'surveyor_name' => ['nullable', 'string', 'max:255'],
             'pic_location_name' => ['nullable', 'string', 'max:255'],
@@ -327,6 +342,8 @@ class AssignmentController extends Controller
 
     public function updatePlnData(Request $request, Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         $validated = $request->validate([
             'pln_status' => ['nullable', 'string', 'max:255'],
             'nidi_slo_date_acquired' => ['nullable', 'date'],
@@ -371,6 +388,8 @@ class AssignmentController extends Controller
 
     public function updateConstructionSubconData(Request $request, Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         $validated = $request->validate([
             'cons_actual_start_date' => ['nullable', 'date'],
             'cons_actual_done_date' => ['nullable', 'date'],
@@ -406,6 +425,8 @@ class AssignmentController extends Controller
 
     public function updateBastData(Request $request, Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         $validated = $request->validate([
             'plant_name' => ['nullable', 'string', 'max:255'],
             'plant_address' => ['nullable', 'string'],
@@ -444,6 +465,8 @@ class AssignmentController extends Controller
 
     public function reassign(Request $request, Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         $user = $this->currentUser();
         $mainContractorId = $user->isSuperAdmin()
             ? $assignment->load('site.project')->site->project->main_contractor_id
@@ -485,6 +508,8 @@ class AssignmentController extends Controller
 
     public function downloadBastReport(Assignment $assignment, BastReportExportService $exportService): HttpResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         abort_unless($assignment->activity_type === ActivityType::Bast, 422, 'Only BAST assignments have a commissioning report.');
         abort_unless(
             in_array($assignment->status, [AssignmentStatus::Completed, AssignmentStatus::Verified, AssignmentStatus::Reported], true),
@@ -513,6 +538,8 @@ class AssignmentController extends Controller
 
     public function storeForSite(Request $request, Site $site): RedirectResponse
     {
+        $this->ensureCanAccessSite($site);
+
         $user = $this->currentUser();
         $mainContractorId = $user->isSuperAdmin()
             ? $site->load('project')->project->main_contractor_id
@@ -565,6 +592,8 @@ class AssignmentController extends Controller
 
     public function destroy(Assignment $assignment): RedirectResponse
     {
+        $this->ensureCanAccessAssignment($assignment);
+
         abort_unless(
             $assignment->status === AssignmentStatus::Pending,
             422,
@@ -662,13 +691,5 @@ class AssignmentController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
-    }
-
-    private function currentUser(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $user;
     }
 }

@@ -18,6 +18,8 @@ class SiteController extends Controller
 {
     public function edit(Site $site): Response
     {
+        $this->ensureCanAccessSite($site);
+
         $site->load(['siteType', 'machineType', 'project.client', 'project.mainContractor']);
 
         $assignments = Assignment::query()
@@ -46,6 +48,8 @@ class SiteController extends Controller
 
     public function update(Request $request, Site $site): RedirectResponse
     {
+        $this->ensureCanAccessSite($site);
+
         $validated = $request->validate([
             'location_name' => ['required', 'string', 'max:255'],
             'address' => ['required', 'string'],

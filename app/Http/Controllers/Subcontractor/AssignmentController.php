@@ -17,7 +17,6 @@ use App\Models\AssignmentBastPhoto;
 use App\Models\AssignmentConstructionPhoto;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
-use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -283,13 +282,5 @@ class AssignmentController extends Controller
             422,
             'Assignment is locked because it has been verified or reported.'
         );
-    }
-
-    private function currentUser(): User
-    {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $user;
     }
 }

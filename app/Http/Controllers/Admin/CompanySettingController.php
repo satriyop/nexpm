@@ -13,6 +13,8 @@ class CompanySettingController extends Controller
 {
     public function index(): Response
     {
+        abort_unless($this->currentUser()->isSuperAdmin(), 403);
+
         return Inertia::render('admin/settings/Company', [
             'pdfFooterNote' => AppSetting::get('pdf.footer_note', ''),
             'reportEmail' => AppSetting::get('notifications.report_email', ''),
@@ -25,6 +27,8 @@ class CompanySettingController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
+        abort_unless($this->currentUser()->isSuperAdmin(), 403);
+
         $request->validate([
             'pdf_footer_note' => ['nullable', 'string', 'max:1000'],
             'report_email' => ['nullable', 'email', 'max:255'],

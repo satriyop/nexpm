@@ -16,6 +16,8 @@ class SiteImportController extends Controller
 
     public function store(Request $request, Project $project): RedirectResponse
     {
+        $this->ensureCanAccessProject($project);
+
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
         ]);
@@ -35,6 +37,8 @@ class SiteImportController extends Controller
 
     public function template(Project $project): Response
     {
+        $this->ensureCanAccessProject($project);
+
         $headers = SiteMasterDataImport::COLUMNS;
 
         $example = [

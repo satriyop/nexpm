@@ -8,6 +8,7 @@ use App\Models\MainContractor;
 use App\Models\Project;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,21 +22,35 @@ class ProjectController extends Controller
         return Inertia::render('admin/projects/Index', [
             'projects' => Project::query()->whereScopedToMainContractor()->with(['mainContractor', 'client'])->latest('id')->paginate($perPage)->withQueryString(),
             'per_page' => $perPage,
-            'mainContractors' => MainContractor::query()->orderBy('name')->get(['id', 'name']),
+            'mainContractors' => MainContractor::query()
+                ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'clients' => Client::query()->whereScopedToMainContractor()->orderBy('name')->get(['id', 'name', 'main_contractor_id']),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $user = $this->currentUser();
+        $mainContractorId = $user->isSuperAdmin()
+            ? $request->integer('main_contractor_id')
+            : $user->main_contractor_id;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'main_contractor_id' => ['required', 'exists:main_contractors,id'],
-            'client_id' => ['required', 'exists:clients,id'],
+            'main_contractor_id' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'exists:main_contractors,id'],
+            'client_id' => [
+                'required',
+                Rule::exists('clients', 'id')
+                    ->where('main_contractor_id', $mainContractorId),
+            ],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'budget' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $validated['main_contractor_id'] = $mainContractorId;
 
         $project = Project::query()->create($validated);
 
@@ -44,6 +59,8 @@ class ProjectController extends Controller
 
     public function show(Request $request, Project $project): Response
     {
+        $this->ensureCanAccessProject($project);
+
         $project->load(['mainContractor', 'client']);
 
         return Inertia::render('admin/projects/Show', [

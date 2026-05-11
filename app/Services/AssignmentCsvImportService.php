@@ -41,6 +41,7 @@ class AssignmentCsvImportService
             ->keyBy('site_code');
 
         $subcontractors = Subcontractor::query()
+            ->whereHas('mainContractor.projects', fn ($query) => $query->whereKey($projectId))
             ->get()
             ->keyBy('code');
 

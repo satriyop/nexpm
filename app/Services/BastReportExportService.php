@@ -5,6 +5,7 @@ namespace App\Services;
 use App\ActivityFields\BastFields;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -218,7 +219,7 @@ class BastReportExportService
 
         $headers = ['Field', 'Value'];
         foreach ($headers as $col => $header) {
-            $cell = $sheet->getCellByColumnAndRow($col + 1, 1);
+            $cell = $sheet->getCell(Coordinate::stringFromColumnIndex($col + 1).'1');
             $cell->setValue($header);
             $cell->getStyle()->getFont()->setBold(true);
             $cell->getStyle()->getFill()
@@ -229,8 +230,8 @@ class BastReportExportService
 
         foreach ($supplementalFields as $row => $field) {
             $rowNum = $row + 2;
-            $sheet->getCellByColumnAndRow(1, $rowNum)->setValue($field['label']);
-            $sheet->getCellByColumnAndRow(2, $rowNum)->setValue($bastData->{$field['key']} ?? '');
+            $sheet->getCell('A'.$rowNum)->setValue($field['label']);
+            $sheet->getCell('B'.$rowNum)->setValue($bastData->{$field['key']} ?? '');
         }
 
         $sheet->getColumnDimension('A')->setWidth(30);

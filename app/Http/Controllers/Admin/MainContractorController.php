@@ -14,13 +14,20 @@ class MainContractorController extends Controller
 {
     public function index(): Response
     {
+        $user = $this->currentUser();
+
         return Inertia::render('admin/main-contractors/Index', [
-            'mainContractors' => MainContractor::query()->latest('id')->paginate(15),
+            'mainContractors' => MainContractor::query()
+                ->when(! $user->isSuperAdmin(), fn ($query) => $query->whereKey($user->main_contractor_id))
+                ->latest('id')
+                ->paginate(15),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($this->currentUser()->isSuperAdmin(), 403);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -35,6 +42,8 @@ class MainContractorController extends Controller
 
     public function update(Request $request, MainContractor $mainContractor): RedirectResponse
     {
+        $this->ensureCanAccessMainContractor($mainContractor->id);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
