@@ -64,7 +64,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::get('sites/{site}/edit', [Admin\SiteController::class, 'edit'])->name('sites.edit');
     Route::patch('sites/{site}', [Admin\SiteController::class, 'update'])->name('sites.update');
 
-    Route::patch('assignments/{assignment}/admin-survey', [Admin\AssignmentController::class, 'updateSurveyData'])->name('assignments.admin-survey');
+    Route::match(['post', 'patch'], 'assignments/{assignment}/admin-survey', [Admin\AssignmentController::class, 'updateSurveyData'])->name('assignments.admin-survey');
     Route::patch('assignments/{assignment}/admin-pln', [Admin\AssignmentController::class, 'updatePlnData'])->name('assignments.admin-pln');
     Route::patch('assignments/{assignment}/admin-construction', [Admin\AssignmentController::class, 'updateConstructionSubconData'])->name('assignments.admin-construction');
     Route::patch('assignments/{assignment}/admin-bast', [Admin\AssignmentController::class, 'updateBastData'])->name('assignments.admin-bast');
@@ -82,7 +82,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
 Route::middleware(['auth', 'verified', 'role:subcontractor'])->prefix('subcontractor')->name('subcontractor.')->group(function () {
     Route::get('assignments', [Subcontractor\AssignmentController::class, 'index'])->name('assignments.index');
     Route::get('assignments/{assignment}', [Subcontractor\AssignmentController::class, 'show'])->name('assignments.show');
-    Route::patch('assignments/{assignment}/survey', [Subcontractor\AssignmentController::class, 'updateSurveyData'])->name('assignments.survey');
+    Route::match(['post', 'patch'], 'assignments/{assignment}/survey', [Subcontractor\AssignmentController::class, 'updateSurveyData'])->name('assignments.survey');
     Route::patch('assignments/{assignment}/pln', [Subcontractor\AssignmentController::class, 'updatePlnData'])->name('assignments.pln');
     Route::patch('assignments/{assignment}/construction', [Subcontractor\AssignmentController::class, 'updateConstructionData'])->name('assignments.construction');
     Route::post('assignments/{assignment}/construction/photos', [Subcontractor\AssignmentController::class, 'storeConstructionPhoto'])->name('assignments.construction.photos');

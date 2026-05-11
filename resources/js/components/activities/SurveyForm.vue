@@ -25,6 +25,7 @@ const props = defineProps<{
 }>();
 
 const surveyForm = useForm({
+    _method: 'patch',
     surveyor_name: props.assignment.survey_data?.surveyor_name ?? '',
     pic_location_name: props.assignment.survey_data?.pic_location_name ?? '',
     pic_location_phone: props.assignment.survey_data?.pic_location_phone ?? '',
@@ -45,20 +46,25 @@ const surveyForm = useForm({
 });
 
 function submitSurvey() {
-    surveyForm.post(SubActions.updateSurveyData(props.assignment).url, {
-        forceFormData: true,
-        onSuccess: () =>
-            surveyForm.reset(
-                'photo_overall_site',
-                'photo_parking_evcs',
-                'photo_access_route',
-                'photo_pln_network',
-                'photo_satellite_gmaps',
-                'file_mockup_3d',
-                'file_site_plan',
-                'file_ba_survey',
-            ),
-    });
+    surveyForm
+        .transform((data) => ({
+            ...data,
+            _method: 'patch',
+        }))
+        .post(SubActions.updateSurveyData(props.assignment).url, {
+            forceFormData: true,
+            onSuccess: () =>
+                surveyForm.reset(
+                    'photo_overall_site',
+                    'photo_parking_evcs',
+                    'photo_access_route',
+                    'photo_pln_network',
+                    'photo_satellite_gmaps',
+                    'file_mockup_3d',
+                    'file_site_plan',
+                    'file_ba_survey',
+                ),
+        });
 }
 
 function storageUrl(path: string) {
@@ -221,20 +227,15 @@ function currentUploadUrl(key: SurveyUploadKey): string | null {
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Power / Daya (kVA)</Label>
-                        <Select
-                            v-model="surveyForm.power_kva"
-                            :disabled="isReadOnly"
+                        <div
+                            class="rounded-md border bg-muted/50 px-3 py-2 text-sm font-medium"
                         >
-                            <SelectTrigger
-                                ><SelectValue placeholder="Select power"
-                            /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="7.7kVA">7.7 kVA</SelectItem>
-                                <SelectItem value="22kVA">22 kVA</SelectItem>
-                                <SelectItem value="50kVA">50 kVA</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <InputError :message="surveyForm.errors.power_kva" />
+                            {{
+                                assignment.site.power_kva ??
+                                assignment.survey_data?.power_kva ??
+                                '—'
+                            }}
+                        </div>
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Available PLN Network Type</Label>
@@ -290,6 +291,7 @@ function currentUploadUrl(key: SurveyUploadKey): string | null {
                                 :model-value="(surveyForm as any)[field.key]"
                                 :current-url="currentUploadUrl(field.key)"
                                 :readonly="isReadOnly"
+                                :test-id="`survey-${field.key}`"
                                 @update:model-value="
                                     (surveyForm as any)[field.key] = $event
                                 "
@@ -300,6 +302,7 @@ function currentUploadUrl(key: SurveyUploadKey): string | null {
                                 :current-url="currentUploadUrl(field.key)"
                                 accept=".pdf,.doc,.docx,image/*"
                                 :readonly="isReadOnly"
+                                :test-id="`survey-${field.key}`"
                                 @update:model-value="
                                     (surveyForm as any)[field.key] = $event
                                 "

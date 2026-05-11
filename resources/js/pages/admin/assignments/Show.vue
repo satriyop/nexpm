@@ -215,6 +215,7 @@ const isSaving = ref(false);
 
 // --- Admin survey edit form ---
 const adminSurveyForm = useForm({
+    _method: 'patch',
     surveyor_name: survey.value?.surveyor_name ?? '',
     pic_location_name: survey.value?.pic_location_name ?? '',
     pic_location_phone: survey.value?.pic_location_phone ?? '',
@@ -237,9 +238,13 @@ const adminSurveyForm = useForm({
 
 function submitAdminSurvey(): void {
     isSaving.value = true;
-    adminSurveyForm.patch(
-        AdminAssignmentActions.updateSurveyData(props.assignment).url,
-        {
+    adminSurveyForm
+        .transform((data) => ({
+            ...data,
+            _method: 'patch',
+        }))
+        .post(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
+            forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
                 showSurveyEdit.value = false;
@@ -247,8 +252,7 @@ function submitAdminSurvey(): void {
             onFinish: () => {
                 isSaving.value = false;
             },
-        },
-    );
+        });
 }
 
 // --- Admin PLN edit form ---
@@ -1016,8 +1020,14 @@ onUnmounted(() => {
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Required Power (kVA)</Label>
-                                <div class="rounded-md border bg-muted/50 px-3 py-2 text-sm font-medium">
-                                    {{ assignment.site.power_kva ?? '—' }}
+                                <div
+                                    class="rounded-md border bg-muted/50 px-3 py-2 text-sm font-medium"
+                                >
+                                    {{
+                                        assignment.site.power_kva ??
+                                        survey?.power_kva ??
+                                        '—'
+                                    }}
                                 </div>
                             </div>
                             <div class="grid gap-1.5">
@@ -1026,7 +1036,8 @@ onUnmounted(() => {
                                     v-model="adminSurveyForm.pln_network_type"
                                 >
                                     <SelectTrigger
-                                        ><SelectValue placeholder="Select phase"
+                                        ><SelectValue
+                                            placeholder="Select phase"
                                     /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="1 Phase"

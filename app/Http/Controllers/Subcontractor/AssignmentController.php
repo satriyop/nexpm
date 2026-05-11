@@ -81,6 +81,7 @@ class AssignmentController extends Controller
         abort_unless($assignment->activity_type === ActivityType::Survey, 422, 'Activity type mismatch.');
 
         $validated = $request->validated();
+        $validated['power_kva'] = $assignment->site?->power_kva;
 
         $fileFields = collect(SurveyFields::all())
             ->filter(fn (array $f) => in_array($f['type'], ['image', 'file'], true))

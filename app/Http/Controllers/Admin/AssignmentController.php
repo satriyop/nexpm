@@ -312,6 +312,8 @@ class AssignmentController extends Controller
             'ss_report_submission_date' => ['nullable', 'date'],
         ]);
 
+        $validated['power_kva'] = $assignment->site?->power_kva;
+
         $fileFields = [
             'photo_overall_site', 'photo_parking_evcs', 'photo_access_route',
             'photo_pln_network', 'photo_satellite_gmaps',
@@ -320,10 +322,13 @@ class AssignmentController extends Controller
 
         $survey = $assignment->surveyData()->firstOrNew([]);
         $survey->assignment_id = $assignment->id;
+        $auditPayload = $validated;
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
-                $survey->{$key} = $request->file($key)->store('survey', 'public');
+                $path = $request->file($key)->store('survey', 'public');
+                $survey->{$key} = $path;
+                $auditPayload[$key] = $path;
             } elseif (! in_array($key, $fileFields)) {
                 $survey->{$key} = $value;
             }
@@ -336,7 +341,7 @@ class AssignmentController extends Controller
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'survey_edited',
-            'payload' => $validated,
+            'payload' => $auditPayload,
         ]);
 
         return back()->with('success', 'Survey data updated.');
@@ -366,10 +371,13 @@ class AssignmentController extends Controller
 
         $pln = $assignment->plnData()->firstOrNew([]);
         $pln->assignment_id = $assignment->id;
+        $auditPayload = $validated;
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
-                $pln->{$key} = $request->file($key)->store('pln', 'public');
+                $path = $request->file($key)->store('pln', 'public');
+                $pln->{$key} = $path;
+                $auditPayload[$key] = $path;
             } elseif (! in_array($key, $plnFileFields)) {
                 $pln->{$key} = $value;
             }
@@ -382,7 +390,7 @@ class AssignmentController extends Controller
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'pln_edited',
-            'payload' => $validated,
+            'payload' => $auditPayload,
         ]);
 
         return back()->with('success', 'PLN data updated.');
@@ -403,10 +411,13 @@ class AssignmentController extends Controller
         ]);
 
         $construction = $assignment->constructionData()->firstOrCreate(['assignment_id' => $assignment->id]);
+        $auditPayload = $validated;
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
-                $construction->{$key} = $request->file($key)->store('construction', 'public');
+                $path = $request->file($key)->store('construction', 'public');
+                $construction->{$key} = $path;
+                $auditPayload[$key] = $path;
             } elseif ($key !== 'foto_machine_sn') {
                 $construction->{$key} = $value;
             }
@@ -419,7 +430,7 @@ class AssignmentController extends Controller
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'construction_edited',
-            'payload' => $validated,
+            'payload' => $auditPayload,
         ]);
 
         return back()->with('success', 'Construction data updated.');

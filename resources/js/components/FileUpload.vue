@@ -8,6 +8,7 @@ defineProps<{
     accept?: string;
     uploading?: boolean;
     readonly?: boolean;
+    testId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -62,6 +63,7 @@ function onFileChange(e: Event) {
             ref="inputRef"
             type="file"
             :accept="accept"
+            :data-test="testId"
             class="sr-only"
             @change="onFileChange"
         />

@@ -8,6 +8,7 @@ defineProps<{
     uploading?: boolean;
     readonly?: boolean;
     deletable?: boolean;
+    testId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -177,6 +178,7 @@ function formatSize(bytes: number): string {
             ref="inputRef"
             type="file"
             accept="image/*"
+            :data-test="testId"
             class="sr-only"
             @change="onFileChange"
         />
