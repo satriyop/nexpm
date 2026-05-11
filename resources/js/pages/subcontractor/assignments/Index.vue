@@ -113,6 +113,14 @@ function isFillable(s: AssignmentStatus): boolean {
     return !['VERIFIED', 'REPORTED', 'DROP'].includes(s);
 }
 
+function assignmentHref(assignment: Assignment): string {
+    return SubAssignmentActions.show(assignment.id).url;
+}
+
+function openAssignment(assignment: Assignment): void {
+    router.visit(assignmentHref(assignment));
+}
+
 function formatDate(value: string | null | undefined): string {
     if (!value) {
         return '—';
@@ -285,7 +293,12 @@ function daysStalled(assignment: Assignment): number | null {
                         <tr
                             v-for="assignment in assignments.data"
                             :key="assignment.id"
-                            class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            class="cursor-pointer border-t border-sidebar-border/70 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset dark:border-sidebar-border"
+                            role="link"
+                            tabindex="0"
+                            @click="openAssignment(assignment)"
+                            @keydown.enter="openAssignment(assignment)"
+                            @keydown.space.prevent="openAssignment(assignment)"
                         >
                             <td class="px-4 py-3 font-medium">
                                 {{ assignment.site?.site_code }}
@@ -369,11 +382,8 @@ function daysStalled(assignment: Assignment): number | null {
                             <td class="px-4 py-3 text-right">
                                 <Button as-child variant="outline" size="sm">
                                     <Link
-                                        :href="
-                                            SubAssignmentActions.show(
-                                                assignment.id,
-                                            ).url
-                                        "
+                                        :href="assignmentHref(assignment)"
+                                        @click.stop
                                     >
                                         <component
                                             :is="
