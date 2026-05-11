@@ -238,7 +238,7 @@ function currentUploadUrl(key: SurveyUploadKey): string | null {
                         <InputError :message="surveyForm.errors.power_kva" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label>PLN Network Type</Label>
+                        <Label>Available PLN Network Type</Label>
                         <Select
                             v-model="surveyForm.pln_network_type"
                             :disabled="isReadOnly"

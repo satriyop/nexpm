@@ -795,7 +795,7 @@ onUnmounted(() => {
                             </div>
                             <div>
                                 <p class="text-xs text-muted-foreground">
-                                    PLN Network Type
+                                    Available PLN Network Type
                                 </p>
                                 <p class="font-medium">
                                     {{ survey.pln_network_type ?? '—' }}
@@ -1023,10 +1023,22 @@ onUnmounted(() => {
                                 />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label>PLN Network Type</Label>
-                                <Input
+                                <Label>Available PLN Network Type</Label>
+                                <Select
                                     v-model="adminSurveyForm.pln_network_type"
-                                />
+                                >
+                                    <SelectTrigger
+                                        ><SelectValue placeholder="Select phase"
+                                    /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1 Phase"
+                                            >1 Phase</SelectItem
+                                        >
+                                        <SelectItem value="3 Phase"
+                                            >3 Phase</SelectItem
+                                        >
+                                    </SelectContent>
+                                </Select>
                                 <InputError
                                     :message="
                                         adminSurveyForm.errors.pln_network_type
