@@ -17,6 +17,8 @@ defineOptions({
     <Head title="Register" />
     <div class="flex flex-col gap-6 text-center text-sm text-muted-foreground">
         <p>Registration is not available. Please contact your administrator.</p>
-        <TextLink :href="login()" class="underline underline-offset-4">Back to login</TextLink>
+        <TextLink :href="login()" class="underline underline-offset-4"
+            >Back to login</TextLink
+        >
     </div>
 </template>

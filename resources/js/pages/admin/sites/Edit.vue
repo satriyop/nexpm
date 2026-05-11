@@ -10,17 +10,42 @@ import InputError from '@/components/InputError.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardFooter,
+    CardHeader,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { dashboard } from '@/routes';
 import type { ActivityType, Assignment } from '@/types';
 
-interface SiteType { id: number; name: string }
-interface MachineType { id: number; name: string }
-interface Project { id: number; name: string; client: { name: string } | null; main_contractor: { name: string } | null }
-interface Subcontractor { id: number; name: string }
+interface SiteType {
+    id: number;
+    name: string;
+}
+interface MachineType {
+    id: number;
+    name: string;
+}
+interface Project {
+    id: number;
+    name: string;
+    client: { name: string } | null;
+    main_contractor: { name: string } | null;
+}
+interface Subcontractor {
+    id: number;
+    name: string;
+}
 interface Site {
     id: number;
     site_code: string;
@@ -75,6 +100,7 @@ const activeTab = ref<Tab>('site');
 
 onMounted(() => {
     const params = new URLSearchParams(window.location.search);
+
     if (params.get('tab') === 'assignments') {
         activeTab.value = 'assignments';
     } else if (params.get('tab') === 'financials') {
@@ -83,12 +109,17 @@ onMounted(() => {
 });
 
 const financialFields = [
-    'invoice_submission_date', 'dp_35_date',
-    'invoice_60_submission_date', 'payment_60_date',
-    'invoice_5_submission_date', 'payment_5_date',
+    'invoice_submission_date',
+    'dp_35_date',
+    'invoice_60_submission_date',
+    'payment_60_date',
+    'invoice_5_submission_date',
+    'payment_5_date',
     'invoice_url',
 ] as const;
-const hasFinancialErrors = computed(() => financialFields.some((f) => !!form.errors[f]));
+const hasFinancialErrors = computed(() =>
+    financialFields.some((f) => !!form.errors[f]),
+);
 
 const NONE = '__none__';
 
@@ -100,11 +131,16 @@ const form = useForm({
     city: props.site.city,
     google_map_url: props.site.google_map_url ?? '',
     bd_pic: props.site.bd_pic ?? '',
-    site_type_id: props.site.site_type_id ? String(props.site.site_type_id) : NONE,
-    machine_type_id: props.site.machine_type_id ? String(props.site.machine_type_id) : NONE,
+    site_type_id: props.site.site_type_id
+        ? String(props.site.site_type_id)
+        : NONE,
+    machine_type_id: props.site.machine_type_id
+        ? String(props.site.machine_type_id)
+        : NONE,
     ss_wo_number: props.site.ss_wo_number ?? '',
     cable_length_to_panel: props.site.cable_length_to_panel ?? '',
-    cable_length_panel_to_charger: props.site.cable_length_panel_to_charger ?? '',
+    cable_length_panel_to_charger:
+        props.site.cable_length_panel_to_charger ?? '',
     charging_station_count: props.site.charging_station_count ?? '',
     ssr_url: props.site.ssr_url ?? '',
     nidi_slo_bpujl_url: props.site.nidi_slo_bpujl_url ?? '',
@@ -123,17 +159,24 @@ function submit(): void {
     form.transform((data) => ({
         ...data,
         site_type_id: data.site_type_id === NONE ? null : data.site_type_id,
-        machine_type_id: data.machine_type_id === NONE ? null : data.machine_type_id,
+        machine_type_id:
+            data.machine_type_id === NONE ? null : data.machine_type_id,
     })).patch(SiteActions.update(props.site).url);
 }
 
 // --- Dirty form guard ---
 function handleBeforeUnload(e: BeforeUnloadEvent): void {
-    if (form.isDirty) { e.preventDefault(); e.returnValue = ''; }
+    if (form.isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
 }
 
 const removeNavGuard = router.on('before', (e) => {
-    if (form.isDirty && !window.confirm('You have unsaved changes. Leave anyway?')) {
+    if (
+        form.isDirty &&
+        !window.confirm('You have unsaved changes. Leave anyway?')
+    ) {
         e.preventDefault();
     }
 });
@@ -147,7 +190,9 @@ onUnmounted(() => {
 
 // --- Assignment helpers ---
 function getAssignment(activityType: ActivityType): Assignment | null {
-    return props.assignments.find((a) => a.activity_type === activityType) ?? null;
+    return (
+        props.assignments.find((a) => a.activity_type === activityType) ?? null
+    );
 }
 
 const surveyAssignment = computed(() => getAssignment('SURVEY'));
@@ -156,13 +201,24 @@ const plnAssignment = computed(() => getAssignment('PLN_CONNECTION'));
 const bastAssignment = computed(() => getAssignment('BAST'));
 
 // Assign forms (unassigned cards)
-const surveyAssignForm = useForm({ activity_type: 'SURVEY', subcontractor_id: '' });
-const constructionAssignForm = useForm({ activity_type: 'CONSTRUCTION', subcontractor_id: '' });
-const plnAssignForm = useForm({ activity_type: 'PLN_CONNECTION', subcontractor_id: '' });
+const surveyAssignForm = useForm({
+    activity_type: 'SURVEY',
+    subcontractor_id: '',
+});
+const constructionAssignForm = useForm({
+    activity_type: 'CONSTRUCTION',
+    subcontractor_id: '',
+});
+const plnAssignForm = useForm({
+    activity_type: 'PLN_CONNECTION',
+    subcontractor_id: '',
+});
 const bastAssignForm = useForm({ activity_type: 'BAST', subcontractor_id: '' });
 
 function submitAssign(form: ReturnType<typeof useForm>): void {
-    form.post(AdminAssignmentActions.storeForSite(props.site).url, { preserveScroll: true });
+    form.post(AdminAssignmentActions.storeForSite(props.site).url, {
+        preserveScroll: true,
+    });
 }
 
 // Reassign forms (assigned cards)
@@ -171,32 +227,85 @@ const constructionReassignForm = useForm({ subcontractor_id: '' });
 const plnReassignForm = useForm({ subcontractor_id: '' });
 const bastReassignForm = useForm({ subcontractor_id: '' });
 
-watch(surveyAssignment, (a) => { surveyReassignForm.subcontractor_id = a?.subcontractor_id?.toString() ?? ''; }, { immediate: true });
-watch(constructionAssignment, (a) => { constructionReassignForm.subcontractor_id = a?.subcontractor_id?.toString() ?? ''; }, { immediate: true });
-watch(plnAssignment, (a) => { plnReassignForm.subcontractor_id = a?.subcontractor_id?.toString() ?? ''; }, { immediate: true });
-watch(bastAssignment, (a) => { bastReassignForm.subcontractor_id = a?.subcontractor_id?.toString() ?? ''; }, { immediate: true });
+watch(
+    surveyAssignment,
+    (a) => {
+        surveyReassignForm.subcontractor_id =
+            a?.subcontractor_id?.toString() ?? '';
+    },
+    { immediate: true },
+);
+watch(
+    constructionAssignment,
+    (a) => {
+        constructionReassignForm.subcontractor_id =
+            a?.subcontractor_id?.toString() ?? '';
+    },
+    { immediate: true },
+);
+watch(
+    plnAssignment,
+    (a) => {
+        plnReassignForm.subcontractor_id =
+            a?.subcontractor_id?.toString() ?? '';
+    },
+    { immediate: true },
+);
+watch(
+    bastAssignment,
+    (a) => {
+        bastReassignForm.subcontractor_id =
+            a?.subcontractor_id?.toString() ?? '';
+    },
+    { immediate: true },
+);
 
-function submitReassign(form: ReturnType<typeof useForm>, assignment: Assignment): void {
-    form.patch(AdminAssignmentActions.reassign(assignment.id).url, { preserveScroll: true });
-}
-
-// Construction WO form
-const woForm = useForm({ cons_wo_number: constructionAssignment.value?.construction_data?.cons_wo_number ?? '' });
-
-function submitWo(): void {
-    if (!constructionAssignment.value) { return; }
-    router.visit(AdminAssignmentActions.updateConstructionPrerequisite(constructionAssignment.value.id).url, {
-        method: 'patch',
-        data: { cons_wo_number: woForm.cons_wo_number },
+function submitReassign(
+    form: ReturnType<typeof useForm>,
+    assignment: Assignment,
+): void {
+    form.patch(AdminAssignmentActions.reassign(assignment.id).url, {
         preserveScroll: true,
-        onError: (errors) => { woForm.setError(errors as Record<string, string>); },
-        onStart: () => { woForm.processing = true; woForm.clearErrors(); },
-        onFinish: () => { woForm.processing = false; },
     });
 }
 
+// Construction WO form
+const woForm = useForm({
+    cons_wo_number:
+        constructionAssignment.value?.construction_data?.cons_wo_number ?? '',
+});
+
+function submitWo(): void {
+    if (!constructionAssignment.value) {
+        return;
+    }
+
+    router.visit(
+        AdminAssignmentActions.updateConstructionPrerequisite(
+            constructionAssignment.value.id,
+        ).url,
+        {
+            method: 'patch',
+            data: { cons_wo_number: woForm.cons_wo_number },
+            preserveScroll: true,
+            onError: (errors) => {
+                woForm.setError(errors as Record<string, string>);
+            },
+            onStart: () => {
+                woForm.processing = true;
+                woForm.clearErrors();
+            },
+            onFinish: () => {
+                woForm.processing = false;
+            },
+        },
+    );
+}
+
 function removeAssignment(assignment: Assignment): void {
-    router.delete(AdminAssignmentActions.destroy(assignment.id).url, { preserveScroll: true });
+    router.delete(AdminAssignmentActions.destroy(assignment.id).url, {
+        preserveScroll: true,
+    });
 }
 </script>
 
@@ -207,10 +316,15 @@ function removeAssignment(assignment: Assignment): void {
         <!-- Page Header -->
         <div class="flex items-center gap-3">
             <a :href="ProjectActions.show(site.project).url">
-                <Button variant="ghost" size="icon"><ArrowLeft class="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon"
+                    ><ArrowLeft class="h-4 w-4"
+                /></Button>
             </a>
             <div class="flex items-center gap-3">
-                <span class="rounded bg-muted px-2 py-0.5 font-mono text-sm font-semibold tracking-wide">{{ site.site_code }}</span>
+                <span
+                    class="rounded bg-muted px-2 py-0.5 font-mono text-sm font-semibold tracking-wide"
+                    >{{ site.site_code }}</span
+                >
                 <h1 class="text-2xl font-semibold">{{ site.location_name }}</h1>
             </div>
         </div>
@@ -220,9 +334,11 @@ function removeAssignment(assignment: Assignment): void {
             <button
                 type="button"
                 class="px-4 py-2 text-sm font-medium transition-colors"
-                :class="activeTab === 'site'
-                    ? 'border-b-2 border-primary text-primary'
-                    : 'text-muted-foreground hover:text-foreground'"
+                :class="
+                    activeTab === 'site'
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                "
                 @click="activeTab = 'site'"
             >
                 Site Details
@@ -230,41 +346,63 @@ function removeAssignment(assignment: Assignment): void {
             <button
                 type="button"
                 class="relative px-4 py-2 text-sm font-medium transition-colors"
-                :class="activeTab === 'financials'
-                    ? 'border-b-2 border-primary text-primary'
-                    : 'text-muted-foreground hover:text-foreground'"
+                :class="
+                    activeTab === 'financials'
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                "
                 @click="activeTab = 'financials'"
             >
                 Financials
                 <span
                     v-if="hasFinancialErrors"
-                    class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-destructive"
+                    class="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-destructive"
                 />
             </button>
             <button
                 type="button"
                 class="px-4 py-2 text-sm font-medium transition-colors"
-                :class="activeTab === 'assignments'
-                    ? 'border-b-2 border-primary text-primary'
-                    : 'text-muted-foreground hover:text-foreground'"
+                :class="
+                    activeTab === 'assignments'
+                        ? 'border-b-2 border-primary text-primary'
+                        : 'text-muted-foreground hover:text-foreground'
+                "
                 @click="activeTab = 'assignments'"
             >
                 Assignments
-                <span class="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                <span
+                    class="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                >
                     {{ assignments.length }}
                 </span>
             </button>
         </div>
 
         <!-- ── Tab 1: Site Details ── -->
-        <form v-if="activeTab === 'site'" class="space-y-6" @submit.prevent="submit" novalidate>
+        <form
+            v-if="activeTab === 'site'"
+            class="space-y-6"
+            @submit.prevent="submit"
+            novalidate
+        >
             <!-- Card 1: Basic Info -->
             <Card>
-                <CardHeader class="pb-2"><h2 class="text-base font-semibold">Basic Info</h2></CardHeader>
+                <CardHeader class="pb-2"
+                    ><h2 class="text-base font-semibold">
+                        Basic Info
+                    </h2></CardHeader
+                >
                 <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="grid gap-1.5">
-                        <Label for="location_name">Location Name <span class="text-destructive">*</span></Label>
-                        <Input id="location_name" v-model="form.location_name" required />
+                        <Label for="location_name"
+                            >Location Name
+                            <span class="text-destructive">*</span></Label
+                        >
+                        <Input
+                            id="location_name"
+                            v-model="form.location_name"
+                            required
+                        />
                         <InputError :message="form.errors.location_name" />
                     </div>
                     <div class="grid gap-1.5">
@@ -273,29 +411,41 @@ function removeAssignment(assignment: Assignment): void {
                         <InputError :message="form.errors.bd_pic" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="province">Province <span class="text-destructive">*</span></Label>
+                        <Label for="province"
+                            >Province
+                            <span class="text-destructive">*</span></Label
+                        >
                         <Input id="province" v-model="form.province" required />
                         <InputError :message="form.errors.province" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="city">City <span class="text-destructive">*</span></Label>
+                        <Label for="city"
+                            >City <span class="text-destructive">*</span></Label
+                        >
                         <Input id="city" v-model="form.city" required />
                         <InputError :message="form.errors.city" />
                     </div>
                     <div class="col-span-full grid gap-1.5">
-                        <Label for="address">Address <span class="text-destructive">*</span></Label>
+                        <Label for="address"
+                            >Address
+                            <span class="text-destructive">*</span></Label
+                        >
                         <textarea
                             id="address"
                             v-model="form.address"
                             required
                             rows="3"
-                            class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                         />
                         <InputError :message="form.errors.address" />
                     </div>
                     <div class="col-span-full grid gap-1.5">
                         <Label for="google_map_url">Google Map URL</Label>
-                        <Input id="google_map_url" v-model="form.google_map_url" type="url" />
+                        <Input
+                            id="google_map_url"
+                            v-model="form.google_map_url"
+                            type="url"
+                        />
                         <InputError :message="form.errors.google_map_url" />
                     </div>
                 </CardContent>
@@ -303,15 +453,26 @@ function removeAssignment(assignment: Assignment): void {
 
             <!-- Card 2: Survey & Technical -->
             <Card>
-                <CardHeader class="pb-2"><h2 class="text-base font-semibold">Survey &amp; Technical</h2></CardHeader>
+                <CardHeader class="pb-2"
+                    ><h2 class="text-base font-semibold">
+                        Survey &amp; Technical
+                    </h2></CardHeader
+                >
                 <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="grid gap-1.5">
                         <Label>Site Type</Label>
                         <Select v-model="form.site_type_id">
-                            <SelectTrigger><SelectValue placeholder="Select site type" /></SelectTrigger>
+                            <SelectTrigger
+                                ><SelectValue placeholder="Select site type"
+                            /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem :value="NONE">— None —</SelectItem>
-                                <SelectItem v-for="st in siteTypes" :key="st.id" :value="String(st.id)">{{ st.name }}</SelectItem>
+                                <SelectItem
+                                    v-for="st in siteTypes"
+                                    :key="st.id"
+                                    :value="String(st.id)"
+                                    >{{ st.name }}</SelectItem
+                                >
                             </SelectContent>
                         </Select>
                         <InputError :message="form.errors.site_type_id" />
@@ -319,10 +480,17 @@ function removeAssignment(assignment: Assignment): void {
                     <div class="grid gap-1.5">
                         <Label>Machine Type</Label>
                         <Select v-model="form.machine_type_id">
-                            <SelectTrigger><SelectValue placeholder="Select machine type" /></SelectTrigger>
+                            <SelectTrigger
+                                ><SelectValue placeholder="Select machine type"
+                            /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem :value="NONE">— None —</SelectItem>
-                                <SelectItem v-for="mt in machineTypes" :key="mt.id" :value="String(mt.id)">{{ mt.name }}</SelectItem>
+                                <SelectItem
+                                    v-for="mt in machineTypes"
+                                    :key="mt.id"
+                                    :value="String(mt.id)"
+                                    >{{ mt.name }}</SelectItem
+                                >
                             </SelectContent>
                         </Select>
                         <InputError :message="form.errors.machine_type_id" />
@@ -333,19 +501,49 @@ function removeAssignment(assignment: Assignment): void {
                         <InputError :message="form.errors.ss_wo_number" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="charging_station_count">Charging Station Count</Label>
-                        <Input id="charging_station_count" v-model="form.charging_station_count" type="number" min="0" step="1" />
-                        <InputError :message="form.errors.charging_station_count" />
+                        <Label for="charging_station_count"
+                            >Charging Station Count</Label
+                        >
+                        <Input
+                            id="charging_station_count"
+                            v-model="form.charging_station_count"
+                            type="number"
+                            min="0"
+                            step="1"
+                        />
+                        <InputError
+                            :message="form.errors.charging_station_count"
+                        />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="cable_length_to_panel">Cable Length to Panel — m</Label>
-                        <Input id="cable_length_to_panel" v-model="form.cable_length_to_panel" type="number" min="0" step="0.01" />
-                        <InputError :message="form.errors.cable_length_to_panel" />
+                        <Label for="cable_length_to_panel"
+                            >Cable Length to Panel — m</Label
+                        >
+                        <Input
+                            id="cable_length_to_panel"
+                            v-model="form.cable_length_to_panel"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                        />
+                        <InputError
+                            :message="form.errors.cable_length_to_panel"
+                        />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="cable_length_panel_to_charger">Cable Length Panel to Charger — m</Label>
-                        <Input id="cable_length_panel_to_charger" v-model="form.cable_length_panel_to_charger" type="number" min="0" step="0.01" />
-                        <InputError :message="form.errors.cable_length_panel_to_charger" />
+                        <Label for="cable_length_panel_to_charger"
+                            >Cable Length Panel to Charger — m</Label
+                        >
+                        <Input
+                            id="cable_length_panel_to_charger"
+                            v-model="form.cable_length_panel_to_charger"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                        />
+                        <InputError
+                            :message="form.errors.cable_length_panel_to_charger"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label for="ssr_url">SSR URL</Label>
@@ -357,11 +555,21 @@ function removeAssignment(assignment: Assignment): void {
 
             <!-- Card 3: Permits & Legal -->
             <Card>
-                <CardHeader class="pb-2"><h2 class="text-base font-semibold">Permits &amp; Legal</h2></CardHeader>
+                <CardHeader class="pb-2"
+                    ><h2 class="text-base font-semibold">
+                        Permits &amp; Legal
+                    </h2></CardHeader
+                >
                 <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="grid gap-1.5">
-                        <Label for="nidi_slo_bpujl_url">NIDI SLO / BPUJL URL</Label>
-                        <Input id="nidi_slo_bpujl_url" v-model="form.nidi_slo_bpujl_url" type="url" />
+                        <Label for="nidi_slo_bpujl_url"
+                            >NIDI SLO / BPUJL URL</Label
+                        >
+                        <Input
+                            id="nidi_slo_bpujl_url"
+                            v-model="form.nidi_slo_bpujl_url"
+                            type="url"
+                        />
                         <InputError :message="form.errors.nidi_slo_bpujl_url" />
                     </div>
                     <div class="grid gap-1.5">
@@ -374,7 +582,9 @@ function removeAssignment(assignment: Assignment): void {
 
             <!-- Card 4: Notes -->
             <Card>
-                <CardHeader class="pb-2"><h2 class="text-base font-semibold">Notes</h2></CardHeader>
+                <CardHeader class="pb-2"
+                    ><h2 class="text-base font-semibold">Notes</h2></CardHeader
+                >
                 <CardContent>
                     <div class="grid gap-1.5">
                         <Label for="latest_remark">Latest Remark / Notes</Label>
@@ -382,7 +592,7 @@ function removeAssignment(assignment: Assignment): void {
                             id="latest_remark"
                             v-model="form.latest_remark"
                             rows="4"
-                            class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                         />
                         <InputError :message="form.errors.latest_remark" />
                     </div>
@@ -390,76 +600,143 @@ function removeAssignment(assignment: Assignment): void {
             </Card>
 
             <div class="flex justify-end">
-                <Button type="submit" :disabled="form.processing" class="min-w-40">
+                <Button
+                    type="submit"
+                    :disabled="form.processing"
+                    class="min-w-40"
+                >
                     {{ form.processing ? 'Saving…' : 'Save Masterdata' }}
                 </Button>
             </div>
         </form>
 
         <!-- ── Tab 2: Financials ── -->
-        <form v-else-if="activeTab === 'financials'" class="space-y-6" @submit.prevent="submit" novalidate>
+        <form
+            v-else-if="activeTab === 'financials'"
+            class="space-y-6"
+            @submit.prevent="submit"
+            novalidate
+        >
             <Card>
-                <CardHeader class="pb-2"><h2 class="text-base font-semibold">Invoice &amp; Payment Tracking</h2></CardHeader>
+                <CardHeader class="pb-2"
+                    ><h2 class="text-base font-semibold">
+                        Invoice &amp; Payment Tracking
+                    </h2></CardHeader
+                >
                 <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div class="grid gap-1.5">
-                        <Label for="invoice_submission_date">Invoice Submission Date / DP</Label>
-                        <Input id="invoice_submission_date" v-model="form.invoice_submission_date" type="date" />
-                        <InputError :message="form.errors.invoice_submission_date" />
+                        <Label for="invoice_submission_date"
+                            >Invoice Submission Date / DP</Label
+                        >
+                        <Input
+                            id="invoice_submission_date"
+                            v-model="form.invoice_submission_date"
+                            type="date"
+                        />
+                        <InputError
+                            :message="form.errors.invoice_submission_date"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label for="dp_35_date">35% DP Date</Label>
-                        <Input id="dp_35_date" v-model="form.dp_35_date" type="date" />
+                        <Input
+                            id="dp_35_date"
+                            v-model="form.dp_35_date"
+                            type="date"
+                        />
                         <InputError :message="form.errors.dp_35_date" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="invoice_60_submission_date">Invoice 60% Submission Date</Label>
-                        <Input id="invoice_60_submission_date" v-model="form.invoice_60_submission_date" type="date" />
-                        <InputError :message="form.errors.invoice_60_submission_date" />
+                        <Label for="invoice_60_submission_date"
+                            >Invoice 60% Submission Date</Label
+                        >
+                        <Input
+                            id="invoice_60_submission_date"
+                            v-model="form.invoice_60_submission_date"
+                            type="date"
+                        />
+                        <InputError
+                            :message="form.errors.invoice_60_submission_date"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label for="payment_60_date">60% Payment Date</Label>
-                        <Input id="payment_60_date" v-model="form.payment_60_date" type="date" />
+                        <Input
+                            id="payment_60_date"
+                            v-model="form.payment_60_date"
+                            type="date"
+                        />
                         <InputError :message="form.errors.payment_60_date" />
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="invoice_5_submission_date">Invoice 5% Submission Date</Label>
-                        <Input id="invoice_5_submission_date" v-model="form.invoice_5_submission_date" type="date" />
-                        <InputError :message="form.errors.invoice_5_submission_date" />
+                        <Label for="invoice_5_submission_date"
+                            >Invoice 5% Submission Date</Label
+                        >
+                        <Input
+                            id="invoice_5_submission_date"
+                            v-model="form.invoice_5_submission_date"
+                            type="date"
+                        />
+                        <InputError
+                            :message="form.errors.invoice_5_submission_date"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label for="payment_5_date">5% Payment Date</Label>
-                        <Input id="payment_5_date" v-model="form.payment_5_date" type="date" />
+                        <Input
+                            id="payment_5_date"
+                            v-model="form.payment_5_date"
+                            type="date"
+                        />
                         <InputError :message="form.errors.payment_5_date" />
                     </div>
                     <div class="col-span-full grid gap-1.5">
                         <Label for="invoice_url">Invoice URL</Label>
-                        <Input id="invoice_url" v-model="form.invoice_url" type="url" />
+                        <Input
+                            id="invoice_url"
+                            v-model="form.invoice_url"
+                            type="url"
+                        />
                         <InputError :message="form.errors.invoice_url" />
                     </div>
                 </CardContent>
             </Card>
 
             <div class="flex justify-end">
-                <Button type="submit" :disabled="form.processing" class="min-w-40">
+                <Button
+                    type="submit"
+                    :disabled="form.processing"
+                    class="min-w-40"
+                >
                     {{ form.processing ? 'Saving…' : 'Save Masterdata' }}
                 </Button>
             </div>
         </form>
 
         <!-- ── Tab 3: Assignments ── -->
-        <div v-else-if="activeTab === 'assignments'" class="grid gap-4 md:grid-cols-2">
-
+        <div
+            v-else-if="activeTab === 'assignments'"
+            class="grid gap-4 md:grid-cols-2"
+        >
             <!-- SURVEY card -->
             <Card>
                 <CardHeader class="pb-3">
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2">
                             <ActivityTypeBadge activity-type="SURVEY" />
-                            <StatusBadge v-if="surveyAssignment" :status="surveyAssignment.status" />
+                            <StatusBadge
+                                v-if="surveyAssignment"
+                                :status="surveyAssignment.status"
+                            />
                         </div>
                         <Button
-                            v-if="surveyAssignment && surveyAssignment.status === 'PENDING'"
-                            type="button" variant="ghost" size="sm"
+                            v-if="
+                                surveyAssignment &&
+                                surveyAssignment.status === 'PENDING'
+                            "
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             class="h-7 text-destructive hover:text-destructive"
                             @click="removeAssignment(surveyAssignment)"
                         >
@@ -470,55 +747,121 @@ function removeAssignment(assignment: Assignment): void {
                 <CardContent class="pb-3">
                     <div v-if="surveyAssignment" class="flex flex-col gap-3">
                         <Alert
-                            v-if="surveyAssignment.status === 'REVISION' && surveyAssignment.revision_comment"
+                            v-if="
+                                surveyAssignment.status === 'REVISION' &&
+                                surveyAssignment.revision_comment
+                            "
                             class="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
                         >
-                            <AlertTriangle class="size-4 text-amber-600 dark:text-amber-300" />
-                            <AlertTitle class="text-sm">Revision Requested</AlertTitle>
-                            <AlertDescription class="text-xs">{{ surveyAssignment.revision_comment }}</AlertDescription>
+                            <AlertTriangle
+                                class="size-4 text-amber-600 dark:text-amber-300"
+                            />
+                            <AlertTitle class="text-sm"
+                                >Revision Requested</AlertTitle
+                            >
+                            <AlertDescription class="text-xs">{{
+                                surveyAssignment.revision_comment
+                            }}</AlertDescription>
                         </Alert>
                         <div v-if="surveyAssignment.survey_data?.surveyor_name">
-                            <p class="text-xs text-muted-foreground">Surveyor</p>
-                            <p class="text-sm font-medium">{{ surveyAssignment.survey_data.surveyor_name }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                Surveyor
+                            </p>
+                            <p class="text-sm font-medium">
+                                {{ surveyAssignment.survey_data.surveyor_name }}
+                            </p>
                         </div>
                         <div class="flex items-end gap-2 border-t pt-3">
                             <div class="flex flex-1 flex-col gap-1">
-                                <p class="text-xs text-muted-foreground">Subcontractor</p>
-                                <Select v-model="surveyReassignForm.subcontractor_id">
-                                    <SelectTrigger class="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <p class="text-xs text-muted-foreground">
+                                    Subcontractor
+                                </p>
+                                <Select
+                                    v-model="
+                                        surveyReassignForm.subcontractor_id
+                                    "
+                                >
+                                    <SelectTrigger class="h-8 text-xs"
+                                        ><SelectValue
+                                    /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                        <SelectItem
+                                            v-for="sc in subcontractors"
+                                            :key="sc.id"
+                                            :value="sc.id.toString()"
+                                            >{{ sc.name }}</SelectItem
+                                        >
                                     </SelectContent>
                                 </Select>
                             </div>
                             <Button
-                                type="button" size="sm" variant="outline" class="h-8 text-xs"
-                                :disabled="surveyReassignForm.processing || surveyReassignForm.subcontractor_id === surveyAssignment.subcontractor_id?.toString()"
-                                @click="submitReassign(surveyReassignForm, surveyAssignment)"
-                            >Change</Button>
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    surveyReassignForm.processing ||
+                                    surveyReassignForm.subcontractor_id ===
+                                        surveyAssignment.subcontractor_id?.toString()
+                                "
+                                @click="
+                                    submitReassign(
+                                        surveyReassignForm,
+                                        surveyAssignment,
+                                    )
+                                "
+                                >Change</Button
+                            >
                         </div>
                     </div>
                     <div v-else class="flex flex-col gap-2">
-                        <p class="text-sm text-muted-foreground">Not assigned</p>
+                        <p class="text-sm text-muted-foreground">
+                            Not assigned
+                        </p>
                         <div class="flex items-end gap-2">
-                            <Select v-model="surveyAssignForm.subcontractor_id" class="flex-1">
-                                <SelectTrigger class="h-8 text-xs"><SelectValue placeholder="Select subcontractor" /></SelectTrigger>
+                            <Select
+                                v-model="surveyAssignForm.subcontractor_id"
+                                class="flex-1"
+                            >
+                                <SelectTrigger class="h-8 text-xs"
+                                    ><SelectValue
+                                        placeholder="Select subcontractor"
+                                /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                    <SelectItem
+                                        v-for="sc in subcontractors"
+                                        :key="sc.id"
+                                        :value="sc.id.toString()"
+                                        >{{ sc.name }}</SelectItem
+                                    >
                                 </SelectContent>
                             </Select>
                             <Button
-                                type="button" size="sm" class="h-8 text-xs"
-                                :disabled="surveyAssignForm.processing || !surveyAssignForm.subcontractor_id"
+                                type="button"
+                                size="sm"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    surveyAssignForm.processing ||
+                                    !surveyAssignForm.subcontractor_id
+                                "
                                 @click="submitAssign(surveyAssignForm)"
-                            >Assign</Button>
+                                >Assign</Button
+                            >
                         </div>
-                        <InputError :message="surveyAssignForm.errors.subcontractor_id" />
+                        <InputError
+                            :message="surveyAssignForm.errors.subcontractor_id"
+                        />
                     </div>
                 </CardContent>
                 <CardFooter v-if="surveyAssignment" class="pt-0">
                     <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link :href="AdminAssignmentActions.show(surveyAssignment.id).url">View Details →</Link>
+                        <Link
+                            :href="
+                                AdminAssignmentActions.show(surveyAssignment.id)
+                                    .url
+                            "
+                            >View Details →</Link
+                        >
                     </Button>
                 </CardFooter>
             </Card>
@@ -529,11 +872,19 @@ function removeAssignment(assignment: Assignment): void {
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2">
                             <ActivityTypeBadge activity-type="CONSTRUCTION" />
-                            <StatusBadge v-if="constructionAssignment" :status="constructionAssignment.status" />
+                            <StatusBadge
+                                v-if="constructionAssignment"
+                                :status="constructionAssignment.status"
+                            />
                         </div>
                         <Button
-                            v-if="constructionAssignment && constructionAssignment.status === 'PENDING'"
-                            type="button" variant="ghost" size="sm"
+                            v-if="
+                                constructionAssignment &&
+                                constructionAssignment.status === 'PENDING'
+                            "
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             class="h-7 text-destructive hover:text-destructive"
                             @click="removeAssignment(constructionAssignment)"
                         >
@@ -542,86 +893,226 @@ function removeAssignment(assignment: Assignment): void {
                     </div>
                 </CardHeader>
                 <CardContent class="pb-3">
-                    <div v-if="constructionAssignment" class="flex flex-col gap-3">
+                    <div
+                        v-if="constructionAssignment"
+                        class="flex flex-col gap-3"
+                    >
                         <Alert
-                            v-if="constructionAssignment.status === 'REVISION' && constructionAssignment.revision_comment"
+                            v-if="
+                                constructionAssignment.status === 'REVISION' &&
+                                constructionAssignment.revision_comment
+                            "
                             class="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
                         >
-                            <AlertTriangle class="size-4 text-amber-600 dark:text-amber-300" />
-                            <AlertTitle class="text-sm">Revision Requested</AlertTitle>
-                            <AlertDescription class="text-xs">{{ constructionAssignment.revision_comment }}</AlertDescription>
+                            <AlertTriangle
+                                class="size-4 text-amber-600 dark:text-amber-300"
+                            />
+                            <AlertTitle class="text-sm"
+                                >Revision Requested</AlertTitle
+                            >
+                            <AlertDescription class="text-xs">{{
+                                constructionAssignment.revision_comment
+                            }}</AlertDescription>
                         </Alert>
-                        <div v-if="constructionAssignment.construction_data?.cons_wo_number" class="flex flex-col gap-2">
+                        <div
+                            v-if="
+                                constructionAssignment.construction_data
+                                    ?.cons_wo_number
+                            "
+                            class="flex flex-col gap-2"
+                        >
                             <div>
-                                <p class="text-xs text-muted-foreground">WO Number</p>
-                                <p class="font-mono text-sm font-medium">{{ constructionAssignment.construction_data.cons_wo_number }}</p>
+                                <p class="text-xs text-muted-foreground">
+                                    WO Number
+                                </p>
+                                <p class="font-mono text-sm font-medium">
+                                    {{
+                                        constructionAssignment.construction_data
+                                            .cons_wo_number
+                                    }}
+                                </p>
                             </div>
                             <div
-                                v-if="constructionAssignment.construction_data.cons_actual_start_date || constructionAssignment.construction_data.cons_actual_done_date"
+                                v-if="
+                                    constructionAssignment.construction_data
+                                        .cons_actual_start_date ||
+                                    constructionAssignment.construction_data
+                                        .cons_actual_done_date
+                                "
                                 class="grid grid-cols-2 gap-2"
                             >
-                                <div v-if="constructionAssignment.construction_data.cons_actual_start_date">
-                                    <p class="text-xs text-muted-foreground">Actual Start</p>
-                                    <p class="text-sm">{{ new Date(constructionAssignment.construction_data.cons_actual_start_date).toLocaleDateString() }}</p>
+                                <div
+                                    v-if="
+                                        constructionAssignment.construction_data
+                                            .cons_actual_start_date
+                                    "
+                                >
+                                    <p class="text-xs text-muted-foreground">
+                                        Actual Start
+                                    </p>
+                                    <p class="text-sm">
+                                        {{
+                                            new Date(
+                                                constructionAssignment
+                                                    .construction_data
+                                                    .cons_actual_start_date,
+                                            ).toLocaleDateString()
+                                        }}
+                                    </p>
                                 </div>
-                                <div v-if="constructionAssignment.construction_data.cons_actual_done_date">
-                                    <p class="text-xs text-muted-foreground">Actual Done</p>
-                                    <p class="text-sm">{{ new Date(constructionAssignment.construction_data.cons_actual_done_date).toLocaleDateString() }}</p>
+                                <div
+                                    v-if="
+                                        constructionAssignment.construction_data
+                                            .cons_actual_done_date
+                                    "
+                                >
+                                    <p class="text-xs text-muted-foreground">
+                                        Actual Done
+                                    </p>
+                                    <p class="text-sm">
+                                        {{
+                                            new Date(
+                                                constructionAssignment
+                                                    .construction_data
+                                                    .cons_actual_done_date,
+                                            ).toLocaleDateString()
+                                        }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
                         <div v-else class="flex flex-col gap-3">
-                            <div class="flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
+                            <div
+                                class="flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200"
+                            >
                                 <LockKeyhole class="size-3.5 shrink-0" />
                                 Sub-contractor is locked until WO is set
                             </div>
-                            <form class="flex items-start gap-2" @submit.prevent="submitWo">
+                            <form
+                                class="flex items-start gap-2"
+                                @submit.prevent="submitWo"
+                            >
                                 <div class="flex flex-1 flex-col gap-1">
-                                    <Label for="wo_number" class="text-xs">WO Number</Label>
-                                    <Input id="wo_number" v-model="woForm.cons_wo_number" placeholder="e.g. WO-2025-0001" class="h-8 text-xs" required />
-                                    <InputError :message="woForm.errors.cons_wo_number" />
+                                    <Label for="wo_number" class="text-xs"
+                                        >WO Number</Label
+                                    >
+                                    <Input
+                                        id="wo_number"
+                                        v-model="woForm.cons_wo_number"
+                                        placeholder="e.g. WO-2025-0001"
+                                        class="h-8 text-xs"
+                                        required
+                                    />
+                                    <InputError
+                                        :message="woForm.errors.cons_wo_number"
+                                    />
                                 </div>
-                                <Button type="submit" size="sm" variant="outline" class="mt-5 h-8 text-xs" :disabled="woForm.processing">Set WO</Button>
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    variant="outline"
+                                    class="mt-5 h-8 text-xs"
+                                    :disabled="woForm.processing"
+                                    >Set WO</Button
+                                >
                             </form>
                         </div>
                         <div class="flex items-end gap-2 border-t pt-3">
                             <div class="flex flex-1 flex-col gap-1">
-                                <p class="text-xs text-muted-foreground">Subcontractor</p>
-                                <Select v-model="constructionReassignForm.subcontractor_id">
-                                    <SelectTrigger class="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <p class="text-xs text-muted-foreground">
+                                    Subcontractor
+                                </p>
+                                <Select
+                                    v-model="
+                                        constructionReassignForm.subcontractor_id
+                                    "
+                                >
+                                    <SelectTrigger class="h-8 text-xs"
+                                        ><SelectValue
+                                    /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                        <SelectItem
+                                            v-for="sc in subcontractors"
+                                            :key="sc.id"
+                                            :value="sc.id.toString()"
+                                            >{{ sc.name }}</SelectItem
+                                        >
                                     </SelectContent>
                                 </Select>
                             </div>
                             <Button
-                                type="button" size="sm" variant="outline" class="h-8 text-xs"
-                                :disabled="constructionReassignForm.processing || constructionReassignForm.subcontractor_id === constructionAssignment.subcontractor_id?.toString()"
-                                @click="submitReassign(constructionReassignForm, constructionAssignment)"
-                            >Change</Button>
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    constructionReassignForm.processing ||
+                                    constructionReassignForm.subcontractor_id ===
+                                        constructionAssignment.subcontractor_id?.toString()
+                                "
+                                @click="
+                                    submitReassign(
+                                        constructionReassignForm,
+                                        constructionAssignment,
+                                    )
+                                "
+                                >Change</Button
+                            >
                         </div>
                     </div>
                     <div v-else class="flex flex-col gap-2">
-                        <p class="text-sm text-muted-foreground">Not assigned</p>
+                        <p class="text-sm text-muted-foreground">
+                            Not assigned
+                        </p>
                         <div class="flex items-end gap-2">
-                            <Select v-model="constructionAssignForm.subcontractor_id" class="flex-1">
-                                <SelectTrigger class="h-8 text-xs"><SelectValue placeholder="Select subcontractor" /></SelectTrigger>
+                            <Select
+                                v-model="
+                                    constructionAssignForm.subcontractor_id
+                                "
+                                class="flex-1"
+                            >
+                                <SelectTrigger class="h-8 text-xs"
+                                    ><SelectValue
+                                        placeholder="Select subcontractor"
+                                /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                    <SelectItem
+                                        v-for="sc in subcontractors"
+                                        :key="sc.id"
+                                        :value="sc.id.toString()"
+                                        >{{ sc.name }}</SelectItem
+                                    >
                                 </SelectContent>
                             </Select>
                             <Button
-                                type="button" size="sm" class="h-8 text-xs"
-                                :disabled="constructionAssignForm.processing || !constructionAssignForm.subcontractor_id"
+                                type="button"
+                                size="sm"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    constructionAssignForm.processing ||
+                                    !constructionAssignForm.subcontractor_id
+                                "
                                 @click="submitAssign(constructionAssignForm)"
-                            >Assign</Button>
+                                >Assign</Button
+                            >
                         </div>
-                        <InputError :message="constructionAssignForm.errors.subcontractor_id" />
+                        <InputError
+                            :message="
+                                constructionAssignForm.errors.subcontractor_id
+                            "
+                        />
                     </div>
                 </CardContent>
                 <CardFooter v-if="constructionAssignment" class="pt-0">
                     <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link :href="AdminAssignmentActions.show(constructionAssignment.id).url">View Details →</Link>
+                        <Link
+                            :href="
+                                AdminAssignmentActions.show(
+                                    constructionAssignment.id,
+                                ).url
+                            "
+                            >View Details →</Link
+                        >
                     </Button>
                 </CardFooter>
             </Card>
@@ -632,11 +1123,19 @@ function removeAssignment(assignment: Assignment): void {
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2">
                             <ActivityTypeBadge activity-type="PLN_CONNECTION" />
-                            <StatusBadge v-if="plnAssignment" :status="plnAssignment.status" />
+                            <StatusBadge
+                                v-if="plnAssignment"
+                                :status="plnAssignment.status"
+                            />
                         </div>
                         <Button
-                            v-if="plnAssignment && plnAssignment.status === 'PENDING'"
-                            type="button" variant="ghost" size="sm"
+                            v-if="
+                                plnAssignment &&
+                                plnAssignment.status === 'PENDING'
+                            "
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             class="h-7 text-destructive hover:text-destructive"
                             @click="removeAssignment(plnAssignment)"
                         >
@@ -647,56 +1146,122 @@ function removeAssignment(assignment: Assignment): void {
                 <CardContent class="pb-3">
                     <div v-if="plnAssignment" class="flex flex-col gap-3">
                         <Alert
-                            v-if="plnAssignment.status === 'REVISION' && plnAssignment.revision_comment"
+                            v-if="
+                                plnAssignment.status === 'REVISION' &&
+                                plnAssignment.revision_comment
+                            "
                             class="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
                         >
-                            <AlertTriangle class="size-4 text-amber-600 dark:text-amber-300" />
-                            <AlertTitle class="text-sm">Revision Requested</AlertTitle>
-                            <AlertDescription class="text-xs">{{ plnAssignment.revision_comment }}</AlertDescription>
+                            <AlertTriangle
+                                class="size-4 text-amber-600 dark:text-amber-300"
+                            />
+                            <AlertTitle class="text-sm"
+                                >Revision Requested</AlertTitle
+                            >
+                            <AlertDescription class="text-xs">{{
+                                plnAssignment.revision_comment
+                            }}</AlertDescription>
                         </Alert>
                         <div v-if="plnAssignment.pln_data?.pln_status">
-                            <p class="text-xs text-muted-foreground">PLN Status</p>
-                            <p class="text-sm font-medium">{{ plnAssignment.pln_data.pln_status }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                PLN Status
+                            </p>
+                            <p class="text-sm font-medium">
+                                {{ plnAssignment.pln_data.pln_status }}
+                            </p>
                         </div>
-                        <p v-else class="text-xs text-muted-foreground">No PLN data submitted yet.</p>
+                        <p v-else class="text-xs text-muted-foreground">
+                            No PLN data submitted yet.
+                        </p>
                         <div class="flex items-end gap-2 border-t pt-3">
                             <div class="flex flex-1 flex-col gap-1">
-                                <p class="text-xs text-muted-foreground">Subcontractor</p>
-                                <Select v-model="plnReassignForm.subcontractor_id">
-                                    <SelectTrigger class="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <p class="text-xs text-muted-foreground">
+                                    Subcontractor
+                                </p>
+                                <Select
+                                    v-model="plnReassignForm.subcontractor_id"
+                                >
+                                    <SelectTrigger class="h-8 text-xs"
+                                        ><SelectValue
+                                    /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                        <SelectItem
+                                            v-for="sc in subcontractors"
+                                            :key="sc.id"
+                                            :value="sc.id.toString()"
+                                            >{{ sc.name }}</SelectItem
+                                        >
                                     </SelectContent>
                                 </Select>
                             </div>
                             <Button
-                                type="button" size="sm" variant="outline" class="h-8 text-xs"
-                                :disabled="plnReassignForm.processing || plnReassignForm.subcontractor_id === plnAssignment.subcontractor_id?.toString()"
-                                @click="submitReassign(plnReassignForm, plnAssignment)"
-                            >Change</Button>
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    plnReassignForm.processing ||
+                                    plnReassignForm.subcontractor_id ===
+                                        plnAssignment.subcontractor_id?.toString()
+                                "
+                                @click="
+                                    submitReassign(
+                                        plnReassignForm,
+                                        plnAssignment,
+                                    )
+                                "
+                                >Change</Button
+                            >
                         </div>
                     </div>
                     <div v-else class="flex flex-col gap-2">
-                        <p class="text-sm text-muted-foreground">Not assigned</p>
+                        <p class="text-sm text-muted-foreground">
+                            Not assigned
+                        </p>
                         <div class="flex items-end gap-2">
-                            <Select v-model="plnAssignForm.subcontractor_id" class="flex-1">
-                                <SelectTrigger class="h-8 text-xs"><SelectValue placeholder="Select subcontractor" /></SelectTrigger>
+                            <Select
+                                v-model="plnAssignForm.subcontractor_id"
+                                class="flex-1"
+                            >
+                                <SelectTrigger class="h-8 text-xs"
+                                    ><SelectValue
+                                        placeholder="Select subcontractor"
+                                /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                    <SelectItem
+                                        v-for="sc in subcontractors"
+                                        :key="sc.id"
+                                        :value="sc.id.toString()"
+                                        >{{ sc.name }}</SelectItem
+                                    >
                                 </SelectContent>
                             </Select>
                             <Button
-                                type="button" size="sm" class="h-8 text-xs"
-                                :disabled="plnAssignForm.processing || !plnAssignForm.subcontractor_id"
+                                type="button"
+                                size="sm"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    plnAssignForm.processing ||
+                                    !plnAssignForm.subcontractor_id
+                                "
                                 @click="submitAssign(plnAssignForm)"
-                            >Assign</Button>
+                                >Assign</Button
+                            >
                         </div>
-                        <InputError :message="plnAssignForm.errors.subcontractor_id" />
+                        <InputError
+                            :message="plnAssignForm.errors.subcontractor_id"
+                        />
                     </div>
                 </CardContent>
                 <CardFooter v-if="plnAssignment" class="pt-0">
                     <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link :href="AdminAssignmentActions.show(plnAssignment.id).url">View Details →</Link>
+                        <Link
+                            :href="
+                                AdminAssignmentActions.show(plnAssignment.id)
+                                    .url
+                            "
+                            >View Details →</Link
+                        >
                     </Button>
                 </CardFooter>
             </Card>
@@ -707,11 +1272,19 @@ function removeAssignment(assignment: Assignment): void {
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2">
                             <ActivityTypeBadge activity-type="BAST" />
-                            <StatusBadge v-if="bastAssignment" :status="bastAssignment.status" />
+                            <StatusBadge
+                                v-if="bastAssignment"
+                                :status="bastAssignment.status"
+                            />
                         </div>
                         <Button
-                            v-if="bastAssignment && bastAssignment.status === 'PENDING'"
-                            type="button" variant="ghost" size="sm"
+                            v-if="
+                                bastAssignment &&
+                                bastAssignment.status === 'PENDING'
+                            "
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             class="h-7 text-destructive hover:text-destructive"
                             @click="removeAssignment(bastAssignment)"
                         >
@@ -722,60 +1295,125 @@ function removeAssignment(assignment: Assignment): void {
                 <CardContent class="pb-3">
                     <div v-if="bastAssignment" class="flex flex-col gap-3">
                         <Alert
-                            v-if="bastAssignment.status === 'REVISION' && bastAssignment.revision_comment"
+                            v-if="
+                                bastAssignment.status === 'REVISION' &&
+                                bastAssignment.revision_comment
+                            "
                             class="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
                         >
-                            <AlertTriangle class="size-4 text-amber-600 dark:text-amber-300" />
-                            <AlertTitle class="text-sm">Revision Requested</AlertTitle>
-                            <AlertDescription class="text-xs">{{ bastAssignment.revision_comment }}</AlertDescription>
+                            <AlertTriangle
+                                class="size-4 text-amber-600 dark:text-amber-300"
+                            />
+                            <AlertTitle class="text-sm"
+                                >Revision Requested</AlertTitle
+                            >
+                            <AlertDescription class="text-xs">{{
+                                bastAssignment.revision_comment
+                            }}</AlertDescription>
                         </Alert>
                         <div v-if="bastAssignment.bast_data?.plant_name">
-                            <p class="text-xs text-muted-foreground">Plant Name</p>
-                            <p class="text-sm font-medium">{{ bastAssignment.bast_data.plant_name }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                Plant Name
+                            </p>
+                            <p class="text-sm font-medium">
+                                {{ bastAssignment.bast_data.plant_name }}
+                            </p>
                         </div>
-                        <p v-else class="text-xs text-muted-foreground">No BAST data submitted yet.</p>
+                        <p v-else class="text-xs text-muted-foreground">
+                            No BAST data submitted yet.
+                        </p>
                         <div class="flex items-end gap-2 border-t pt-3">
                             <div class="flex flex-1 flex-col gap-1">
-                                <p class="text-xs text-muted-foreground">Subcontractor</p>
-                                <Select v-model="bastReassignForm.subcontractor_id">
-                                    <SelectTrigger class="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <p class="text-xs text-muted-foreground">
+                                    Subcontractor
+                                </p>
+                                <Select
+                                    v-model="bastReassignForm.subcontractor_id"
+                                >
+                                    <SelectTrigger class="h-8 text-xs"
+                                        ><SelectValue
+                                    /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                        <SelectItem
+                                            v-for="sc in subcontractors"
+                                            :key="sc.id"
+                                            :value="sc.id.toString()"
+                                            >{{ sc.name }}</SelectItem
+                                        >
                                     </SelectContent>
                                 </Select>
                             </div>
                             <Button
-                                type="button" size="sm" variant="outline" class="h-8 text-xs"
-                                :disabled="bastReassignForm.processing || bastReassignForm.subcontractor_id === bastAssignment.subcontractor_id?.toString()"
-                                @click="submitReassign(bastReassignForm, bastAssignment)"
-                            >Change</Button>
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    bastReassignForm.processing ||
+                                    bastReassignForm.subcontractor_id ===
+                                        bastAssignment.subcontractor_id?.toString()
+                                "
+                                @click="
+                                    submitReassign(
+                                        bastReassignForm,
+                                        bastAssignment,
+                                    )
+                                "
+                                >Change</Button
+                            >
                         </div>
                     </div>
                     <div v-else class="flex flex-col gap-2">
-                        <p class="text-sm text-muted-foreground">Not assigned</p>
+                        <p class="text-sm text-muted-foreground">
+                            Not assigned
+                        </p>
                         <div class="flex items-end gap-2">
-                            <Select v-model="bastAssignForm.subcontractor_id" class="flex-1">
-                                <SelectTrigger class="h-8 text-xs"><SelectValue placeholder="Select subcontractor" /></SelectTrigger>
+                            <Select
+                                v-model="bastAssignForm.subcontractor_id"
+                                class="flex-1"
+                            >
+                                <SelectTrigger class="h-8 text-xs"
+                                    ><SelectValue
+                                        placeholder="Select subcontractor"
+                                /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem v-for="sc in subcontractors" :key="sc.id" :value="sc.id.toString()">{{ sc.name }}</SelectItem>
+                                    <SelectItem
+                                        v-for="sc in subcontractors"
+                                        :key="sc.id"
+                                        :value="sc.id.toString()"
+                                        >{{ sc.name }}</SelectItem
+                                    >
                                 </SelectContent>
                             </Select>
                             <Button
-                                type="button" size="sm" class="h-8 text-xs"
-                                :disabled="bastAssignForm.processing || !bastAssignForm.subcontractor_id"
+                                type="button"
+                                size="sm"
+                                class="h-8 text-xs"
+                                :disabled="
+                                    bastAssignForm.processing ||
+                                    !bastAssignForm.subcontractor_id
+                                "
                                 @click="submitAssign(bastAssignForm)"
-                            >Assign</Button>
+                                >Assign</Button
+                            >
                         </div>
-                        <InputError :message="bastAssignForm.errors.subcontractor_id" />
+                        <InputError
+                            :message="bastAssignForm.errors.subcontractor_id"
+                        />
                     </div>
                 </CardContent>
                 <CardFooter v-if="bastAssignment" class="pt-0">
                     <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link :href="AdminAssignmentActions.show(bastAssignment.id).url">View Details →</Link>
+                        <Link
+                            :href="
+                                AdminAssignmentActions.show(bastAssignment.id)
+                                    .url
+                            "
+                            >View Details →</Link
+                        >
                     </Button>
                 </CardFooter>
             </Card>
-
         </div>
     </div>
 </template>

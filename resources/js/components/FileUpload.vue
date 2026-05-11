@@ -2,7 +2,7 @@
 import { ExternalLink, FileText, RefreshCw } from 'lucide-vue-next';
 import { ref } from 'vue';
 
-const props = defineProps<{
+defineProps<{
     modelValue: File | null;
     currentUrl?: string | null;
     accept?: string;
@@ -52,7 +52,9 @@ function onFileChange(e: Event) {
         >
             <RefreshCw v-if="uploading" class="h-4 w-4 animate-spin" />
             <FileText v-else class="h-4 w-4" />
-            <span>{{ currentUrl || selectedName ? 'Replace File' : 'Choose File' }}</span>
+            <span>{{
+                currentUrl || selectedName ? 'Replace File' : 'Choose File'
+            }}</span>
         </button>
 
         <!-- Hidden native file input -->

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Line } from 'vue-chartjs';
 import {
     CategoryScale,
     Chart as ChartJS,
@@ -10,8 +8,17 @@ import {
     PointElement,
     Tooltip,
 } from 'chart.js';
+import { computed } from 'vue';
+import { Line } from 'vue-chartjs';
 
-ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Filler, Tooltip);
+ChartJS.register(
+    LineElement,
+    PointElement,
+    CategoryScale,
+    LinearScale,
+    Filler,
+    Tooltip,
+);
 
 const props = defineProps<{
     weeks: { label: string; count: number }[];

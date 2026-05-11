@@ -70,7 +70,9 @@ const statusOptions: { value: AssignmentStatus; label: string }[] = [
     { value: 'DROP', label: 'Drop' },
 ];
 
-const hasActiveFilters = computed(() => search.value !== '' || status.value !== ALL);
+const hasActiveFilters = computed(
+    () => search.value !== '' || status.value !== ALL,
+);
 
 function applyFilters(): void {
     const query: Record<string, string> = {};
@@ -78,6 +80,7 @@ function applyFilters(): void {
     if (search.value.trim()) {
         query.search = search.value.trim();
     }
+
     if (status.value !== ALL) {
         query.status = status.value;
     }
@@ -97,7 +100,10 @@ function resetFilters(): void {
 
 let searchTimeout: number | null = null;
 function onSearchInput() {
-    if (searchTimeout) clearTimeout(searchTimeout);
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+
     searchTimeout = window.setTimeout(() => {
         applyFilters();
     }, 300);
@@ -128,6 +134,7 @@ function lastUpdated(assignment: Assignment): string {
         assignment.construction_data?.updated_at ??
         assignment.bast_data?.updated_at ??
         null;
+
     return formatDate(ts);
 }
 
@@ -144,14 +151,21 @@ const TERMINAL_STATUSES = ['VERIFIED', 'REPORTED', 'DROP'];
 const sla = usePage().props.sla;
 
 function daysStalled(assignment: Assignment): number | null {
-    if (TERMINAL_STATUSES.includes(assignment.status)) { return null; }
+    if (TERMINAL_STATUSES.includes(assignment.status)) {
+        return null;
+    }
+
     const ts =
         assignment.survey_data?.updated_at ??
         assignment.pln_data?.updated_at ??
         assignment.construction_data?.updated_at ??
         assignment.bast_data?.updated_at ??
         null;
-    if (!ts) { return null; }
+
+    if (!ts) {
+        return null;
+    }
+
     return Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
 }
 </script>
@@ -170,11 +184,17 @@ function daysStalled(assignment: Assignment): number | null {
         <div
             class="flex flex-col gap-3 rounded-xl border border-sidebar-border/70 bg-card p-4 sm:flex-row sm:items-end dark:border-sidebar-border"
         >
-            <div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 sm:max-w-md">
+            <div
+                class="grid flex-1 grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2"
+            >
                 <div class="grid gap-1.5">
-                    <label class="text-xs font-medium text-muted-foreground">Search Site</label>
+                    <label class="text-xs font-medium text-muted-foreground"
+                        >Search Site</label
+                    >
                     <div class="relative">
-                        <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search
+                            class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground"
+                        />
                         <Input
                             v-model="search"
                             type="search"
@@ -185,7 +205,9 @@ function daysStalled(assignment: Assignment): number | null {
                     </div>
                 </div>
                 <div class="grid gap-1.5">
-                    <label class="text-xs font-medium text-muted-foreground">Status</label>
+                    <label class="text-xs font-medium text-muted-foreground"
+                        >Status</label
+                    >
                     <Select v-model="status" @update:model-value="applyFilters">
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="All statuses" />
@@ -220,7 +242,7 @@ function daysStalled(assignment: Assignment): number | null {
         >
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-muted/40 text-xs uppercase tracking-wide">
+                    <thead class="bg-muted/40 text-xs tracking-wide uppercase">
                         <tr>
                             <th
                                 class="px-4 py-3 text-left font-medium text-muted-foreground"
@@ -284,34 +306,43 @@ function daysStalled(assignment: Assignment): number | null {
                                     <StatusBadge :status="assignment.status" />
                                     <span
                                         v-if="assignment.status === 'REVISION'"
-                                        class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                        class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium tracking-wide text-amber-800 uppercase dark:bg-amber-900/40 dark:text-amber-200"
                                     >
                                         <AlertTriangle class="size-3" />
                                         Revision Requested
                                     </span>
                                     <span
-                                        v-if="assignment.status === 'PENDING' && !isStarted(assignment)"
-                                        class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                                        v-if="
+                                            assignment.status === 'PENDING' &&
+                                            !isStarted(assignment)
+                                        "
+                                        class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
                                     >
                                         Not started
                                     </span>
                                     <span
-                                        v-if="daysStalled(assignment) !== null && daysStalled(assignment)! >= sla.stalled_days"
-                                        class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-800 dark:bg-red-900/40 dark:text-red-200"
+                                        v-if="
+                                            daysStalled(assignment) !== null &&
+                                            daysStalled(assignment)! >=
+                                                sla.stalled_days
+                                        "
+                                        class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium tracking-wide text-red-800 uppercase dark:bg-red-900/40 dark:text-red-200"
                                     >
                                         Stalled · {{ daysStalled(assignment) }}d
                                     </span>
                                     <span
-                                        v-else-if="daysStalled(assignment) !== null && daysStalled(assignment)! >= sla.slow_days"
-                                        class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                        v-else-if="
+                                            daysStalled(assignment) !== null &&
+                                            daysStalled(assignment)! >=
+                                                sla.slow_days
+                                        "
+                                        class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium tracking-wide text-amber-800 uppercase dark:bg-amber-900/40 dark:text-amber-200"
                                     >
                                         Slow · {{ daysStalled(assignment) }}d
                                     </span>
                                 </div>
                             </td>
-                            <td
-                                class="px-4 py-3 text-xs text-muted-foreground"
-                            >
+                            <td class="px-4 py-3 text-xs text-muted-foreground">
                                 {{ lastUpdated(assignment) }}
                             </td>
                             <td class="px-4 py-3 text-right">
@@ -356,8 +387,8 @@ function daysStalled(assignment: Assignment): number | null {
                                         No assignments found
                                     </p>
                                     <p class="text-xs">
-                                        You currently have no assignments.
-                                        Check back later.
+                                        You currently have no assignments. Check
+                                        back later.
                                     </p>
                                 </div>
                             </td>
@@ -366,7 +397,10 @@ function daysStalled(assignment: Assignment): number | null {
                 </table>
             </div>
 
-            <PaginationLinks v-if="assignments.data.length > 0" :data="assignments" />
+            <PaginationLinks
+                v-if="assignments.data.length > 0"
+                :data="assignments"
+            />
         </div>
     </div>
 </template>

@@ -7,7 +7,13 @@ import InputError from '@/components/InputError.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
@@ -40,7 +46,10 @@ const addForm = useForm({ name: '', phone: '', email: '', pic: '' });
 
 function submitAdd() {
     addForm.post(Actions.store().url, {
-        onSuccess: () => { addOpen.value = false; addForm.reset(); },
+        onSuccess: () => {
+            addOpen.value = false;
+            addForm.reset();
+        },
     });
 }
 
@@ -70,13 +79,20 @@ function openEdit(mc: MainContractor) {
 function onLogoChange(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0] ?? null;
     editForm.logo = file;
-    logoPreview.value = file ? URL.createObjectURL(file) : (editingContractor.value?.logo_url ?? null);
+    logoPreview.value = file
+        ? URL.createObjectURL(file)
+        : (editingContractor.value?.logo_url ?? null);
 }
 
 function submitEdit() {
-    if (!editingContractor.value) return;
+    if (!editingContractor.value) {
+        return;
+    }
+
     editForm.post(Actions.update(editingContractor.value.id).url, {
-        onSuccess: () => { editOpen.value = false; },
+        onSuccess: () => {
+            editOpen.value = false;
+        },
     });
 }
 </script>
@@ -87,41 +103,82 @@ function submitEdit() {
     <div class="space-y-6 p-6">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-semibold">Main Contractors</h1>
-            <Button @click="addOpen = true"><Plus class="mr-1.5 h-4 w-4" />Add Contractor</Button>
+            <Button @click="addOpen = true"
+                ><Plus class="mr-1.5 h-4 w-4" />Add Contractor</Button
+            >
         </div>
 
         <Card>
-            <CardHeader><CardTitle>All Contractors ({{ mainContractors.total }})</CardTitle></CardHeader>
+            <CardHeader
+                ><CardTitle
+                    >All Contractors ({{ mainContractors.total }})</CardTitle
+                ></CardHeader
+            >
             <CardContent class="p-0">
                 <table class="w-full text-sm">
                     <thead class="border-b bg-muted/50">
                         <tr>
-                            <th class="px-4 py-3 text-left font-medium">Logo</th>
-                            <th class="px-4 py-3 text-left font-medium">Name</th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Logo
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Name
+                            </th>
                             <th class="px-4 py-3 text-left font-medium">PIC</th>
-                            <th class="px-4 py-3 text-left font-medium">Phone</th>
-                            <th class="px-4 py-3 text-left font-medium">Email</th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Phone
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Email
+                            </th>
                             <th class="px-4 py-3 text-left font-medium"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y">
-                        <tr v-for="mc in mainContractors.data" :key="mc.id" class="hover:bg-muted/30">
+                        <tr
+                            v-for="mc in mainContractors.data"
+                            :key="mc.id"
+                            class="hover:bg-muted/30"
+                        >
                             <td class="px-4 py-3">
-                                <img v-if="mc.logo_url" :src="mc.logo_url" :alt="mc.name" class="h-8 w-8 rounded object-contain" />
-                                <div v-else class="h-8 w-8 rounded bg-muted"></div>
+                                <img
+                                    v-if="mc.logo_url"
+                                    :src="mc.logo_url"
+                                    :alt="mc.name"
+                                    class="h-8 w-8 rounded object-contain"
+                                />
+                                <div
+                                    v-else
+                                    class="h-8 w-8 rounded bg-muted"
+                                ></div>
                             </td>
                             <td class="px-4 py-3 font-medium">{{ mc.name }}</td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ mc.pic ?? '—' }}</td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ mc.phone ?? '—' }}</td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ mc.email ?? '—' }}</td>
+                            <td class="px-4 py-3 text-muted-foreground">
+                                {{ mc.pic ?? '—' }}
+                            </td>
+                            <td class="px-4 py-3 text-muted-foreground">
+                                {{ mc.phone ?? '—' }}
+                            </td>
+                            <td class="px-4 py-3 text-muted-foreground">
+                                {{ mc.email ?? '—' }}
+                            </td>
                             <td class="px-4 py-3">
-                                <Button variant="ghost" size="sm" @click="openEdit(mc)">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="openEdit(mc)"
+                                >
                                     <Pencil class="h-4 w-4" />
                                 </Button>
                             </td>
                         </tr>
                         <tr v-if="!mainContractors.data.length">
-                            <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">No contractors yet.</td>
+                            <td
+                                colspan="6"
+                                class="px-4 py-8 text-center text-muted-foreground"
+                            >
+                                No contractors yet.
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -134,16 +191,25 @@ function submitEdit() {
     <!-- Add modal -->
     <Dialog v-model:open="addOpen">
         <DialogContent>
-            <DialogHeader><DialogTitle>Add Main Contractor</DialogTitle></DialogHeader>
+            <DialogHeader
+                ><DialogTitle>Add Main Contractor</DialogTitle></DialogHeader
+            >
             <form class="space-y-4" @submit.prevent="submitAdd">
                 <div class="grid gap-1.5">
                     <Label>Name <span class="text-destructive">*</span></Label>
-                    <Input v-model="addForm.name" placeholder="PT Nusantara Energi…" autofocus />
+                    <Input
+                        v-model="addForm.name"
+                        placeholder="PT Nusantara Energi…"
+                        autofocus
+                    />
                     <InputError :message="addForm.errors.name" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label>PIC</Label>
-                    <Input v-model="addForm.pic" placeholder="Contact person name" />
+                    <Input
+                        v-model="addForm.pic"
+                        placeholder="Contact person name"
+                    />
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="grid gap-1.5">
@@ -152,12 +218,23 @@ function submitEdit() {
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Email</Label>
-                        <Input v-model="addForm.email" type="email" placeholder="admin@company.com" />
+                        <Input
+                            v-model="addForm.email"
+                            type="email"
+                            placeholder="admin@company.com"
+                        />
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" type="button" @click="addOpen = false">Cancel</Button>
-                    <Button type="submit" :disabled="addForm.processing">Save</Button>
+                    <Button
+                        variant="outline"
+                        type="button"
+                        @click="addOpen = false"
+                        >Cancel</Button
+                    >
+                    <Button type="submit" :disabled="addForm.processing"
+                        >Save</Button
+                    >
                 </DialogFooter>
             </form>
         </DialogContent>
@@ -166,38 +243,69 @@ function submitEdit() {
     <!-- Edit modal -->
     <Dialog v-model:open="editOpen">
         <DialogContent>
-            <DialogHeader><DialogTitle>Edit Contractor</DialogTitle></DialogHeader>
+            <DialogHeader
+                ><DialogTitle>Edit Contractor</DialogTitle></DialogHeader
+            >
             <form class="space-y-4" @submit.prevent="submitEdit">
                 <div class="grid gap-1.5">
                     <Label>Name <span class="text-destructive">*</span></Label>
-                    <Input v-model="editForm.name" placeholder="PT Nusantara Energi…" autofocus />
+                    <Input
+                        v-model="editForm.name"
+                        placeholder="PT Nusantara Energi…"
+                        autofocus
+                    />
                     <InputError :message="editForm.errors.name" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label>PIC</Label>
-                    <Input v-model="editForm.pic" placeholder="Contact person name" />
+                    <Input
+                        v-model="editForm.pic"
+                        placeholder="Contact person name"
+                    />
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="grid gap-1.5">
                         <Label>Phone</Label>
-                        <Input v-model="editForm.phone" placeholder="+62 812…" />
+                        <Input
+                            v-model="editForm.phone"
+                            placeholder="+62 812…"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Email</Label>
-                        <Input v-model="editForm.email" type="email" placeholder="admin@company.com" />
+                        <Input
+                            v-model="editForm.email"
+                            type="email"
+                            placeholder="admin@company.com"
+                        />
                     </div>
                 </div>
                 <div class="grid gap-1.5">
                     <Label>Logo</Label>
                     <div v-if="logoPreview" class="mb-2">
-                        <img :src="logoPreview" alt="Logo preview" class="h-16 max-w-[160px] rounded border object-contain p-1" />
+                        <img
+                            :src="logoPreview"
+                            alt="Logo preview"
+                            class="h-16 max-w-[160px] rounded border object-contain p-1"
+                        />
                     </div>
-                    <Input type="file" accept="image/*" @change="onLogoChange" />
+                    <Input
+                        type="file"
+                        accept="image/*"
+                        @change="onLogoChange"
+                    />
                     <InputError :message="editForm.errors.logo" />
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" type="button" @click="editOpen = false">Cancel</Button>
-                    <Button type="submit" :disabled="editForm.processing">Save</Button>
+                    <Button
+                        variant="outline"
+                        type="button"
+                        @click="editOpen = false"
+                        >Cancel</Button
+                    >
+                    <Button type="submit" :disabled="editForm.processing"
+                        >Save</Button
+                    >
                 </DialogFooter>
             </form>
         </DialogContent>

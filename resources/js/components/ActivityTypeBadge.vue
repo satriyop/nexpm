@@ -23,7 +23,9 @@ const styleMap: Record<string, string> = {
     BAST: 'border-transparent bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-200',
 };
 
-const label = computed(() => labelMap[props.activityType] ?? props.activityType);
+const label = computed(
+    () => labelMap[props.activityType] ?? props.activityType,
+);
 const className = computed(
     () => styleMap[props.activityType] ?? styleMap.SURVEY,
 );

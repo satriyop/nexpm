@@ -1,7 +1,14 @@
 <script setup lang="ts">
+import {
+    BarElement,
+    CategoryScale,
+    Chart as ChartJS,
+    Legend,
+    LinearScale,
+    Tooltip,
+} from 'chart.js';
 import { computed } from 'vue';
 import { Bar } from 'vue-chartjs';
-import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -56,6 +63,7 @@ const chartOptions = computed(() => ({
             callbacks: {
                 footer: (items: any[]) => {
                     const total = items.reduce((s, i) => s + i.raw, 0);
+
                     return `Total: ${total}`;
                 },
             },

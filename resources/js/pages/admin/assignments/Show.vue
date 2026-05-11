@@ -51,7 +51,11 @@ import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
 import type { Assignment } from '@/types';
 
-interface SubcontractorOption { id: number; name: string; code: string }
+interface SubcontractorOption {
+    id: number;
+    name: string;
+    code: string;
+}
 
 interface AuditLog {
     id: number;
@@ -71,7 +75,12 @@ defineOptions({
     layout: (page: { assignment: Assignment }) => ({
         breadcrumbs: [
             { title: 'Dashboard', href: dashboard() },
-            { title: 'Assignments', href: AdminAssignmentActions.siteAssignments(page.assignment.site.id).url },
+            {
+                title: 'Assignments',
+                href: AdminAssignmentActions.siteAssignments(
+                    page.assignment.site.id,
+                ).url,
+            },
             { title: page.assignment.site.site_code, href: '#' },
         ],
     }),
@@ -94,14 +103,16 @@ const isWoMissing = computed(
 const verifyOpen = ref(false);
 const verifyForm = useForm({});
 
-const canVerify = computed(() =>
-    props.assignment.status === 'DOCUMENT' ||
-    props.assignment.status === 'COMPLETED',
+const canVerify = computed(
+    () =>
+        props.assignment.status === 'DOCUMENT' ||
+        props.assignment.status === 'COMPLETED',
 );
 
-const canRevise = computed(() =>
-    props.assignment.activity_type === 'BAST' &&
-    props.assignment.status === 'COMPLETED',
+const canRevise = computed(
+    () =>
+        props.assignment.activity_type === 'BAST' &&
+        props.assignment.status === 'COMPLETED',
 );
 
 const isDropped = computed(() => props.assignment.status === 'DROP');
@@ -111,15 +122,12 @@ function openVerifyDialog(): void {
 }
 
 function submitVerify(): void {
-    verifyForm.post(
-        AdminAssignmentActions.verify(props.assignment.id).url,
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                verifyOpen.value = false;
-            },
+    verifyForm.post(AdminAssignmentActions.verify(props.assignment.id).url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            verifyOpen.value = false;
         },
-    );
+    });
 }
 
 // --- Revise dialog ---
@@ -135,16 +143,13 @@ function openReviseDialog(): void {
 }
 
 function submitRevise(): void {
-    reviseForm.post(
-        AdminAssignmentActions.revise(props.assignment.id).url,
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                reviseOpen.value = false;
-                reviseForm.reset();
-            },
+    reviseForm.post(AdminAssignmentActions.revise(props.assignment.id).url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            reviseOpen.value = false;
+            reviseForm.reset();
         },
-    );
+    });
 }
 
 // --- Drop / Restore ---
@@ -155,7 +160,9 @@ const dropDialogOpen = ref(false);
 function confirmDrop(): void {
     dropForm.patch(AdminAssignmentActions.drop(props.assignment.id).url, {
         preserveScroll: true,
-        onSuccess: () => { dropDialogOpen.value = false; },
+        onSuccess: () => {
+            dropDialogOpen.value = false;
+        },
     });
 }
 
@@ -231,11 +238,18 @@ const adminSurveyForm = useForm({
 
 function submitAdminSurvey(): void {
     isSaving.value = true;
-    adminSurveyForm.patch(AdminAssignmentActions.updateSurveyData(props.assignment).url, {
-        preserveScroll: true,
-        onSuccess: () => { showSurveyEdit.value = false; },
-        onFinish: () => { isSaving.value = false; },
-    });
+    adminSurveyForm.patch(
+        AdminAssignmentActions.updateSurveyData(props.assignment).url,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                showSurveyEdit.value = false;
+            },
+            onFinish: () => {
+                isSaving.value = false;
+            },
+        },
+    );
 }
 
 // --- Admin PLN edit form ---
@@ -255,11 +269,18 @@ const adminPlnForm = useForm({
 
 function submitAdminPln(): void {
     isSaving.value = true;
-    adminPlnForm.patch(AdminAssignmentActions.updatePlnData(props.assignment).url, {
-        preserveScroll: true,
-        onSuccess: () => { showPlnEdit.value = false; },
-        onFinish: () => { isSaving.value = false; },
-    });
+    adminPlnForm.patch(
+        AdminAssignmentActions.updatePlnData(props.assignment).url,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                showPlnEdit.value = false;
+            },
+            onFinish: () => {
+                isSaving.value = false;
+            },
+        },
+    );
 }
 
 // --- Admin construction subcon edit form ---
@@ -272,15 +293,29 @@ const adminConstructionForm = useForm({
 
 function submitAdminConstruction(): void {
     isSaving.value = true;
-    router.visit(AdminAssignmentActions.updateConstructionSubconData(props.assignment).url, {
-        method: 'patch',
-        data: { ...adminConstructionForm.data() },
-        preserveScroll: true,
-        onError: (errors) => { adminConstructionForm.setError(errors); },
-        onStart: () => { adminConstructionForm.processing = true; adminConstructionForm.clearErrors(); },
-        onFinish: () => { adminConstructionForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { showConstructionEdit.value = false; },
-    });
+    router.visit(
+        AdminAssignmentActions.updateConstructionSubconData(props.assignment)
+            .url,
+        {
+            method: 'patch',
+            data: { ...adminConstructionForm.data() },
+            preserveScroll: true,
+            onError: (errors) => {
+                adminConstructionForm.setError(errors);
+            },
+            onStart: () => {
+                adminConstructionForm.processing = true;
+                adminConstructionForm.clearErrors();
+            },
+            onFinish: () => {
+                adminConstructionForm.processing = false;
+                isSaving.value = false;
+            },
+            onSuccess: () => {
+                showConstructionEdit.value = false;
+            },
+        },
+    );
 }
 
 // --- Admin BAST edit form ---
@@ -309,10 +344,20 @@ function submitAdminBast(): void {
         method: 'patch',
         data: { ...adminBastForm.data() },
         preserveScroll: true,
-        onError: (errors) => { adminBastForm.setError(errors); },
-        onStart: () => { adminBastForm.processing = true; adminBastForm.clearErrors(); },
-        onFinish: () => { adminBastForm.processing = false; isSaving.value = false; },
-        onSuccess: () => { showBastEdit.value = false; },
+        onError: (errors) => {
+            adminBastForm.setError(errors);
+        },
+        onStart: () => {
+            adminBastForm.processing = true;
+            adminBastForm.clearErrors();
+        },
+        onFinish: () => {
+            adminBastForm.processing = false;
+            isSaving.value = false;
+        },
+        onSuccess: () => {
+            showBastEdit.value = false;
+        },
     });
 }
 
@@ -385,17 +430,28 @@ const BAST_CHECKPOINT_LABELS: Record<string, string> = {
 };
 
 const BAST_SECTION_ORDER = [
-    'device', 'sim_card', 'grounding', 'fire_extinguisher',
-    'kwh_meter', 'ac_panel', 'measurements', 'cables',
+    'device',
+    'sim_card',
+    'grounding',
+    'fire_extinguisher',
+    'kwh_meter',
+    'ac_panel',
+    'measurements',
+    'cables',
 ];
 
 const bastPhotosBySection = computed(() => {
     const photos = bast.value?.bast_photos ?? [];
     const map: Record<string, typeof photos> = {};
+
     for (const photo of photos) {
-        if (!map[photo.section]) { map[photo.section] = []; }
+        if (!map[photo.section]) {
+            map[photo.section] = [];
+        }
+
         map[photo.section].push(photo);
     }
+
     return map;
 });
 
@@ -408,10 +464,20 @@ function submitReassign(): void {
         method: 'patch',
         data: { subcontractor_id: reassignForm.subcontractor_id },
         preserveScroll: true,
-        onError: (errors) => { reassignForm.setError(errors); },
-        onStart: () => { reassignForm.processing = true; reassignForm.clearErrors(); },
-        onFinish: () => { reassignForm.processing = false; },
-        onSuccess: () => { reassignOpen.value = false; reassignForm.reset(); },
+        onError: (errors) => {
+            reassignForm.setError(errors);
+        },
+        onStart: () => {
+            reassignForm.processing = true;
+            reassignForm.clearErrors();
+        },
+        onFinish: () => {
+            reassignForm.processing = false;
+        },
+        onSuccess: () => {
+            reassignOpen.value = false;
+            reassignForm.reset();
+        },
     });
 }
 
@@ -460,21 +526,34 @@ function storageUrl(path: string | null | undefined): string {
 }
 
 // --- Navigation guard (warn if any edit panel is open) ---
-const anyEditOpen = computed(() =>
-    showSurveyEdit.value ||
-    showPlnEdit.value ||
-    showConstructionEdit.value ||
-    showBastEdit.value,
+const anyEditOpen = computed(
+    () =>
+        showSurveyEdit.value ||
+        showPlnEdit.value ||
+        showConstructionEdit.value ||
+        showBastEdit.value,
 );
 
 function handleBeforeUnload(e: BeforeUnloadEvent): void {
-    if (anyEditOpen.value) { e.preventDefault(); e.returnValue = ''; }
+    if (anyEditOpen.value) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
 }
 
 const removeNavGuard = router.on('before', (e) => {
-    if (isSaving.value) return;
-    if (e.detail.visit.method !== 'get') return;
-    if (anyEditOpen.value && !window.confirm('You have unsaved changes. Leave anyway?')) {
+    if (isSaving.value) {
+        return;
+    }
+
+    if (e.detail.visit.method !== 'get') {
+        return;
+    }
+
+    if (
+        anyEditOpen.value &&
+        !window.confirm('You have unsaved changes. Leave anyway?')
+    ) {
         e.preventDefault();
     }
 });
@@ -496,9 +575,15 @@ onUnmounted(() => {
                 as-child
                 variant="ghost"
                 size="sm"
-                class="w-fit -ml-2 text-muted-foreground"
+                class="-ml-2 w-fit text-muted-foreground"
             >
-                <Link :href="AdminAssignmentActions.siteAssignments(assignment.site.id).url">
+                <Link
+                    :href="
+                        AdminAssignmentActions.siteAssignments(
+                            assignment.site.id,
+                        ).url
+                    "
+                >
                     <ArrowLeft class="size-4" />
                     Back to Assignments
                 </Link>
@@ -510,7 +595,7 @@ onUnmounted(() => {
                     <div class="flex items-center gap-2 text-2xl font-semibold">
                         <span>{{ assignment.site?.site_code }}</span>
                         <span class="text-muted-foreground">·</span>
-                        <span class="text-muted-foreground font-normal">
+                        <span class="font-normal text-muted-foreground">
                             {{ assignment.site?.location_name }}
                         </span>
                     </div>
@@ -528,7 +613,9 @@ onUnmounted(() => {
         </div>
 
         <Alert
-            v-if="assignment.status === 'REVISION' && assignment.revision_comment"
+            v-if="
+                assignment.status === 'REVISION' && assignment.revision_comment
+            "
             class="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
         >
             <AlertTriangle class="size-4 text-amber-600 dark:text-amber-300" />
@@ -602,9 +689,16 @@ onUnmounted(() => {
                 </Card>
 
                 <Card>
-                    <CardHeader class="flex flex-row items-center justify-between gap-2">
+                    <CardHeader
+                        class="flex flex-row items-center justify-between gap-2"
+                    >
                         <CardTitle>Sub-Contractor</CardTitle>
-                        <Button variant="outline" size="sm" type="button" @click="reassignOpen = true">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            @click="reassignOpen = true"
+                        >
                             <RefreshCw class="size-3.5" />
                             Reassign
                         </Button>
@@ -634,7 +728,10 @@ onUnmounted(() => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="grid gap-4">
-                        <div v-if="!survey" class="text-sm text-muted-foreground">
+                        <div
+                            v-if="!survey"
+                            class="text-sm text-muted-foreground"
+                        >
                             No survey data submitted yet.
                         </div>
                         <div v-else class="grid gap-4 sm:grid-cols-2">
@@ -675,7 +772,9 @@ onUnmounted(() => {
                                     SS Schedule Date
                                 </p>
                                 <p class="font-medium">
-                                    {{ formatDateOnly(survey.ss_schedule_date) }}
+                                    {{
+                                        formatDateOnly(survey.ss_schedule_date)
+                                    }}
                                 </p>
                             </div>
                             <div>
@@ -707,7 +806,7 @@ onUnmounted(() => {
                                     Additional Info
                                 </p>
                                 <p
-                                    class="whitespace-pre-line text-sm text-foreground"
+                                    class="text-sm whitespace-pre-line text-foreground"
                                 >
                                     {{ survey.additional_info ?? '—' }}
                                 </p>
@@ -724,18 +823,20 @@ onUnmounted(() => {
 
                             <div class="sm:col-span-2">
                                 <p
-                                    class="mb-2 text-xs font-medium uppercase text-muted-foreground"
+                                    class="mb-2 text-xs font-medium text-muted-foreground uppercase"
                                 >
                                     Photos
                                 </p>
-                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                <div
+                                    class="grid grid-cols-2 gap-3 sm:grid-cols-3"
+                                >
                                     <div
                                         v-for="(photo, key) in {
-                                            photo_overall_site:
-                                                'Overall Site',
+                                            photo_overall_site: 'Overall Site',
                                             photo_parking_evcs:
                                                 'Parking / EVCS',
-                                            photo_access_route: 'Jalur Akses Menuju Lokasi',
+                                            photo_access_route:
+                                                'Jalur Akses Menuju Lokasi',
                                             photo_pln_network: 'PLN Network',
                                             photo_satellite_gmaps:
                                                 'Satellite / GMaps',
@@ -787,14 +888,16 @@ onUnmounted(() => {
 
                             <div class="sm:col-span-2">
                                 <p
-                                    class="mb-2 text-xs font-medium uppercase text-muted-foreground"
+                                    class="mb-2 text-xs font-medium text-muted-foreground uppercase"
                                 >
                                     Files
                                 </p>
                                 <div class="flex flex-wrap gap-2">
                                     <a
                                         v-if="survey.file_mockup_3d"
-                                        :href="storageUrl(survey.file_mockup_3d)"
+                                        :href="
+                                            storageUrl(survey.file_mockup_3d)
+                                        "
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
@@ -804,7 +907,9 @@ onUnmounted(() => {
                                     </a>
                                     <a
                                         v-if="survey.file_ba_survey"
-                                        :href="storageUrl(survey.file_ba_survey)"
+                                        :href="
+                                            storageUrl(survey.file_ba_survey)
+                                        "
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
@@ -826,80 +931,181 @@ onUnmounted(() => {
                         </div>
                         <Separator class="my-2" />
                         <div class="flex justify-end">
-                            <Button variant="ghost" size="sm" type="button" @click="showSurveyEdit = !showSurveyEdit">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                @click="showSurveyEdit = !showSurveyEdit"
+                            >
                                 <Pencil class="size-3.5" />
-                                {{ showSurveyEdit ? 'Cancel Edit' : 'Edit Data' }}
+                                {{
+                                    showSurveyEdit ? 'Cancel Edit' : 'Edit Data'
+                                }}
                             </Button>
                         </div>
-                        <form v-if="showSurveyEdit" class="grid gap-4 pt-2 sm:grid-cols-2" @submit.prevent="submitAdminSurvey">
+                        <form
+                            v-if="showSurveyEdit"
+                            class="grid gap-4 pt-2 sm:grid-cols-2"
+                            @submit.prevent="submitAdminSurvey"
+                        >
                             <div class="grid gap-1.5">
                                 <Label>Surveyor Name</Label>
-                                <Input v-model="adminSurveyForm.surveyor_name" />
-                                <InputError :message="adminSurveyForm.errors.surveyor_name" />
+                                <Input
+                                    v-model="adminSurveyForm.surveyor_name"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors.surveyor_name
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>PIC Location Name</Label>
-                                <Input v-model="adminSurveyForm.pic_location_name" />
-                                <InputError :message="adminSurveyForm.errors.pic_location_name" />
+                                <Input
+                                    v-model="adminSurveyForm.pic_location_name"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors.pic_location_name
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>PIC Phone</Label>
-                                <Input v-model="adminSurveyForm.pic_location_phone" />
-                                <InputError :message="adminSurveyForm.errors.pic_location_phone" />
+                                <Input
+                                    v-model="adminSurveyForm.pic_location_phone"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors
+                                            .pic_location_phone
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Charger Type</Label>
                                 <Input v-model="adminSurveyForm.charger_type" />
-                                <InputError :message="adminSurveyForm.errors.charger_type" />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors.charger_type
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>SS Schedule Date</Label>
-                                <Input v-model="adminSurveyForm.ss_schedule_date" type="date" />
-                                <InputError :message="adminSurveyForm.errors.ss_schedule_date" />
+                                <Input
+                                    v-model="adminSurveyForm.ss_schedule_date"
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors.ss_schedule_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Cable Pulling Type</Label>
-                                <Input v-model="adminSurveyForm.cable_pulling_type" />
-                                <InputError :message="adminSurveyForm.errors.cable_pulling_type" />
+                                <Input
+                                    v-model="adminSurveyForm.cable_pulling_type"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors
+                                            .cable_pulling_type
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Power kVA</Label>
                                 <Input v-model="adminSurveyForm.power_kva" />
-                                <InputError :message="adminSurveyForm.errors.power_kva" />
+                                <InputError
+                                    :message="adminSurveyForm.errors.power_kva"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>PLN Network Type</Label>
-                                <Input v-model="adminSurveyForm.pln_network_type" />
-                                <InputError :message="adminSurveyForm.errors.pln_network_type" />
+                                <Input
+                                    v-model="adminSurveyForm.pln_network_type"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors.pln_network_type
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Parking Slot</Label>
                                 <Input v-model="adminSurveyForm.parking_slot" />
-                                <InputError :message="adminSurveyForm.errors.parking_slot" />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors.parking_slot
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5 sm:col-span-2">
                                 <Label>Additional Info</Label>
-                                <textarea v-model="adminSurveyForm.additional_info" rows="3"
-                                    class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
-                                <InputError :message="adminSurveyForm.errors.additional_info" />
+                                <textarea
+                                    v-model="adminSurveyForm.additional_info"
+                                    rows="3"
+                                    class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors.additional_info
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>SS Report Submission Date</Label>
-                                <Input v-model="adminSurveyForm.ss_report_submission_date" type="date" />
-                                <InputError :message="adminSurveyForm.errors.ss_report_submission_date" />
+                                <Input
+                                    v-model="
+                                        adminSurveyForm.ss_report_submission_date
+                                    "
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminSurveyForm.errors
+                                            .ss_report_submission_date
+                                    "
+                                />
                             </div>
                             <!-- Survey photos -->
                             <div class="grid gap-1.5 sm:col-span-2">
-                                <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Photos</Label>
+                                <Label
+                                    class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                    >Photos</Label
+                                >
                                 <div class="grid gap-3 sm:grid-cols-2">
-                                    <div v-for="([key, label]) in ([
-                                        ['photo_overall_site', 'Tampak Keseluruhan Site'],
-                                        ['photo_parking_evcs', 'Lahan Parkir EVCS/BSS'],
-                                        ['photo_access_route', 'Jalur Akses Menuju Lokasi'],
-                                        ['photo_pln_network', 'Jaringan PLN Terdekat'],
-                                        ['photo_satellite_gmaps', 'Satelit GMaps'],
-                                    ] as const)" :key="key" class="grid gap-1">
-                                        <span class="text-xs font-medium">{{ label }}</span>
+                                    <div
+                                        v-for="[key, label] in [
+                                            [
+                                                'photo_overall_site',
+                                                'Tampak Keseluruhan Site',
+                                            ],
+                                            [
+                                                'photo_parking_evcs',
+                                                'Lahan Parkir EVCS/BSS',
+                                            ],
+                                            [
+                                                'photo_access_route',
+                                                'Jalur Akses Menuju Lokasi',
+                                            ],
+                                            [
+                                                'photo_pln_network',
+                                                'Jaringan PLN Terdekat',
+                                            ],
+                                            [
+                                                'photo_satellite_gmaps',
+                                                'Satelit GMaps',
+                                            ],
+                                        ] as const"
+                                        :key="key"
+                                        class="grid gap-1"
+                                    >
+                                        <span class="text-xs font-medium">{{
+                                            label
+                                        }}</span>
                                         <a
                                             v-if="survey?.[key]"
                                             :href="storageUrl(survey[key]!)"
@@ -912,22 +1118,44 @@ onUnmounted(() => {
                                             type="file"
                                             accept="image/*"
                                             class="text-xs"
-                                            @change="(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) adminSurveyForm[key] = f; }"
+                                            @change="
+                                                (e) => {
+                                                    const f = (
+                                                        e.target as HTMLInputElement
+                                                    ).files?.[0];
+                                                    if (f)
+                                                        adminSurveyForm[key] =
+                                                            f;
+                                                }
+                                            "
                                         />
-                                        <InputError :message="adminSurveyForm.errors[key]" />
+                                        <InputError
+                                            :message="
+                                                adminSurveyForm.errors[key]
+                                            "
+                                        />
                                     </div>
                                 </div>
                             </div>
                             <!-- Survey files -->
                             <div class="grid gap-1.5 sm:col-span-2">
-                                <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</Label>
+                                <Label
+                                    class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                    >Files</Label
+                                >
                                 <div class="grid gap-3 sm:grid-cols-2">
-                                    <div v-for="([key, label]) in ([
-                                        ['file_mockup_3d', '3D Mockup'],
-                                        ['file_site_plan', 'Site Plan'],
-                                        ['file_ba_survey', 'BA Survey'],
-                                    ] as const)" :key="key" class="grid gap-1">
-                                        <span class="text-xs font-medium">{{ label }}</span>
+                                    <div
+                                        v-for="[key, label] in [
+                                            ['file_mockup_3d', '3D Mockup'],
+                                            ['file_site_plan', 'Site Plan'],
+                                            ['file_ba_survey', 'BA Survey'],
+                                        ] as const"
+                                        :key="key"
+                                        class="grid gap-1"
+                                    >
+                                        <span class="text-xs font-medium">{{
+                                            label
+                                        }}</span>
                                         <a
                                             v-if="survey?.[key]"
                                             :href="storageUrl(survey[key]!)"
@@ -940,15 +1168,35 @@ onUnmounted(() => {
                                             type="file"
                                             accept=".pdf,.jpg,.jpeg,.png,.dwg"
                                             class="text-xs"
-                                            @change="(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) adminSurveyForm[key] = f; }"
+                                            @change="
+                                                (e) => {
+                                                    const f = (
+                                                        e.target as HTMLInputElement
+                                                    ).files?.[0];
+                                                    if (f)
+                                                        adminSurveyForm[key] =
+                                                            f;
+                                                }
+                                            "
                                         />
-                                        <InputError :message="adminSurveyForm.errors[key]" />
+                                        <InputError
+                                            :message="
+                                                adminSurveyForm.errors[key]
+                                            "
+                                        />
                                     </div>
                                 </div>
                             </div>
                             <div class="flex justify-end sm:col-span-2">
-                                <Button type="submit" :disabled="adminSurveyForm.processing">
-                                    {{ adminSurveyForm.processing ? 'Saving…' : 'Save Changes' }}
+                                <Button
+                                    type="submit"
+                                    :disabled="adminSurveyForm.processing"
+                                >
+                                    {{
+                                        adminSurveyForm.processing
+                                            ? 'Saving…'
+                                            : 'Save Changes'
+                                    }}
                                 </Button>
                             </div>
                         </form>
@@ -1021,14 +1269,14 @@ onUnmounted(() => {
                                     Catatan Progres
                                 </p>
                                 <p
-                                    class="whitespace-pre-line text-sm text-foreground"
+                                    class="text-sm whitespace-pre-line text-foreground"
                                 >
                                     {{ pln.catatan_progres ?? '—' }}
                                 </p>
                             </div>
                             <div class="sm:col-span-2">
                                 <p
-                                    class="mb-2 text-xs font-medium uppercase text-muted-foreground"
+                                    class="mb-2 text-xs font-medium text-muted-foreground uppercase"
                                 >
                                     Files
                                 </p>
@@ -1078,58 +1326,127 @@ onUnmounted(() => {
                         </div>
                         <Separator class="my-2" />
                         <div class="flex justify-end">
-                            <Button variant="ghost" size="sm" type="button" @click="showPlnEdit = !showPlnEdit">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                @click="showPlnEdit = !showPlnEdit"
+                            >
                                 <Pencil class="size-3.5" />
                                 {{ showPlnEdit ? 'Cancel Edit' : 'Edit Data' }}
                             </Button>
                         </div>
-                        <form v-if="showPlnEdit" class="grid gap-4 pt-2 sm:grid-cols-2" @submit.prevent="submitAdminPln">
+                        <form
+                            v-if="showPlnEdit"
+                            class="grid gap-4 pt-2 sm:grid-cols-2"
+                            @submit.prevent="submitAdminPln"
+                        >
                             <div class="grid gap-1.5">
                                 <Label>PLN Status</Label>
                                 <Input v-model="adminPlnForm.pln_status" />
-                                <InputError :message="adminPlnForm.errors.pln_status" />
+                                <InputError
+                                    :message="adminPlnForm.errors.pln_status"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>NIDI/SLO Date</Label>
-                                <Input v-model="adminPlnForm.nidi_slo_date_acquired" type="date" />
-                                <InputError :message="adminPlnForm.errors.nidi_slo_date_acquired" />
+                                <Input
+                                    v-model="
+                                        adminPlnForm.nidi_slo_date_acquired
+                                    "
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminPlnForm.errors
+                                            .nidi_slo_date_acquired
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Type / Rate</Label>
                                 <Input v-model="adminPlnForm.type_rate" />
-                                <InputError :message="adminPlnForm.errors.type_rate" />
+                                <InputError
+                                    :message="adminPlnForm.errors.type_rate"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>kWh Meter Installation Date</Label>
-                                <Input v-model="adminPlnForm.kwh_meter_installation_date" type="date" />
-                                <InputError :message="adminPlnForm.errors.kwh_meter_installation_date" />
+                                <Input
+                                    v-model="
+                                        adminPlnForm.kwh_meter_installation_date
+                                    "
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminPlnForm.errors
+                                            .kwh_meter_installation_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>ID Pelanggan</Label>
                                 <Input v-model="adminPlnForm.id_pelanggan" />
-                                <InputError :message="adminPlnForm.errors.id_pelanggan" />
+                                <InputError
+                                    :message="adminPlnForm.errors.id_pelanggan"
+                                />
                             </div>
                             <div class="grid gap-1.5 sm:col-span-2">
                                 <Label>Catatan Progres</Label>
-                                <textarea v-model="adminPlnForm.catatan_progres" rows="3"
-                                    class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
-                                <InputError :message="adminPlnForm.errors.catatan_progres" />
+                                <textarea
+                                    v-model="adminPlnForm.catatan_progres"
+                                    rows="3"
+                                    class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                />
+                                <InputError
+                                    :message="
+                                        adminPlnForm.errors.catatan_progres
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Email BPUJL Request Date</Label>
-                                <Input v-model="adminPlnForm.email_bpujl_req_date" type="date" />
-                                <InputError :message="adminPlnForm.errors.email_bpujl_req_date" />
+                                <Input
+                                    v-model="adminPlnForm.email_bpujl_req_date"
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminPlnForm.errors.email_bpujl_req_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>BPUJL Acquired Date</Label>
-                                <Input v-model="adminPlnForm.bpujl_acquired_date" type="date" />
-                                <InputError :message="adminPlnForm.errors.bpujl_acquired_date" />
+                                <Input
+                                    v-model="adminPlnForm.bpujl_acquired_date"
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminPlnForm.errors.bpujl_acquired_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5 sm:col-span-2">
-                                <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</Label>
+                                <Label
+                                    class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                    >Files</Label
+                                >
                                 <div class="grid gap-3 sm:grid-cols-3">
-                                    <div v-for="([key, label]) in ([['file_slo', 'SLO'], ['file_nidi', 'NIDI'], ['file_reg', 'Registration']] as const)" :key="key" class="grid gap-1">
-                                        <span class="text-xs font-medium">{{ label }}</span>
+                                    <div
+                                        v-for="[key, label] in [
+                                            ['file_slo', 'SLO'],
+                                            ['file_nidi', 'NIDI'],
+                                            ['file_reg', 'Registration'],
+                                        ] as const"
+                                        :key="key"
+                                        class="grid gap-1"
+                                    >
+                                        <span class="text-xs font-medium">{{
+                                            label
+                                        }}</span>
                                         <a
                                             v-if="pln?.[key]"
                                             :href="storageUrl(pln[key]!)"
@@ -1142,15 +1459,32 @@ onUnmounted(() => {
                                             type="file"
                                             accept=".pdf,.jpg,.jpeg,.png"
                                             class="text-xs"
-                                            @change="(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) adminPlnForm[key] = f; }"
+                                            @change="
+                                                (e) => {
+                                                    const f = (
+                                                        e.target as HTMLInputElement
+                                                    ).files?.[0];
+                                                    if (f)
+                                                        adminPlnForm[key] = f;
+                                                }
+                                            "
                                         />
-                                        <InputError :message="adminPlnForm.errors[key]" />
+                                        <InputError
+                                            :message="adminPlnForm.errors[key]"
+                                        />
                                     </div>
                                 </div>
                             </div>
                             <div class="flex justify-end sm:col-span-2">
-                                <Button type="submit" :disabled="adminPlnForm.processing">
-                                    {{ adminPlnForm.processing ? 'Saving…' : 'Save Changes' }}
+                                <Button
+                                    type="submit"
+                                    :disabled="adminPlnForm.processing"
+                                >
+                                    {{
+                                        adminPlnForm.processing
+                                            ? 'Saving…'
+                                            : 'Save Changes'
+                                    }}
                                 </Button>
                             </div>
                         </form>
@@ -1176,13 +1510,15 @@ onUnmounted(() => {
                         <div v-else class="flex flex-col gap-6">
                             <div>
                                 <h3
-                                    class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                    class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                 >
                                     Admin Prerequisites
                                 </h3>
                                 <div class="grid gap-4 sm:grid-cols-3">
                                     <div>
-                                        <p class="text-xs text-muted-foreground">
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             WO Number
                                         </p>
                                         <p class="font-medium">
@@ -1193,7 +1529,9 @@ onUnmounted(() => {
                                         </p>
                                     </div>
                                     <div>
-                                        <p class="text-xs text-muted-foreground">
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             Project Status
                                         </p>
                                         <p class="font-medium">
@@ -1204,7 +1542,9 @@ onUnmounted(() => {
                                         </p>
                                     </div>
                                     <div>
-                                        <p class="text-xs text-muted-foreground">
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             Setup Approval
                                         </p>
                                         <p class="font-medium">
@@ -1222,13 +1562,15 @@ onUnmounted(() => {
 
                             <div>
                                 <h3
-                                    class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                    class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                 >
                                     Sub-Contractor Submission
                                 </h3>
                                 <div class="grid gap-4 sm:grid-cols-2">
                                     <div>
-                                        <p class="text-xs text-muted-foreground">
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             Actual Start
                                         </p>
                                         <p class="font-medium">
@@ -1240,7 +1582,9 @@ onUnmounted(() => {
                                         </p>
                                     </div>
                                     <div>
-                                        <p class="text-xs text-muted-foreground">
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             Actual Done
                                         </p>
                                         <p class="font-medium">
@@ -1252,7 +1596,9 @@ onUnmounted(() => {
                                         </p>
                                     </div>
                                     <div>
-                                        <p class="text-xs text-muted-foreground">
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             Machine Serial
                                         </p>
                                         <p class="font-medium">
@@ -1263,11 +1609,13 @@ onUnmounted(() => {
                                         </p>
                                     </div>
                                     <div class="sm:col-span-2">
-                                        <p class="text-xs text-muted-foreground">
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
                                             Catatan Progres
                                         </p>
                                         <p
-                                            class="whitespace-pre-line text-sm text-foreground"
+                                            class="text-sm whitespace-pre-line text-foreground"
                                         >
                                             {{
                                                 construction.catatan_progres ??
@@ -1282,7 +1630,7 @@ onUnmounted(() => {
 
                             <div>
                                 <h3
-                                    class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                    class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                 >
                                     Progress Photos
                                 </h3>
@@ -1316,36 +1664,100 @@ onUnmounted(() => {
                             </div>
                             <Separator />
                             <div class="flex justify-end">
-                                <Button variant="ghost" size="sm" type="button" @click="showConstructionEdit = !showConstructionEdit">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    type="button"
+                                    @click="
+                                        showConstructionEdit =
+                                            !showConstructionEdit
+                                    "
+                                >
                                     <Pencil class="size-3.5" />
-                                    {{ showConstructionEdit ? 'Cancel Edit' : 'Edit Data' }}
+                                    {{
+                                        showConstructionEdit
+                                            ? 'Cancel Edit'
+                                            : 'Edit Data'
+                                    }}
                                 </Button>
                             </div>
-                            <form v-if="showConstructionEdit" class="grid gap-4 pt-2 sm:grid-cols-2" @submit.prevent="submitAdminConstruction">
+                            <form
+                                v-if="showConstructionEdit"
+                                class="grid gap-4 pt-2 sm:grid-cols-2"
+                                @submit.prevent="submitAdminConstruction"
+                            >
                                 <div class="grid gap-1.5">
                                     <Label>Actual Start Date</Label>
-                                    <Input v-model="adminConstructionForm.cons_actual_start_date" type="date" />
-                                    <InputError :message="adminConstructionForm.errors.cons_actual_start_date" />
+                                    <Input
+                                        v-model="
+                                            adminConstructionForm.cons_actual_start_date
+                                        "
+                                        type="date"
+                                    />
+                                    <InputError
+                                        :message="
+                                            adminConstructionForm.errors
+                                                .cons_actual_start_date
+                                        "
+                                    />
                                 </div>
                                 <div class="grid gap-1.5">
                                     <Label>Actual Done Date</Label>
-                                    <Input v-model="adminConstructionForm.cons_actual_done_date" type="date" />
-                                    <InputError :message="adminConstructionForm.errors.cons_actual_done_date" />
+                                    <Input
+                                        v-model="
+                                            adminConstructionForm.cons_actual_done_date
+                                        "
+                                        type="date"
+                                    />
+                                    <InputError
+                                        :message="
+                                            adminConstructionForm.errors
+                                                .cons_actual_done_date
+                                        "
+                                    />
                                 </div>
                                 <div class="grid gap-1.5">
                                     <Label>Machine Serial Number</Label>
-                                    <Input v-model="adminConstructionForm.machine_serial_number" />
-                                    <InputError :message="adminConstructionForm.errors.machine_serial_number" />
+                                    <Input
+                                        v-model="
+                                            adminConstructionForm.machine_serial_number
+                                        "
+                                    />
+                                    <InputError
+                                        :message="
+                                            adminConstructionForm.errors
+                                                .machine_serial_number
+                                        "
+                                    />
                                 </div>
                                 <div class="grid gap-1.5 sm:col-span-2">
                                     <Label>Catatan Progres</Label>
-                                    <textarea v-model="adminConstructionForm.catatan_progres" rows="3"
-                                        class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
-                                    <InputError :message="adminConstructionForm.errors.catatan_progres" />
+                                    <textarea
+                                        v-model="
+                                            adminConstructionForm.catatan_progres
+                                        "
+                                        rows="3"
+                                        class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                    />
+                                    <InputError
+                                        :message="
+                                            adminConstructionForm.errors
+                                                .catatan_progres
+                                        "
+                                    />
                                 </div>
                                 <div class="flex justify-end sm:col-span-2">
-                                    <Button type="submit" :disabled="adminConstructionForm.processing">
-                                        {{ adminConstructionForm.processing ? 'Saving…' : 'Save Changes' }}
+                                    <Button
+                                        type="submit"
+                                        :disabled="
+                                            adminConstructionForm.processing
+                                        "
+                                    >
+                                        {{
+                                            adminConstructionForm.processing
+                                                ? 'Saving…'
+                                                : 'Save Changes'
+                                        }}
                                     </Button>
                                 </div>
                             </form>
@@ -1355,11 +1767,21 @@ onUnmounted(() => {
 
                 <!-- BAST -->
                 <Card v-if="assignment.activity_type === 'BAST'">
-                    <CardHeader class="flex flex-row items-start justify-between gap-2">
+                    <CardHeader
+                        class="flex flex-row items-start justify-between gap-2"
+                    >
                         <CardTitle>BAST Commissioning Data</CardTitle>
                         <a
-                            v-if="['COMPLETED','VERIFIED','REPORTED'].includes(assignment.status)"
-                            :href="AdminAssignmentActions.downloadBastReport(assignment).url"
+                            v-if="
+                                ['COMPLETED', 'VERIFIED', 'REPORTED'].includes(
+                                    assignment.status,
+                                )
+                            "
+                            :href="
+                                AdminAssignmentActions.downloadBastReport(
+                                    assignment,
+                                ).url
+                            "
                             target="_blank"
                         >
                             <Button variant="outline" size="sm" type="button">
@@ -1374,42 +1796,88 @@ onUnmounted(() => {
                         </div>
                         <div v-else class="flex flex-col gap-6">
                             <!-- Plant info summary -->
-                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            <div
+                                class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                            >
                                 <div>
-                                    <p class="text-xs text-muted-foreground">Plant Name</p>
-                                    <p class="font-medium">{{ bast.plant_name ?? '—' }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Plant Name
+                                    </p>
+                                    <p class="font-medium">
+                                        {{ bast.plant_name ?? '—' }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">Customer</p>
-                                    <p class="font-medium">{{ bast.customer ?? '—' }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Customer
+                                    </p>
+                                    <p class="font-medium">
+                                        {{ bast.customer ?? '—' }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">Charger Type</p>
-                                    <p class="font-medium">{{ bast.charger_type ?? '—' }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Charger Type
+                                    </p>
+                                    <p class="font-medium">
+                                        {{ bast.charger_type ?? '—' }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">Serial Number</p>
-                                    <p class="font-medium">{{ bast.sn_unit ?? '—' }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Serial Number
+                                    </p>
+                                    <p class="font-medium">
+                                        {{ bast.sn_unit ?? '—' }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">ID PLN</p>
-                                    <p class="font-medium">{{ bast.id_pln ?? '—' }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        ID PLN
+                                    </p>
+                                    <p class="font-medium">
+                                        {{ bast.id_pln ?? '—' }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">SIM Provider</p>
-                                    <p class="font-medium">{{ bast.sim_provider ?? '—' }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        SIM Provider
+                                    </p>
+                                    <p class="font-medium">
+                                        {{ bast.sim_provider ?? '—' }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">Installation Date</p>
-                                    <p class="font-medium">{{ formatDateOnly(bast.installation_date) }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Installation Date
+                                    </p>
+                                    <p class="font-medium">
+                                        {{
+                                            formatDateOnly(
+                                                bast.installation_date,
+                                            )
+                                        }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">Commissioning Date</p>
-                                    <p class="font-medium">{{ formatDateOnly(bast.commissioning_date) }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Commissioning Date
+                                    </p>
+                                    <p class="font-medium">
+                                        {{
+                                            formatDateOnly(
+                                                bast.commissioning_date,
+                                            )
+                                        }}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-muted-foreground">Photos uploaded</p>
-                                    <p class="font-medium">{{ bast.bast_photos?.length ?? 0 }}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Photos uploaded
+                                    </p>
+                                    <p class="font-medium">
+                                        {{ bast.bast_photos?.length ?? 0 }}
+                                    </p>
                                 </div>
                             </div>
 
@@ -1420,12 +1888,21 @@ onUnmounted(() => {
                                 :key="sectionKey"
                                 class="flex flex-col gap-3"
                             >
-                                <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    {{ BAST_SECTION_LABELS[sectionKey] ?? sectionKey }}
+                                <h3
+                                    class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                >
+                                    {{
+                                        BAST_SECTION_LABELS[sectionKey] ??
+                                        sectionKey
+                                    }}
                                 </h3>
-                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                <div
+                                    class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+                                >
                                     <div
-                                        v-for="photo in bastPhotosBySection[sectionKey]"
+                                        v-for="photo in bastPhotosBySection[
+                                            sectionKey
+                                        ]"
                                         :key="photo.id"
                                         class="flex flex-col gap-1"
                                     >
@@ -1436,13 +1913,25 @@ onUnmounted(() => {
                                             class="block overflow-hidden rounded-lg border border-sidebar-border/70 dark:border-sidebar-border"
                                         >
                                             <img
-                                                :src="storageUrl(photo.photo_path)"
-                                                :alt="BAST_CHECKPOINT_LABELS[photo.checkpoint_key] ?? photo.checkpoint_key"
+                                                :src="
+                                                    storageUrl(photo.photo_path)
+                                                "
+                                                :alt="
+                                                    BAST_CHECKPOINT_LABELS[
+                                                        photo.checkpoint_key
+                                                    ] ?? photo.checkpoint_key
+                                                "
                                                 class="aspect-square w-full object-cover transition-opacity hover:opacity-80"
                                             />
                                         </a>
-                                        <p class="text-[11px] leading-tight text-muted-foreground">
-                                            {{ BAST_CHECKPOINT_LABELS[photo.checkpoint_key] ?? photo.checkpoint_key }}
+                                        <p
+                                            class="text-[11px] leading-tight text-muted-foreground"
+                                        >
+                                            {{
+                                                BAST_CHECKPOINT_LABELS[
+                                                    photo.checkpoint_key
+                                                ] ?? photo.checkpoint_key
+                                            }}
                                         </p>
                                     </div>
                                 </div>
@@ -1457,96 +1946,186 @@ onUnmounted(() => {
                         </div>
                         <Separator class="my-2" />
                         <div class="flex justify-end">
-                            <Button variant="ghost" size="sm" type="button" @click="showBastEdit = !showBastEdit">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                @click="showBastEdit = !showBastEdit"
+                            >
                                 <Pencil class="size-3.5" />
                                 {{ showBastEdit ? 'Cancel Edit' : 'Edit Data' }}
                             </Button>
                         </div>
-                        <form v-if="showBastEdit" class="grid gap-4 pt-2 sm:grid-cols-2" @submit.prevent="submitAdminBast">
+                        <form
+                            v-if="showBastEdit"
+                            class="grid gap-4 pt-2 sm:grid-cols-2"
+                            @submit.prevent="submitAdminBast"
+                        >
                             <div class="grid gap-1.5">
                                 <Label>Plant Name</Label>
                                 <Input v-model="adminBastForm.plant_name" />
-                                <InputError :message="adminBastForm.errors.plant_name" />
+                                <InputError
+                                    :message="adminBastForm.errors.plant_name"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Customer</Label>
                                 <Input v-model="adminBastForm.customer" />
-                                <InputError :message="adminBastForm.errors.customer" />
+                                <InputError
+                                    :message="adminBastForm.errors.customer"
+                                />
                             </div>
                             <div class="grid gap-1.5 sm:col-span-2">
                                 <Label>Plant Address</Label>
-                                <textarea v-model="adminBastForm.plant_address" rows="2"
-                                    class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50" />
-                                <InputError :message="adminBastForm.errors.plant_address" />
+                                <textarea
+                                    v-model="adminBastForm.plant_address"
+                                    rows="2"
+                                    class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.plant_address
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Plant Coordinate</Label>
-                                <Input v-model="adminBastForm.plant_coordinate" />
-                                <InputError :message="adminBastForm.errors.plant_coordinate" />
+                                <Input
+                                    v-model="adminBastForm.plant_coordinate"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.plant_coordinate
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Google Maps Link</Label>
                                 <Input v-model="adminBastForm.gmaps_link" />
-                                <InputError :message="adminBastForm.errors.gmaps_link" />
+                                <InputError
+                                    :message="adminBastForm.errors.gmaps_link"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Charger Type</Label>
                                 <Input v-model="adminBastForm.charger_type" />
-                                <InputError :message="adminBastForm.errors.charger_type" />
+                                <InputError
+                                    :message="adminBastForm.errors.charger_type"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Serial Number (Unit)</Label>
                                 <Input v-model="adminBastForm.sn_unit" />
-                                <InputError :message="adminBastForm.errors.sn_unit" />
+                                <InputError
+                                    :message="adminBastForm.errors.sn_unit"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>ID PLN</Label>
                                 <Input v-model="adminBastForm.id_pln" />
-                                <InputError :message="adminBastForm.errors.id_pln" />
+                                <InputError
+                                    :message="adminBastForm.errors.id_pln"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>SIM Provider</Label>
                                 <Input v-model="adminBastForm.sim_provider" />
-                                <InputError :message="adminBastForm.errors.sim_provider" />
+                                <InputError
+                                    :message="adminBastForm.errors.sim_provider"
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Installation Vendor</Label>
-                                <Input v-model="adminBastForm.installation_vendor" />
-                                <InputError :message="adminBastForm.errors.installation_vendor" />
+                                <Input
+                                    v-model="adminBastForm.installation_vendor"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.installation_vendor
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>PIC Vendor Contact</Label>
-                                <Input v-model="adminBastForm.pic_vendor_contact" />
-                                <InputError :message="adminBastForm.errors.pic_vendor_contact" />
+                                <Input
+                                    v-model="adminBastForm.pic_vendor_contact"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.pic_vendor_contact
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Installation Date</Label>
-                                <Input v-model="adminBastForm.installation_date" type="date" />
-                                <InputError :message="adminBastForm.errors.installation_date" />
+                                <Input
+                                    v-model="adminBastForm.installation_date"
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.installation_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Commissioning Date</Label>
-                                <Input v-model="adminBastForm.commissioning_date" type="date" />
-                                <InputError :message="adminBastForm.errors.commissioning_date" />
+                                <Input
+                                    v-model="adminBastForm.commissioning_date"
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.commissioning_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Nomor SIM Card</Label>
                                 <Input v-model="adminBastForm.nomor_simcard" />
-                                <InputError :message="adminBastForm.errors.nomor_simcard" />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.nomor_simcard
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Go Live Date PLN Pass</Label>
-                                <Input v-model="adminBastForm.go_live_date_pln_pass" type="date" />
-                                <InputError :message="adminBastForm.errors.go_live_date_pln_pass" />
+                                <Input
+                                    v-model="
+                                        adminBastForm.go_live_date_pln_pass
+                                    "
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors
+                                            .go_live_date_pln_pass
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>Go Live Date PLN</Label>
-                                <Input v-model="adminBastForm.go_live_date_pln" type="date" />
-                                <InputError :message="adminBastForm.errors.go_live_date_pln" />
+                                <Input
+                                    v-model="adminBastForm.go_live_date_pln"
+                                    type="date"
+                                />
+                                <InputError
+                                    :message="
+                                        adminBastForm.errors.go_live_date_pln
+                                    "
+                                />
                             </div>
                             <div class="flex justify-end sm:col-span-2">
-                                <Button type="submit" :disabled="adminBastForm.processing">
-                                    {{ adminBastForm.processing ? 'Saving…' : 'Save Changes' }}
+                                <Button
+                                    type="submit"
+                                    :disabled="adminBastForm.processing"
+                                >
+                                    {{
+                                        adminBastForm.processing
+                                            ? 'Saving…'
+                                            : 'Save Changes'
+                                    }}
                                 </Button>
                             </div>
                         </form>
@@ -1555,7 +2134,9 @@ onUnmounted(() => {
             </div>
 
             <!-- Right column: Admin actions and prerequisite -->
-            <div class="flex flex-col gap-6 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            <div
+                class="flex flex-col gap-6 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto"
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle>Verification</CardTitle>
@@ -1646,15 +2227,14 @@ onUnmounted(() => {
                                 <AlertTriangle class="size-4" />
                                 Dropped
                             </div>
-                            <p class="mt-1 text-xs text-red-800/90 dark:text-red-200/90">
+                            <p
+                                class="mt-1 text-xs text-red-800/90 dark:text-red-200/90"
+                            >
                                 This assignment has been archived.
                             </p>
                         </div>
 
-                        <p
-                            v-else
-                            class="text-sm text-muted-foreground"
-                        >
+                        <p v-else class="text-sm text-muted-foreground">
                             Awaiting submission from the sub-contractor.
                         </p>
 
@@ -1698,8 +2278,8 @@ onUnmounted(() => {
                             </span>
                         </CardTitle>
                         <CardDescription>
-                            Sub-contractor cannot submit construction data
-                            until the WO Number is set.
+                            Sub-contractor cannot submit construction data until
+                            the WO Number is set.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -1767,40 +2347,83 @@ onUnmounted(() => {
         </div>
 
         <!-- Audit Log -->
-        <div class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border">
-            <div class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+        <div
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div
+                class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+            >
                 <ClipboardList class="size-4 text-muted-foreground" />
                 <h2 class="text-sm font-semibold">Audit Log</h2>
-                <span v-if="auditLogs" class="ml-auto text-xs text-muted-foreground">{{ auditLogs.length }} event(s)</span>
+                <span
+                    v-if="auditLogs"
+                    class="ml-auto text-xs text-muted-foreground"
+                    >{{ auditLogs.length }} event(s)</span
+                >
             </div>
 
             <template v-if="auditLogs != null">
-                <div v-if="auditLogs.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">
+                <div
+                    v-if="auditLogs.length === 0"
+                    class="px-4 py-8 text-center text-sm text-muted-foreground"
+                >
                     No audit events recorded.
                 </div>
-                <ul v-else class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                    <li v-for="log in auditLogs" :key="log.id" class="flex items-start gap-3 px-4 py-3 text-sm">
-                        <span class="mt-0.5 size-2 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-muted/30" />
+                <ul
+                    v-else
+                    class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
+                >
+                    <li
+                        v-for="log in auditLogs"
+                        :key="log.id"
+                        class="flex items-start gap-3 px-4 py-3 text-sm"
+                    >
+                        <span
+                            class="mt-0.5 size-2 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-muted/30"
+                        />
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="font-medium capitalize">{{ log.event.replace(/_/g, ' ') }}</span>
-                                <span v-if="log.user" class="text-muted-foreground">by {{ log.user.name }}</span>
+                                <span class="font-medium capitalize">{{
+                                    log.event.replace(/_/g, ' ')
+                                }}</span>
+                                <span
+                                    v-if="log.user"
+                                    class="text-muted-foreground"
+                                    >by {{ log.user.name }}</span
+                                >
                             </div>
-                            <div v-if="log.payload && Object.keys(log.payload).length" class="mt-1 rounded-md bg-muted/50 px-2 py-1 font-mono text-xs text-muted-foreground">
-                                <span v-for="(val, key) in log.payload" :key="String(key)">
+                            <div
+                                v-if="
+                                    log.payload &&
+                                    Object.keys(log.payload).length
+                                "
+                                class="mt-1 rounded-md bg-muted/50 px-2 py-1 font-mono text-xs text-muted-foreground"
+                            >
+                                <span
+                                    v-for="(val, key) in log.payload"
+                                    :key="String(key)"
+                                >
                                     {{ key }}: {{ String(val) }}
                                 </span>
                             </div>
                         </div>
                         <span class="shrink-0 text-xs text-muted-foreground">
-                            {{ log.created_at ? new Date(log.created_at).toLocaleString() : '—' }}
+                            {{
+                                log.created_at
+                                    ? new Date(log.created_at).toLocaleString()
+                                    : '—'
+                            }}
                         </span>
                     </li>
                 </ul>
             </template>
             <template v-else>
                 <div class="flex flex-col gap-2 p-4">
-                    <div v-for="n in 3" :key="n" class="h-10 animate-pulse rounded bg-muted" />
+                    <div
+                        v-for="n in 3"
+                        :key="n"
+                        class="h-10 animate-pulse rounded bg-muted"
+                    />
                 </div>
             </template>
         </div>
@@ -1885,7 +2508,9 @@ onUnmounted(() => {
                 <DialogHeader>
                     <DialogTitle>Reassign Sub-Contractor</DialogTitle>
                     <DialogDescription>
-                        This will clear all submitted data and reset the assignment to PENDING. The new sub-contractor must fill everything from scratch.
+                        This will clear all submitted data and reset the
+                        assignment to PENDING. The new sub-contractor must fill
+                        everything from scratch.
                     </DialogDescription>
                 </DialogHeader>
                 <div class="grid gap-3 py-2">
@@ -1904,14 +2529,24 @@ onUnmounted(() => {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="reassignForm.errors.subcontractor_id" />
+                    <InputError
+                        :message="reassignForm.errors.subcontractor_id"
+                    />
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" type="button" @click="reassignOpen = false">Cancel</Button>
+                    <Button
+                        variant="outline"
+                        type="button"
+                        @click="reassignOpen = false"
+                        >Cancel</Button
+                    >
                     <Button
                         type="button"
                         variant="destructive"
-                        :disabled="reassignForm.processing || !reassignForm.subcontractor_id"
+                        :disabled="
+                            reassignForm.processing ||
+                            !reassignForm.subcontractor_id
+                        "
                         @click="submitReassign"
                     >
                         Confirm Reassign
@@ -1926,8 +2561,9 @@ onUnmounted(() => {
                 <DialogHeader>
                     <DialogTitle>Archive Assignment?</DialogTitle>
                     <DialogDescription>
-                        This assignment will be marked as <strong>DROPPED</strong> and hidden from the active list.
-                        You can restore it later from this page.
+                        This assignment will be marked as
+                        <strong>DROPPED</strong> and hidden from the active
+                        list. You can restore it later from this page.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
@@ -1945,7 +2581,11 @@ onUnmounted(() => {
                         :disabled="dropForm.processing"
                         @click="confirmDrop"
                     >
-                        {{ dropForm.processing ? 'Archiving…' : 'Archive Assignment' }}
+                        {{
+                            dropForm.processing
+                                ? 'Archiving…'
+                                : 'Archive Assignment'
+                        }}
                     </Button>
                 </DialogFooter>
             </DialogContent>

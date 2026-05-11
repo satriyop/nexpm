@@ -39,8 +39,13 @@ const isReadOnly = computed(() =>
         <!-- Header -->
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-semibold">{{ assignment.site.location_name }}</h1>
-                <p class="text-sm text-muted-foreground">{{ assignment.site.site_code }} · {{ assignment.site.city }}, {{ assignment.site.province }}</p>
+                <h1 class="text-2xl font-semibold">
+                    {{ assignment.site.location_name }}
+                </h1>
+                <p class="text-sm text-muted-foreground">
+                    {{ assignment.site.site_code }} ·
+                    {{ assignment.site.city }}, {{ assignment.site.province }}
+                </p>
             </div>
             <div class="flex items-center gap-2">
                 <ActivityTypeBadge :activity-type="assignment.activity_type" />
@@ -49,32 +54,54 @@ const isReadOnly = computed(() =>
         </div>
 
         <!-- Activity stepper -->
-        <AssignmentStepper :activity-type="assignment.activity_type" :status="assignment.status" />
+        <AssignmentStepper
+            :activity-type="assignment.activity_type"
+            :status="assignment.status"
+        />
 
         <!-- Revision alert -->
-        <Alert v-if="assignment.status === 'REVISION'" variant="destructive" class="border-amber-300 bg-amber-50 text-amber-800">
+        <Alert
+            v-if="assignment.status === 'REVISION'"
+            variant="destructive"
+            class="border-amber-300 bg-amber-50 text-amber-800"
+        >
             <AlertTriangle class="h-4 w-4 !text-amber-600" />
             <AlertDescription class="space-y-2">
                 <p class="font-semibold">Revision Requested</p>
-                <p class="whitespace-pre-wrap text-sm leading-relaxed">{{ assignment.revision_comment }}</p>
+                <p class="text-sm leading-relaxed whitespace-pre-wrap">
+                    {{ assignment.revision_comment }}
+                </p>
             </AlertDescription>
         </Alert>
 
         <!-- Locked state -->
-        <Alert v-if="isLocked" class="border-yellow-300 bg-yellow-50 text-yellow-800">
+        <Alert
+            v-if="isLocked"
+            class="border-yellow-300 bg-yellow-50 text-yellow-800"
+        >
             <Lock class="h-4 w-4 !text-yellow-600" />
             <AlertDescription>
-                This assignment is locked pending Work Order assignment from Admin. Please wait until the WO Number is assigned.
+                This assignment is locked pending Work Order assignment from
+                Admin. Please wait until the WO Number is assigned.
             </AlertDescription>
         </Alert>
 
         <!-- Verified / Reported / Dropped state -->
-        <Alert v-else-if="isReadOnly" class="border-green-300 bg-green-50 text-green-800">
+        <Alert
+            v-else-if="isReadOnly"
+            class="border-green-300 bg-green-50 text-green-800"
+        >
             <CheckCircle class="h-4 w-4 !text-green-600" />
             <AlertDescription>
                 This assignment has been
-                <strong>{{ assignment.status === 'VERIFIED' ? 'verified' : assignment.status === 'REPORTED' ? 'reported' : 'dropped' }}</strong>.
-                No further changes can be made.
+                <strong>{{
+                    assignment.status === 'VERIFIED'
+                        ? 'verified'
+                        : assignment.status === 'REPORTED'
+                          ? 'reported'
+                          : 'dropped'
+                }}</strong
+                >. No further changes can be made.
             </AlertDescription>
         </Alert>
 
