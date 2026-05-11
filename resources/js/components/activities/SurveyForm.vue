@@ -9,9 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import type { Assignment } from '@/types';
+import type { Assignment, AssignmentSurveyData } from '@/types';
 
 const props = defineProps<{
     assignment: Assignment;
@@ -42,26 +48,86 @@ const surveyForm = useForm({
 function submitSurvey() {
     surveyForm.post(SubActions.updateSurveyData(props.assignment).url, {
         forceFormData: true,
-        onSuccess: () => surveyForm.reset('photo_overall_site', 'photo_parking_evcs', 'photo_access_route', 'photo_pln_network', 'photo_satellite_gmaps', 'file_mockup_3d', 'file_site_plan', 'file_ba_survey'),
+        onSuccess: () =>
+            surveyForm.reset(
+                'photo_overall_site',
+                'photo_parking_evcs',
+                'photo_access_route',
+                'photo_pln_network',
+                'photo_satellite_gmaps',
+                'file_mockup_3d',
+                'file_site_plan',
+                'file_ba_survey',
+            ),
     });
 }
 
 function storageUrl(path: string) {
-    if (!path) return '#';
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (!path) {
+        return '#';
+    }
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+
     return `/storage/${path}`;
 }
 
-const photoFields = computed(() => [
-    { key: 'photo_overall_site', label: 'Foto Tampak Keseluruhan Site', isImage: true },
-    { key: 'photo_parking_evcs', label: 'Foto Lahan Parkir EVCS / Lokasi BSS', isImage: true },
-    { key: 'photo_access_route', label: 'Foto Jalur Akses Menuju Lokasi', isImage: true },
-    { key: 'photo_pln_network', label: 'Foto Jaringan PLN Terdekat', isImage: true },
-    { key: 'photo_satellite_gmaps', label: 'Foto Satelit GMaps', isImage: true },
+type SurveyUploadKey = Extract<
+    keyof AssignmentSurveyData,
+    | 'photo_overall_site'
+    | 'photo_parking_evcs'
+    | 'photo_access_route'
+    | 'photo_pln_network'
+    | 'photo_satellite_gmaps'
+    | 'file_mockup_3d'
+    | 'file_site_plan'
+    | 'file_ba_survey'
+>;
+
+interface SurveyUploadField {
+    key: SurveyUploadKey;
+    label: string;
+    isImage: boolean;
+}
+
+const photoFields = computed<SurveyUploadField[]>(() => [
+    {
+        key: 'photo_overall_site',
+        label: 'Foto Tampak Keseluruhan Site',
+        isImage: true,
+    },
+    {
+        key: 'photo_parking_evcs',
+        label: 'Foto Lahan Parkir EVCS / Lokasi BSS',
+        isImage: true,
+    },
+    {
+        key: 'photo_access_route',
+        label: 'Foto Jalur Akses Menuju Lokasi',
+        isImage: true,
+    },
+    {
+        key: 'photo_pln_network',
+        label: 'Foto Jaringan PLN Terdekat',
+        isImage: true,
+    },
+    {
+        key: 'photo_satellite_gmaps',
+        label: 'Foto Satelit GMaps',
+        isImage: true,
+    },
     { key: 'file_mockup_3d', label: 'Mock Up 3D', isImage: false },
     { key: 'file_site_plan', label: 'Site Plan', isImage: false },
     { key: 'file_ba_survey', label: 'BA Survey', isImage: false },
 ]);
+
+function currentUploadUrl(key: SurveyUploadKey): string | null {
+    const path = props.assignment.survey_data?.[key];
+
+    return path ? storageUrl(path) : null;
+}
 </script>
 
 <template>
@@ -74,23 +140,46 @@ const photoFields = computed(() => [
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="grid gap-1.5">
                         <Label>Surveyor Name</Label>
-                        <Input v-model="surveyForm.surveyor_name" :disabled="isReadOnly" placeholder="Nama Surveyor" />
-                        <InputError :message="surveyForm.errors.surveyor_name" />
+                        <Input
+                            v-model="surveyForm.surveyor_name"
+                            :disabled="isReadOnly"
+                            placeholder="Nama Surveyor"
+                        />
+                        <InputError
+                            :message="surveyForm.errors.surveyor_name"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label>PIC Location Name</Label>
-                        <Input v-model="surveyForm.pic_location_name" :disabled="isReadOnly" placeholder="Nama PIC Lokasi" />
-                        <InputError :message="surveyForm.errors.pic_location_name" />
+                        <Input
+                            v-model="surveyForm.pic_location_name"
+                            :disabled="isReadOnly"
+                            placeholder="Nama PIC Lokasi"
+                        />
+                        <InputError
+                            :message="surveyForm.errors.pic_location_name"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label>PIC Location Phone</Label>
-                        <Input v-model="surveyForm.pic_location_phone" :disabled="isReadOnly" placeholder="No. HP PIC" />
-                        <InputError :message="surveyForm.errors.pic_location_phone" />
+                        <Input
+                            v-model="surveyForm.pic_location_phone"
+                            :disabled="isReadOnly"
+                            placeholder="No. HP PIC"
+                        />
+                        <InputError
+                            :message="surveyForm.errors.pic_location_phone"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Charger Type</Label>
-                        <Select v-model="surveyForm.charger_type" :disabled="isReadOnly">
-                            <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                        <Select
+                            v-model="surveyForm.charger_type"
+                            :disabled="isReadOnly"
+                        >
+                            <SelectTrigger
+                                ><SelectValue placeholder="Select type"
+                            /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="EVCS">EVCS</SelectItem>
                                 <SelectItem value="BSS">BSS</SelectItem>
@@ -100,24 +189,46 @@ const photoFields = computed(() => [
                     </div>
                     <div class="grid gap-1.5">
                         <Label>SS Schedule Date (w/ Landlord)</Label>
-                        <Input v-model="surveyForm.ss_schedule_date" type="date" :disabled="isReadOnly" />
-                        <InputError :message="surveyForm.errors.ss_schedule_date" />
+                        <Input
+                            v-model="surveyForm.ss_schedule_date"
+                            type="date"
+                            :disabled="isReadOnly"
+                        />
+                        <InputError
+                            :message="surveyForm.errors.ss_schedule_date"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Cable Pulling Type</Label>
-                        <Select v-model="surveyForm.cable_pulling_type" :disabled="isReadOnly">
-                            <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                        <Select
+                            v-model="surveyForm.cable_pulling_type"
+                            :disabled="isReadOnly"
+                        >
+                            <SelectTrigger
+                                ><SelectValue placeholder="Select type"
+                            /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="New Power">New Power</SelectItem>
-                                <SelectItem value="Existing Power">Existing Power</SelectItem>
+                                <SelectItem value="New Power"
+                                    >New Power</SelectItem
+                                >
+                                <SelectItem value="Existing Power"
+                                    >Existing Power</SelectItem
+                                >
                             </SelectContent>
                         </Select>
-                        <InputError :message="surveyForm.errors.cable_pulling_type" />
+                        <InputError
+                            :message="surveyForm.errors.cable_pulling_type"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Power / Daya (kVA)</Label>
-                        <Select v-model="surveyForm.power_kva" :disabled="isReadOnly">
-                            <SelectTrigger><SelectValue placeholder="Select power" /></SelectTrigger>
+                        <Select
+                            v-model="surveyForm.power_kva"
+                            :disabled="isReadOnly"
+                        >
+                            <SelectTrigger
+                                ><SelectValue placeholder="Select power"
+                            /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="7.7kVA">7.7 kVA</SelectItem>
                                 <SelectItem value="22kVA">22 kVA</SelectItem>
@@ -128,18 +239,29 @@ const photoFields = computed(() => [
                     </div>
                     <div class="grid gap-1.5">
                         <Label>PLN Network Type</Label>
-                        <Select v-model="surveyForm.pln_network_type" :disabled="isReadOnly">
-                            <SelectTrigger><SelectValue placeholder="Select phase" /></SelectTrigger>
+                        <Select
+                            v-model="surveyForm.pln_network_type"
+                            :disabled="isReadOnly"
+                        >
+                            <SelectTrigger
+                                ><SelectValue placeholder="Select phase"
+                            /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="1 Phase">1 Phase</SelectItem>
                                 <SelectItem value="3 Phase">3 Phase</SelectItem>
                             </SelectContent>
                         </Select>
-                        <InputError :message="surveyForm.errors.pln_network_type" />
+                        <InputError
+                            :message="surveyForm.errors.pln_network_type"
+                        />
                     </div>
                     <div class="grid gap-1.5">
                         <Label>Parking Slot</Label>
-                        <Input v-model="surveyForm.parking_slot" :disabled="isReadOnly" placeholder="e.g. B1-12" />
+                        <Input
+                            v-model="surveyForm.parking_slot"
+                            :disabled="isReadOnly"
+                            placeholder="e.g. B1-12"
+                        />
                         <InputError :message="surveyForm.errors.parking_slot" />
                     </div>
                 </div>
@@ -150,13 +272,15 @@ const photoFields = computed(() => [
                         v-model="surveyForm.additional_info"
                         :disabled="isReadOnly"
                         rows="3"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                         placeholder="Tambahan Informasi Lain-Lain"
                     />
                 </div>
 
                 <Separator />
-                <p class="text-sm font-medium text-muted-foreground">Photos & Files</p>
+                <p class="text-sm font-medium text-muted-foreground">
+                    Photos & Files
+                </p>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <template v-for="field in photoFields" :key="field.key">
@@ -165,26 +289,36 @@ const photoFields = computed(() => [
                             <PhotoUpload
                                 v-if="field.isImage"
                                 :model-value="(surveyForm as any)[field.key]"
-                                :current-url="assignment.survey_data?.[field.key as keyof typeof assignment.survey_data] ? storageUrl(String(assignment.survey_data[field.key as keyof typeof assignment.survey_data])) : null"
+                                :current-url="currentUploadUrl(field.key)"
                                 :readonly="isReadOnly"
-                                @update:model-value="(surveyForm as any)[field.key] = $event"
+                                @update:model-value="
+                                    (surveyForm as any)[field.key] = $event
+                                "
                             />
                             <FileUpload
                                 v-else
                                 :model-value="(surveyForm as any)[field.key]"
-                                :current-url="assignment.survey_data?.[field.key as keyof typeof assignment.survey_data] ? storageUrl(String(assignment.survey_data[field.key as keyof typeof assignment.survey_data])) : null"
+                                :current-url="currentUploadUrl(field.key)"
                                 accept=".pdf,.doc,.docx,image/*"
                                 :readonly="isReadOnly"
-                                @update:model-value="(surveyForm as any)[field.key] = $event"
+                                @update:model-value="
+                                    (surveyForm as any)[field.key] = $event
+                                "
                             />
-                            <InputError :message="(surveyForm.errors as any)[field.key]" />
+                            <InputError
+                                :message="(surveyForm.errors as any)[field.key]"
+                            />
                         </div>
                     </template>
                 </div>
 
                 <div v-if="!isReadOnly" class="flex justify-end pt-2">
                     <Button type="submit" :disabled="surveyForm.processing">
-                        {{ surveyForm.processing ? 'Saving…' : 'Save Survey Data' }}
+                        {{
+                            surveyForm.processing
+                                ? 'Saving…'
+                                : 'Save Survey Data'
+                        }}
                     </Button>
                 </div>
             </form>

@@ -115,6 +115,21 @@ test('completing BAST data after revision auto-flips status back to COMPLETED', 
     expect($assignment->refresh()->status)->toBe(AssignmentStatus::Completed);
 });
 
+test('survey revision is not a valid admin revision action', function () {
+    $admin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $assignment = Assignment::factory()->survey()->create([
+        'status' => AssignmentStatus::Document,
+    ]);
+
+    $response = $this->actingAs($admin)->post(route('admin.assignments.revise', $assignment), [
+        'revision_comment' => 'Please revise the survey photos.',
+    ]);
+
+    $response->assertUnprocessable();
+
+    expect($assignment->refresh()->status)->toBe(AssignmentStatus::Document);
+});
+
 test('construction assignment is locked when wo number missing', function () {
     $assignment = Assignment::factory()->construction()->create();
 

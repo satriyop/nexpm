@@ -1,6 +1,6 @@
 # NexPM — Entity Relationship Diagram
 
-**Last updated:** 2026-04-29
+**Last updated:** 2026-05-11
 
 ---
 
@@ -10,14 +10,6 @@
 erDiagram
 
     %% ── Configurable lookup tables ──────────────────────────────────
-
-    SUBCONTRACTOR_TYPES {
-        bigint id PK
-        string name
-        json activity_types "nullable — which ActivityType values this type handles; null = all"
-        timestamps created_at
-        timestamps updated_at
-    }
 
     SITE_TYPES {
         bigint id PK
@@ -41,6 +33,7 @@ erDiagram
         string phone
         string email
         string pic
+        string logo
         timestamps created_at
         timestamps updated_at
     }
@@ -52,6 +45,7 @@ erDiagram
         string phone
         string email
         string pic
+        string logo
         timestamps created_at
         timestamps updated_at
     }
@@ -88,9 +82,7 @@ erDiagram
         decimal cable_length_to_panel
         decimal cable_length_panel_to_charger
         int charging_station_count
-        date ss_report_submission_date
         string ssr_url
-        date bpujl_date_acquired
         string nidi_slo_bpujl_url
         string sik_url
         text latest_remark
@@ -118,7 +110,6 @@ erDiagram
     SUBCONTRACTORS {
         bigint id PK
         bigint main_contractor_id FK
-        bigint subcontractor_type_id FK
         string name
         string phone
         string email
@@ -137,7 +128,10 @@ erDiagram
         string name
         string email UK
         string password
-        enum role "super_admin|admin|subcontractor|client"
+        enum role "super_admin|admin|subcontractor"
+        text two_factor_secret
+        text two_factor_recovery_codes
+        timestamp two_factor_confirmed_at
         timestamps created_at
         timestamps updated_at
     }
@@ -149,10 +143,22 @@ erDiagram
         bigint site_id FK
         bigint subcontractor_id FK
         enum activity_type "SURVEY|PLN_CONNECTION|CONSTRUCTION|BAST"
-        enum status "PENDING|COMPLETED|REVISION|VERIFIED|REPORTED"
+        enum status "PENDING|DROP|VERIFIED|REPORTED|SURVEY|DOCUMENT|CONSTRUCTION|MACHINE_ONSITE|DONE|LIVE|REGISTRATION|BILLING|CONNECTION|KWH_DONE|COMPLETED|REVISION"
         text revision_comment "nullable"
+        timestamp verified_at "nullable"
+        bigint verified_by FK "nullable → users.id"
+        timestamp reported_at "nullable"
         timestamps created_at
         timestamps updated_at
+    }
+
+    ASSIGNMENT_AUDIT_LOGS {
+        bigint id PK
+        bigint assignment_id FK
+        bigint user_id FK
+        string event
+        json payload
+        timestamp created_at
     }
 
     %% ── Assignment data tables (one per activity type) ─────────────
@@ -160,6 +166,7 @@ erDiagram
     ASSIGNMENT_SURVEY_DATA {
         bigint id PK
         bigint assignment_id FK UK
+        string ss_wo_number
         string surveyor_name
         string pic_location_name
         string pic_location_phone
@@ -171,12 +178,14 @@ erDiagram
         text additional_info
         string photo_overall_site
         string photo_parking_evcs
-        string photo_other_angle
+        string photo_access_route
         string photo_pln_network
         string photo_satellite_gmaps
         string file_mockup_3d
+        string file_site_plan
         string file_ba_survey
         string parking_slot
+        date ss_report_submission_date
         timestamps created_at
         timestamps updated_at
     }
@@ -190,9 +199,13 @@ erDiagram
         string file_slo
         string file_nidi
         string file_reg
+        string file_pk
         date kwh_meter_installation_date
         string id_pelanggan
         text catatan_progres
+        date email_bpujl_req_date
+        date bpujl_acquired_date
+        string foto_kwh
         timestamps created_at
         timestamps updated_at
     }
@@ -206,7 +219,10 @@ erDiagram
         date cons_actual_start_date
         date cons_actual_done_date
         string machine_serial_number
+        string foto_machine_sn
         text catatan_progres
+        date go_live_date_pln
+        date go_live_date_pln_pass
         timestamps created_at
         timestamps updated_at
     }
@@ -243,23 +259,38 @@ erDiagram
         timestamps updated_at
     }
 
+    ASSIGNMENT_BAST_PHOTOS {
+        bigint id PK
+        bigint assignment_bast_data_id FK
+        string section
+        string checkpoint_key
+        string photo_path
+        timestamps created_at
+        timestamps updated_at
+    }
+
     %% ── Reports ─────────────────────────────────────────────────────
 
     REPORTS {
         bigint id PK
-        bigint project_id FK
-        bigint created_by FK "→ users.id"
-        string title
-        string file_path
-        timestamp exported_at
+        string name
+        string report_type "SSR|BAST|DAILY"
+        bigint exported_by FK "→ users.id"
         timestamps created_at
         timestamps updated_at
     }
 
     REPORT_ASSIGNMENTS {
-        bigint id PK
         bigint report_id FK
         bigint assignment_id FK
+    }
+
+    APP_SETTINGS {
+        bigint id PK
+        string key UK
+        text value
+        timestamps created_at
+        timestamps updated_at
     }
 
     %% ── Notifications ───────────────────────────────────────────────
@@ -291,9 +322,10 @@ erDiagram
     SITES ||--o{ SITE_PHOTOS : "has many"
     SITES ||--o{ ASSIGNMENTS : "has many assignments"
 
-    SUBCONTRACTOR_TYPES ||--o{ SUBCONTRACTORS : "classifies"
     SUBCONTRACTORS ||--o{ ASSIGNMENTS : "assigned to"
     SUBCONTRACTORS ||--|| USERS : "has one user account"
+    USERS ||--o{ ASSIGNMENTS : "verifies"
+    USERS ||--o{ ASSIGNMENT_AUDIT_LOGS : "creates"
 
     ASSIGNMENTS ||--o| ASSIGNMENT_SURVEY_DATA : "has one"
     ASSIGNMENTS ||--o| ASSIGNMENT_PLN_DATA : "has one"
@@ -301,8 +333,10 @@ erDiagram
     ASSIGNMENTS ||--o| ASSIGNMENT_BAST_DATA : "has one"
 
     ASSIGNMENT_CONSTRUCTION_DATA ||--o{ ASSIGNMENT_CONSTRUCTION_PHOTOS : "has many"
+    ASSIGNMENT_BAST_DATA ||--o{ ASSIGNMENT_BAST_PHOTOS : "has many"
+    ASSIGNMENTS ||--o{ ASSIGNMENT_AUDIT_LOGS : "logs"
 
-    PROJECTS ||--o{ REPORTS : "has many"
+    USERS ||--o{ REPORTS : "exports"
     REPORTS ||--o{ REPORT_ASSIGNMENTS : "includes"
     ASSIGNMENTS ||--o{ REPORT_ASSIGNMENTS : "included in"
 ```
@@ -314,22 +348,22 @@ erDiagram
 ### 1. Activity Data in Separate Tables
 Each activity type (Survey, PLN, Construction, BAST) stores its form data in a dedicated table (`assignment_survey_data`, `assignment_pln_data`, etc.), linked 1-to-1 with `assignments`.
 
-**Why:** BAST alone has ~50 fields. Merging all activity fields into one table would create a massive, sparse table. Separate tables let each activity schema evolve independently without impacting others.
+**Why:** BAST and the other activities have distinct data shapes. Merging all activity fields into one table would create a sparse table. Separate tables let each activity schema evolve independently without impacting others.
 
 ### 2. MainContractor as Tenant
-All sensitive entities (Projects, Sites, Sub-Contractors, Users) carry a `main_contractor_id`. Queries are always scoped to the authenticated user's Main Contractor.
+Tenant ownership is anchored on `main_contractor_id`. Projects, Clients, Subcontractors, and Users carry it directly; Sites inherit tenant scope through their Project. Queries are scoped to the authenticated user's Main Contractor, with Super Admin allowed cross-tenant access.
 
 **Why:** Super Admin manages nex, VGT, and future Main Contractors in one system — but each company's data must stay isolated.
 
 ### 3. Configurable Type Tables
-`subcontractor_types`, `site_types`, and `machine_types` are database-driven lookup tables, not hardcoded enums.
+`site_types` and `machine_types` are database-driven lookup tables, not hardcoded enums.
 
-**Why:** Super Admin must be able to add new types (e.g., a new specialist sub-con category) without a code deployment.
+**Why:** Site and machine classifications need to be adjusted without a code deployment. `subcontractor_types` has been removed in the current implementation.
 
 ### 4. Assignment Status as Enum on Assignments Table
 Status lives directly on the `assignments` row rather than in a separate status-history table.
 
-**Why:** Current requirements only need the current status. A status audit log can be added later via an observer/event if needed.
+**Why:** Current screens mostly need the current state, while `assignment_audit_logs` records major admin events such as verification, revision, drop, restore, reassignment, and edits.
 
 ### 5. Construction Assignment Prerequisite Lock
 The `cons_wo_number` field in `assignment_construction_data` being null means the assignment is locked for the sub-con. Admin fills it first.
@@ -337,12 +371,11 @@ The `cons_wo_number` field in `assignment_construction_data` being null means th
 **Why:** Construction cannot begin without a Work Order number issued by the admin — this is a real-world dependency encoded in the schema.
 
 ### 6. Activity Scope is Implicit, Not Configured
-A site's activity scope is defined by which assignments exist on it — not by a configuration field on Project or MainContractor. A site may have 1–4 assignments covering any combination of activity types. This means "site complete" = all existing assignments are VERIFIED, not all 4 types.
+A site's activity scope is defined by which assignments exist on it — not by a configuration field on Project or MainContractor. A site may have 1–4 assignments covering any combination of activity types. This means "site complete" = all existing active assignments are verified or reported, not all 4 types.
 
-The `subcontractor_types.activity_types` column formalizes which activity types each sub-contractor type can handle (Construction → SURVEY/CONSTRUCTION/BAST; PLN → PLN_CONNECTION). The system enforces this at assignment time (CSV import and reassign) to prevent mismatched assignments.
+The current implementation scopes selectable subcontractors by Main Contractor. It does not enforce activity compatibility by subcontractor type because that table/column no longer exists.
 
 ### 7. Reports via Junction Table
 `report_assignments` is a many-to-many join between a Report and the Assignments it includes.
 
 **Why:** Admin selects specific verified assignments per export. One assignment could theoretically appear in multiple historical reports.
-```

@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('reports', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('report_type')->default('BAST');
             $table->foreignId('exported_by')->constrained('users');
             $table->timestamps();
         });

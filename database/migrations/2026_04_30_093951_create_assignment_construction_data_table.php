@@ -17,7 +17,10 @@ return new class extends Migration
             $table->date('cons_actual_start_date')->nullable();
             $table->date('cons_actual_done_date')->nullable();
             $table->string('machine_serial_number')->nullable();
+            $table->string('foto_machine_sn')->nullable();
             $table->text('catatan_progres')->nullable();
+            $table->date('go_live_date_pln')->nullable();
+            $table->date('go_live_date_pln_pass')->nullable();
             $table->timestamps();
         });
     }

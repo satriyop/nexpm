@@ -16,21 +16,29 @@ const props = defineProps<{
 }>();
 
 const constructionForm = useForm({
-    cons_actual_start_date: props.assignment.construction_data?.cons_actual_start_date ?? '',
-    cons_actual_done_date: props.assignment.construction_data?.cons_actual_done_date ?? '',
-    machine_serial_number: props.assignment.construction_data?.machine_serial_number ?? '',
+    cons_actual_start_date:
+        props.assignment.construction_data?.cons_actual_start_date ?? '',
+    cons_actual_done_date:
+        props.assignment.construction_data?.cons_actual_done_date ?? '',
+    machine_serial_number:
+        props.assignment.construction_data?.machine_serial_number ?? '',
     catatan_progres: props.assignment.construction_data?.catatan_progres ?? '',
 });
 
 function submitConstruction() {
-    constructionForm.patch(SubActions.updateConstructionData(props.assignment).url);
+    constructionForm.patch(
+        SubActions.updateConstructionData(props.assignment).url,
+    );
 }
 
 const uploadingPhoto = ref(false);
 const constructionUploadKey = ref(0);
 
 function onConstructionPhotoSelected(file: File | null) {
-    if (!file) return;
+    if (!file) {
+        return;
+    }
+
     const form = useForm({ photo: file });
     uploadingPhoto.value = true;
     form.post(SubActions.storeConstructionPhoto(props.assignment).url, {
@@ -44,12 +52,23 @@ function onConstructionPhotoSelected(file: File | null) {
 
 function destroyConstructionPhoto(photoId: number) {
     const form = useForm({});
-    form.delete(SubActions.destroyConstructionPhoto(props.assignment, photoId).url);
+    form.delete(
+        SubActions.destroyConstructionPhoto({
+            assignment: props.assignment.id,
+            photo: photoId,
+        }).url,
+    );
 }
 
 function storageUrl(path: string) {
-    if (!path) return '#';
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (!path) {
+        return '#';
+    }
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
+
     return `/storage/${path}`;
 }
 </script>
@@ -59,21 +78,44 @@ function storageUrl(path: string) {
         <!-- Admin fields (read-only) -->
         <Card class="border-muted bg-muted/30">
             <CardHeader>
-                <CardTitle class="text-base text-muted-foreground">Work Order (filled by Admin)</CardTitle>
+                <CardTitle class="text-base text-muted-foreground"
+                    >Work Order (filled by Admin)</CardTitle
+                >
             </CardHeader>
             <CardContent>
-                <dl class="grid gap-3 sm:grid-cols-3 text-sm">
+                <dl class="grid gap-3 text-sm sm:grid-cols-3">
                     <div>
-                        <dt class="font-medium text-muted-foreground">WO Number</dt>
-                        <dd>{{ assignment.construction_data?.cons_wo_number ?? '—' }}</dd>
+                        <dt class="font-medium text-muted-foreground">
+                            WO Number
+                        </dt>
+                        <dd>
+                            {{
+                                assignment.construction_data?.cons_wo_number ??
+                                '—'
+                            }}
+                        </dd>
                     </div>
                     <div>
-                        <dt class="font-medium text-muted-foreground">Project Status</dt>
-                        <dd>{{ assignment.construction_data?.project_status ?? '—' }}</dd>
+                        <dt class="font-medium text-muted-foreground">
+                            Project Status
+                        </dt>
+                        <dd>
+                            {{
+                                assignment.construction_data?.project_status ??
+                                '—'
+                            }}
+                        </dd>
                     </div>
                     <div>
-                        <dt class="font-medium text-muted-foreground">Setup Approval Date</dt>
-                        <dd>{{ assignment.construction_data?.setup_approval_date ?? '—' }}</dd>
+                        <dt class="font-medium text-muted-foreground">
+                            Setup Approval Date
+                        </dt>
+                        <dd>
+                            {{
+                                assignment.construction_data
+                                    ?.setup_approval_date ?? '—'
+                            }}
+                        </dd>
                     </div>
                 </dl>
             </CardContent>
@@ -89,18 +131,47 @@ function storageUrl(path: string) {
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div class="grid gap-1.5">
                             <Label>Actual Start Date</Label>
-                            <Input v-model="constructionForm.cons_actual_start_date" type="date" :disabled="isReadOnly" />
-                            <InputError :message="constructionForm.errors.cons_actual_start_date" />
+                            <Input
+                                v-model="
+                                    constructionForm.cons_actual_start_date
+                                "
+                                type="date"
+                                :disabled="isReadOnly"
+                            />
+                            <InputError
+                                :message="
+                                    constructionForm.errors
+                                        .cons_actual_start_date
+                                "
+                            />
                         </div>
                         <div class="grid gap-1.5">
                             <Label>Actual Done Date</Label>
-                            <Input v-model="constructionForm.cons_actual_done_date" type="date" :disabled="isReadOnly" />
-                            <InputError :message="constructionForm.errors.cons_actual_done_date" />
+                            <Input
+                                v-model="constructionForm.cons_actual_done_date"
+                                type="date"
+                                :disabled="isReadOnly"
+                            />
+                            <InputError
+                                :message="
+                                    constructionForm.errors
+                                        .cons_actual_done_date
+                                "
+                            />
                         </div>
                         <div class="grid gap-1.5 sm:col-span-2">
                             <Label>Machine Serial Number</Label>
-                            <Input v-model="constructionForm.machine_serial_number" :disabled="isReadOnly" placeholder="Machine SN" />
-                            <InputError :message="constructionForm.errors.machine_serial_number" />
+                            <Input
+                                v-model="constructionForm.machine_serial_number"
+                                :disabled="isReadOnly"
+                                placeholder="Machine SN"
+                            />
+                            <InputError
+                                :message="
+                                    constructionForm.errors
+                                        .machine_serial_number
+                                "
+                            />
                         </div>
                     </div>
                     <div class="grid gap-1.5">
@@ -109,13 +180,20 @@ function storageUrl(path: string) {
                             v-model="constructionForm.catatan_progres"
                             :disabled="isReadOnly"
                             rows="3"
-                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                             placeholder="Progress notes…"
                         />
                     </div>
                     <div v-if="!isReadOnly" class="flex justify-end">
-                        <Button type="submit" :disabled="constructionForm.processing">
-                            {{ constructionForm.processing ? 'Saving…' : 'Save Construction Data' }}
+                        <Button
+                            type="submit"
+                            :disabled="constructionForm.processing"
+                        >
+                            {{
+                                constructionForm.processing
+                                    ? 'Saving…'
+                                    : 'Save Construction Data'
+                            }}
                         </Button>
                     </div>
                 </form>
@@ -128,15 +206,22 @@ function storageUrl(path: string) {
                 <CardTitle>Progress Photos</CardTitle>
             </CardHeader>
             <CardContent class="space-y-4">
-                <div v-if="assignment.construction_data?.construction_photos?.length" class="flex flex-wrap gap-3">
+                <div
+                    v-if="
+                        assignment.construction_data?.construction_photos
+                            ?.length
+                    "
+                    class="flex flex-wrap gap-3"
+                >
                     <div
-                        v-for="photo in assignment.construction_data.construction_photos"
+                        v-for="photo in assignment.construction_data
+                            .construction_photos"
                         :key="photo.id"
                         class="relative"
                     >
                         <img
                             :src="storageUrl(photo.path)"
-                            class="h-24 w-24 rounded object-cover border"
+                            class="h-24 w-24 rounded border object-cover"
                             alt="Progress photo"
                         />
                         <Button
@@ -144,12 +229,15 @@ function storageUrl(path: string) {
                             type="button"
                             variant="destructive"
                             size="sm"
-                            class="absolute right-1 top-1 h-6 px-2 text-xs"
+                            class="absolute top-1 right-1 h-6 px-2 text-xs"
                             @click="destroyConstructionPhoto(photo.id)"
-                        >×</Button>
+                            >×</Button
+                        >
                     </div>
                 </div>
-                <p v-else class="text-sm text-muted-foreground">No photos uploaded yet.</p>
+                <p v-else class="text-sm text-muted-foreground">
+                    No photos uploaded yet.
+                </p>
 
                 <div v-if="!isReadOnly" class="grid gap-1.5">
                     <Label>Upload Progress Photo</Label>

@@ -475,12 +475,15 @@ class TestDataSeeder extends Seeder
             ActivityType::Bast->value => 'B',
         ];
 
-        // Representative status set for combo generation (keeps site count manageable).
-        // These 5 cover: not started, activity-specific completion trigger (Document for survey),
-        // BAST revision, admin verified, and final reported state.
         $statusChar = [
             AssignmentStatus::Pending->value => 'P',
+            AssignmentStatus::Survey->value => 'S',
             AssignmentStatus::Document->value => 'D',
+            AssignmentStatus::Construction->value => 'K',
+            AssignmentStatus::Live->value => 'I',
+            AssignmentStatus::Registration->value => 'G',
+            AssignmentStatus::KwhDone->value => 'W',
+            AssignmentStatus::Completed->value => 'C',
             AssignmentStatus::Revision->value => 'X',
             AssignmentStatus::Verified->value => 'V',
             AssignmentStatus::Reported->value => 'R',
@@ -503,7 +506,7 @@ class TestDataSeeder extends Seeder
         $comboIndex = 0;
 
         foreach ($this->activitySubsets() as $activitySubset) {
-            foreach ($this->statusTuples(count($activitySubset)) as $statusTuple) {
+            foreach ($this->statusTuples($activitySubset) as $statusTuple) {
                 $actCode = implode('', array_map(fn ($a) => $activityChar[$a->value], $activitySubset));
                 $statusCode = implode('', array_map(fn ($s) => $statusChar[$s->value], $statusTuple));
                 $siteCode = "{$prefix}-{$actCode}-{$statusCode}";
@@ -579,27 +582,19 @@ class TestDataSeeder extends Seeder
     }
 
     /**
-     * Returns every k-tuple of the representative statuses (5^k tuples total).
-     * Uses Document as the "subcon fully submitted" marker to keep site count identical.
+     * Returns every status tuple for the given activity subset. Each activity gets
+     * statuses that are valid for that activity in the current workflow.
      *
      * @return AssignmentStatus[][]
      */
-    private function statusTuples(int $k): array
+    private function statusTuples(array $activitySubset): array
     {
-        $statuses = [
-            AssignmentStatus::Pending,
-            AssignmentStatus::Document,
-            AssignmentStatus::Revision,
-            AssignmentStatus::Verified,
-            AssignmentStatus::Reported,
-        ];
-
         $tuples = [[]];
 
-        for ($i = 0; $i < $k; $i++) {
+        foreach ($activitySubset as $activityType) {
             $next = [];
             foreach ($tuples as $tuple) {
-                foreach ($statuses as $status) {
+                foreach ($this->statusesForActivity($activityType) as $status) {
                     $next[] = [...$tuple, $status];
                 }
             }
@@ -607,6 +602,43 @@ class TestDataSeeder extends Seeder
         }
 
         return $tuples;
+    }
+
+    /**
+     * @return AssignmentStatus[]
+     */
+    private function statusesForActivity(ActivityType $activityType): array
+    {
+        return match ($activityType) {
+            ActivityType::Survey => [
+                AssignmentStatus::Pending,
+                AssignmentStatus::Survey,
+                AssignmentStatus::Document,
+                AssignmentStatus::Verified,
+                AssignmentStatus::Reported,
+            ],
+            ActivityType::Construction => [
+                AssignmentStatus::Pending,
+                AssignmentStatus::Construction,
+                AssignmentStatus::Live,
+                AssignmentStatus::Verified,
+                AssignmentStatus::Reported,
+            ],
+            ActivityType::PlnConnection => [
+                AssignmentStatus::Pending,
+                AssignmentStatus::Registration,
+                AssignmentStatus::KwhDone,
+                AssignmentStatus::Verified,
+                AssignmentStatus::Reported,
+            ],
+            ActivityType::Bast => [
+                AssignmentStatus::Pending,
+                AssignmentStatus::Completed,
+                AssignmentStatus::Revision,
+                AssignmentStatus::Verified,
+                AssignmentStatus::Reported,
+            ],
+        };
     }
 
     /**
@@ -625,30 +657,11 @@ class TestDataSeeder extends Seeder
         $isEvcs = $siteTypeId === $evcsTypeId;
 
         match ($activityType) {
-            ActivityType::Survey => AssignmentSurveyData::firstOrCreate(
-                ['assignment_id' => $assignment->id],
-                [
-                    'ss_wo_number' => 'SS-WO-'.str_pad($n, 6, '0', STR_PAD_LEFT),
-                    'surveyor_name' => 'Surveyor CMB-'.$n,
-                    'pic_location_name' => 'PIC Lokasi '.$n,
-                    'pic_location_phone' => '+628'.str_pad($n, 9, '0', STR_PAD_LEFT),
-                    'charger_type' => $isEvcs ? 'EVCS 22kW' : 'BSS-500',
-                    'ss_schedule_date' => now()->subDays(5)->format('Y-m-d'),
-                    'cable_pulling_type' => 'New Power',
-                    'power_kva' => '22kVA',
-                    'pln_network_type' => '3 Phase',
-                    'parking_slot' => 'CMB-'.$n,
-                    'photo_overall_site' => 'https://picsum.photos/seed/cmb'.$n.'a/800/600',
-                    'photo_parking_evcs' => 'https://picsum.photos/seed/cmb'.$n.'b/800/600',
-                    'photo_access_route' => 'https://picsum.photos/seed/cmb'.$n.'c/800/600',
-                    'photo_pln_network' => 'https://picsum.photos/seed/cmb'.$n.'d/800/600',
-                    'photo_satellite_gmaps' => 'https://picsum.photos/seed/cmb'.$n.'e/800/600',
-                ],
-            ),
+            ActivityType::Survey => $this->seedComboSurveyData($assignment, $targetStatus, $n, $isEvcs),
 
-            ActivityType::PlnConnection => $this->seedPlnData($assignment, $n),
+            ActivityType::PlnConnection => $this->seedComboPlnData($assignment, $targetStatus, $n),
 
-            ActivityType::Construction => $this->seedConstructionData($assignment, $n, false),
+            ActivityType::Construction => $this->seedComboConstructionData($assignment, $targetStatus, $n),
 
             ActivityType::Bast => $this->seedBastData(
                 $assignment, $n,
@@ -726,6 +739,75 @@ class TestDataSeeder extends Seeder
         imagedestroy($img);
 
         return $filename;
+    }
+
+    private function seedComboSurveyData(Assignment $assignment, AssignmentStatus $targetStatus, int $n, bool $isEvcs): void
+    {
+        $attributes = [
+            'ss_wo_number' => 'SS-WO-'.str_pad($n, 6, '0', STR_PAD_LEFT),
+            'ss_schedule_date' => now()->subDays(5)->format('Y-m-d'),
+        ];
+
+        if ($targetStatus !== AssignmentStatus::Survey) {
+            $attributes = [
+                ...$attributes,
+                'surveyor_name' => 'Surveyor CMB-'.$n,
+                'pic_location_name' => 'PIC Lokasi '.$n,
+                'pic_location_phone' => '+628'.str_pad($n, 9, '0', STR_PAD_LEFT),
+                'charger_type' => $isEvcs ? 'EVCS 22kW' : 'BSS-500',
+                'cable_pulling_type' => 'New Power',
+                'power_kva' => '22kVA',
+                'pln_network_type' => '3 Phase',
+                'parking_slot' => 'CMB-'.$n,
+                'photo_overall_site' => 'https://picsum.photos/seed/cmb'.$n.'a/800/600',
+                'photo_parking_evcs' => 'https://picsum.photos/seed/cmb'.$n.'b/800/600',
+                'photo_access_route' => 'https://picsum.photos/seed/cmb'.$n.'c/800/600',
+                'photo_pln_network' => 'https://picsum.photos/seed/cmb'.$n.'d/800/600',
+                'photo_satellite_gmaps' => 'https://picsum.photos/seed/cmb'.$n.'e/800/600',
+            ];
+        }
+
+        AssignmentSurveyData::firstOrCreate(
+            ['assignment_id' => $assignment->id],
+            $attributes,
+        );
+    }
+
+    private function seedComboConstructionData(Assignment $assignment, AssignmentStatus $targetStatus, int $n): void
+    {
+        if ($targetStatus === AssignmentStatus::Construction) {
+            AssignmentConstructionData::firstOrCreate(
+                ['assignment_id' => $assignment->id],
+                [
+                    'cons_wo_number' => 'WO-2026-00'.$n,
+                    'project_status' => 'On Progress',
+                    'setup_approval_date' => now()->subDays(10)->format('Y-m-d'),
+                    'cons_actual_start_date' => now()->subDays(7)->format('Y-m-d'),
+                ],
+            );
+
+            return;
+        }
+
+        $this->seedConstructionData($assignment, $n, false);
+    }
+
+    private function seedComboPlnData(Assignment $assignment, AssignmentStatus $targetStatus, int $n): void
+    {
+        if ($targetStatus === AssignmentStatus::Registration) {
+            AssignmentPlnData::firstOrCreate(
+                ['assignment_id' => $assignment->id],
+                [
+                    'file_slo' => 'https://placehold.co/600x800/png?text=SLO-'.$n,
+                    'file_nidi' => 'https://placehold.co/600x800/png?text=NIDI-'.$n,
+                    'file_reg' => 'https://placehold.co/600x800/png?text=REG-'.$n,
+                ],
+            );
+
+            return;
+        }
+
+        $this->seedPlnData($assignment, $n);
     }
 
     private function seedSurveyData(Assignment $assignment, int $n, array $scenario): void
@@ -810,6 +892,7 @@ class TestDataSeeder extends Seeder
                 'file_slo' => 'https://placehold.co/600x800/png?text=SLO-'.$n,
                 'file_nidi' => 'https://placehold.co/600x800/png?text=NIDI-'.$n,
                 'file_reg' => 'https://placehold.co/600x800/png?text=REG-'.$n,
+                'file_pk' => 'https://placehold.co/600x800/png?text=PK-'.$n,
                 'email_bpujl_req_date' => now()->subDays(15)->format('Y-m-d'),
                 'bpujl_acquired_date' => now()->subDays(10)->format('Y-m-d'),
                 'kwh_meter_installation_date' => now()->subDays(3)->format('Y-m-d'),
@@ -822,7 +905,7 @@ class TestDataSeeder extends Seeder
 
     /**
      * For COMPLETED/VERIFIED/REPORTED/REVISION statuses the BAST form was submitted,
-     * so we must also create all 9 required checkpoint photos — otherwise isComplete() returns false
+     * so we must also create all required checkpoint photos — otherwise isComplete() returns false
      * and the UI would show an inconsistent state.
      */
     private function seedBastData(Assignment $assignment, int $n, array $scenario, AssignmentStatus $targetStatus): void

@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('subcontractors', function (Blueprint $table) {
             $table->id();
             $table->foreignId('main_contractor_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('subcontractor_type_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->string('phone')->nullable();
             $table->string('email')->nullable();

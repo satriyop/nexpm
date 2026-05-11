@@ -3,7 +3,7 @@
 **Application:** NexPM  
 **Owner:** PT Nusantara Energi Khatulistiwa (nex)  
 **Client context:** vGreen (https://vgreencharge.id) EV Charging Station rollout  
-**Last updated:** 2026-05-01
+**Last updated:** 2026-05-11
 
 ---
 
@@ -15,8 +15,9 @@ NexPM is a project management web application that coordinates the rollout of EV
 1. Super Admin imports site master data via CSV and completes additional masterdata fields through the admin UI.
 2. Admin reviews and completes site masterdata (WO numbers, cable specs, invoice tracking, etc.).
 3. Sub-Contractors log in and fill their assigned activity forms (Survey, PLN Connection, Construction, BAST).
-4. Admin verifies each completed activity, sends revisions when needed.
-5. Admin exports a per-site XLS report to the client.
+4. The system advances each assignment through activity-specific progress statuses as required fields are saved.
+5. Admin verifies eligible assignments, sends BAST revisions when needed, and archives or restores assignments that leave scope.
+6. Admin exports SSR PDF, BAST COMM-TEST XLSX/ZIP, or Daily Monitoring XLSX reports.
 
 ---
 
@@ -35,31 +36,23 @@ NexPM is a project management web application that coordinates the rollout of EV
 
 | Role | Description |
 |------|-------------|
-| **Super Admin** | System owner. Manages all Main Contractors. Configures Sub-Contractor types, Site types, Machine types. Uploads Site master data CSV and Sub-Con assignment CSV. Creates Admin accounts. Edits all site masterdata fields including invoice/payment columns. |
-| **Admin** | Scoped to one Main Contractor. Manages day-to-day operations: completes and edits site masterdata fields, monitors assignment progress, fills Construction prerequisites (WO Number, Project Status, Setup Approval Date), verifies completed activities, sends revision requests, edits sub-con data directly, generates XLS reports. Creates Sub-Contractor accounts. Edits invoice/payment columns. |
+| **Super Admin** | System owner. Manages all Main Contractors. Uploads Site master data CSV and Sub-Con assignment CSV. Creates Admin accounts. Edits all site masterdata fields including invoice/payment columns. |
+| **Admin** | Scoped to one Main Contractor. Manages day-to-day operations: completes and edits site masterdata fields, monitors assignment progress, fills Construction prerequisites, verifies eligible activities, sends BAST revision requests, edits sub-con data directly, generates reports, creates Sub-Contractor accounts, and edits invoice/payment columns. |
 | **Sub-Contractor User** | One account per Sub-Contractor company. Logs in via web app to fill assigned activity forms. All field workers at a company share the same account. |
-| **Client** | No portal access in current scope. Receives exported XLS report files sent manually by Admin. |
+| **Client** | No portal access in current implementation. Receives exported report files sent manually by Admin. |
 
 ---
 
 ## 4. Data Model
 
-### 4.1 Configurable Master Types (managed by Super Admin)
+### 4.1 Configurable Master Types
 
 | Entity | Default Values | Notes |
 |--------|---------------|-------|
-| SubContractorType | Construction, PLN | More types can be added. Each type stores which activity types it handles. |
-| SiteType | EVCS, BSS | More types can be added |
-| MachineType | (to be defined) | Selectable options for charging machine |
+| SiteType | EVCS, BSS | Database lookup table used to classify sites and split Daily Monitoring sheets. Current UI uses these values but does not include a management screen for them. |
+| MachineType | Seeded machine options | Database lookup table used by site master data. Current UI uses these values but does not include a management screen for them. |
 
-**SubContractorType → Activity mapping (default):**
-
-| SubContractorType | Handles Activities |
-|-------------------|--------------------|
-| Construction | SURVEY, CONSTRUCTION, BAST |
-| PLN | PLN_CONNECTION |
-
-This mapping is stored in `subcontractor_types.activity_types` (JSON). It governs which sub-contractors can be assigned to each activity — the system rejects assignments where the sub-con's type does not handle that activity (both via CSV import and the reassign UI).
+`SubContractorType` was removed from the current implementation. Subcontractors are scoped directly to a Main Contractor and assigned by `subcontractor_id`. Activity compatibility is not currently enforced by subcontractor type.
 
 ### 4.2 Core Entities
 
@@ -113,9 +106,7 @@ Masterdata fields marked **[Admin]** are filled by Admin or Super Admin via the 
 | cable_length_to_panel | decimal | **[Admin]** | Cable length: kWh meter to panel (meters) |
 | cable_length_panel_to_charger | decimal | **[Admin]** | Cable length: panel to charger (meters) |
 | charging_station_count | integer | **[Admin]** | Number of charging units at this site |
-| ss_report_submission_date | date | **[Admin]** | Date SS report was submitted to client |
 | ssr_url | string | **[Admin]** | SS Report & Quotation URL |
-| bpujl_date_acquired | date | **[Admin]** | BPUJL permit date |
 | nidi_slo_bpujl_url | string | **[Admin]** | NIDI SLO / BPUJL document URL |
 | sik_url | string | **[Admin]** | SIK document URL |
 | latest_remark | text | **[Admin]** | Free-form notes / latest status remark |
@@ -135,8 +126,8 @@ Masterdata fields marked **[Admin]** are filled by Admin or Super Admin via the 
 | phone | string |
 | email | string |
 | pic | string |
-| subcontractor_type_id | FK → SubContractorType |
 | main_contractor_id | FK → MainContractor |
+| code | string (unique) |
 
 #### Assignment
 The core work unit: one Site × one Activity × one SubContractor.
@@ -146,8 +137,10 @@ The core work unit: one Site × one Activity × one SubContractor.
 | site_id | FK → Site | |
 | activity_type | enum | SURVEY, PLN_CONNECTION, CONSTRUCTION, BAST |
 | subcontractor_id | FK → SubContractor | |
-| status | enum | PENDING, COMPLETED, REVISION, VERIFIED, REPORTED |
+| status | enum | PENDING, DROP, VERIFIED, REPORTED, SURVEY, DOCUMENT, CONSTRUCTION, MACHINE_ONSITE, DONE, LIVE, REGISTRATION, BILLING, CONNECTION, KWH_DONE, COMPLETED, REVISION |
 | revision_comment | text | Filled by Admin when sending back for revision |
+| verified_at / verified_by | timestamp / FK users.id | Filled when Admin verifies |
+| reported_at | timestamp | Filled when included in a generated report |
 
 ---
 
@@ -155,65 +148,129 @@ The core work unit: one Site × one Activity × one SubContractor.
 
 ### 5.1 Status Flow (per activity, independently)
 
+Assignment status is stored on `assignments.status`. The current implementation uses activity-specific progress statuses instead of a single generic `COMPLETED` state for all activities.
+
+**Shared statuses**
+
 ```
 PENDING
-  └─► COMPLETED   (automatic — triggers when all required fields are filled by sub-con)
-        ├─► VERIFIED   (Admin approves this activity)
-        └─► REVISION   (Admin rejects with comment → sub-con notified)
-              └─► COMPLETED  (sub-con re-fills after seeing comment)
-                    └─► VERIFIED
-                          └─► REPORTED  (activity included in an XLS export)
+DROP       (archived / removed from active scope)
+VERIFIED   (approved by Admin)
+REPORTED   (included in a generated report)
 ```
 
-- Verification is **per activity**, not per site.
-- A site is considered "fully complete" only when all 4 activity assignments are VERIFIED.
-- Admin can either verify directly OR edit the sub-con's data themselves before verifying.
+**Survey**
 
-### 5.2 Activity → Sub-Contractor Type
+```
+PENDING
+  └─► SURVEY     (SS schedule date saved)
+        └─► DOCUMENT  (all required Survey fields/photos saved)
+              └─► VERIFIED
+                    └─► REPORTED
+```
 
-| Activity | Sub-Con Type | Special Rule |
-|----------|-------------|--------------|
-| SURVEY | Construction | None |
-| PLN_CONNECTION | PLN | None |
-| CONSTRUCTION | Construction | Admin must fill **Cons WO Number**, **Project Status**, and **Setup Approval Date** first — assignment is locked for sub-con until this is done |
-| BAST | Construction | None |
+**Construction**
+
+```
+PENDING
+  └─► CONSTRUCTION     (actual start date saved)
+        └─► MACHINE_ONSITE  (machine serial number and machine SN photo saved)
+              └─► DONE      (actual done date saved)
+                    └─► LIVE (PLN go-live date saved)
+```
+
+Construction currently progresses through operational statuses but is not included in `AssignmentStatus::verifiableStatuses()`. Only `DOCUMENT` and BAST `COMPLETED` are verifiable in code.
+
+**PLN Connection**
+
+```
+PENDING
+  └─► REGISTRATION (SLO, NIDI, and registration files saved)
+        └─► BILLING    (BPUJL request email date saved)
+              └─► CONNECTION (BPUJL acquired date saved)
+                    └─► KWH_DONE (type rate, ID pelanggan, kWh install date, and kWh photo saved)
+```
+
+PLN currently progresses through operational statuses but is not included in `AssignmentStatus::verifiableStatuses()`.
+
+**BAST**
+
+```
+PENDING
+  └─► COMPLETED  (required BAST fields and required photo checkpoints saved)
+        ├─► VERIFIED
+        │     └─► REPORTED
+        └─► REVISION   (Admin sends comment)
+              └─► COMPLETED  (complete BAST data is saved again)
+```
+
+Statuses are forward-only for activity progress. Clearing a required field after a status advances does not roll the assignment back. Admin-locked statuses (`VERIFIED`, `REPORTED`, `DROP`, `REVISION`) are not overwritten automatically, except BAST `REVISION` can return to `COMPLETED` once complete BAST data is saved again.
+
+- Verification is **per assignment**, not per site.
+- A site is considered complete when all of its existing active assignments are verified/reported, not when all four activity types exist.
+- Admin can edit sub-con data directly before verifying.
+- Report generation requires selected assignments to be `VERIFIED`; included assignments are marked `REPORTED`.
+
+### 5.2 Negative / Exception Flows
+
+| Flow | Current behavior |
+|------|------------------|
+| Assignment leaves scope | Admin can mark it `DROP`. Dropped assignments are hidden from active dashboards/lists unless filtered. |
+| Assignment returns to scope | Admin can restore a `DROP` assignment, which resets status to `PENDING`. |
+| Wrong subcontractor | Admin can reassign. Existing activity data is deleted and the assignment is reset to `PENDING`. |
+| Pending assignment created by mistake | Admin can delete only assignments that are still `PENDING`. |
+| Verified or reported assignment | Subcontractor edits are blocked. Admin actions are limited by controller rules. |
+| BAST revision | Only BAST assignments in `COMPLETED` can be sent to `REVISION`. The revision comment is stored on the assignment. |
+
+### 5.3 Activity Assignment Rules
+
+| Activity | Special Rule |
+|----------|--------------|
+| SURVEY | Can be assigned to any subcontractor in the site's Main Contractor. |
+| PLN_CONNECTION | Can be assigned to any subcontractor in the site's Main Contractor. |
+| CONSTRUCTION | Sub-con form is locked until Admin fills **Cons WO Number**. `Project Status` and `Setup Approval Date` are stored as admin fields but do not control the lock. |
+| BAST | Can be assigned to any subcontractor in the site's Main Contractor. |
 
 **Activity scope is defined implicitly by which assignments exist on each site.** A site may have any combination of 1–4 assignments — not all activity types are required. The absence of a PLN assignment for a site means PLN is simply not in scope for that site (e.g., the main contractor was not engaged for PLN work on that site).
 
 This means:
-- A site is considered **fully complete** when all of its *existing* assignments are VERIFIED (not when all 4 activity types are VERIFIED).
-- The dashboard Activity Pipeline matrix only shows rows for activity types that have at least one assignment — rows with zero assignments across all visible sites are hidden to avoid confusion.
-- There is no explicit "scope configuration" — the assignments CSV upload implicitly defines which activities apply to each site.
+- A site is considered **fully complete** when all of its *existing active* assignments are verified/reported (not when all 4 activity types are present).
+- The dashboard Activity Pipeline matrix only shows activity/status counts that exist in the filtered dataset.
+- There is no explicit "scope configuration" — the assignment creation UI and assignments CSV upload implicitly define which activities apply to each site.
 
 ---
 
 ## 6. Activity Form Fields
 
-### 6.1 SURVEY (filled by Construction Sub-Con)
-All fields required for auto-COMPLETED trigger.
+### 6.1 SURVEY
+The Survey assignment advances to `DOCUMENT` when all required Survey fields/photos are present.
 
 | Field | Input Type |
 |-------|-----------|
 | Nama Surveyor | text |
 | Nama PIC Lokasi | text |
 | No. HP PIC Lokasi | text |
-| Jenis Charger (BSS / EVCS) | select |
+| Jenis Charger (BSS / EVCS) | text |
 | SS Date — Schedule with Landlord | date |
-| Cable Pulling Type | select |
-| Power / Daya (kVA) | select |
-| Tipe Jaringan PLN (1 phase / 3 phase) | select |
-| Tambahan Informasi Lain-Lain | textarea |
+| Cable Pulling Type | text |
+| Power / Daya (kVA) | text |
+| Tipe Jaringan PLN (1 phase / 3 phase) | text |
+| Parking Slot | text |
 | Foto tampak keseluruhan site | photo upload |
 | Foto lahan parkir EVCS atau lokasi BSS | photo upload |
-| Foto Lahan dari sudut pandang lain | photo upload |
+| Foto Jalur Akses Menuju Lokasi | photo upload |
 | Foto Jaringan PLN Terdekat | photo upload |
 | Foto Satelit GMaps | photo upload |
+| Tambahan Informasi Lain-Lain | textarea |
 | Mock Up 3D | file upload |
+| Site Plan | file upload |
 | BA Survey | file upload |
-| Parking Slot | text |
+| SS Report Submission Date | date |
 
-### 6.2 PLN CONNECTION (filled by PLN Sub-Con)
-All fields required for auto-COMPLETED trigger.
+Required for `DOCUMENT`: surveyor name, PIC location name, PIC location phone, charger type, SS schedule date, cable pulling type, power kVA, PLN network type, parking slot, and the five photo fields. The document uploads and additional info are stored and can appear in SSR output but are not part of the `isComplete()` check.
+
+### 6.2 PLN CONNECTION
+The PLN assignment advances through `REGISTRATION`, `BILLING`, `CONNECTION`, and `KWH_DONE` based on progressively saved fields.
 
 | Field | Input Type |
 |-------|-----------|
@@ -223,9 +280,15 @@ All fields required for auto-COMPLETED trigger.
 | File SLO | file upload |
 | File NIDI | file upload |
 | File Reg | file upload |
+| File PK | file upload |
+| Email BPUJL Request Date | date |
+| BPUJL Acquired Date | date |
 | kWh Meter PLN Installation Date | date |
+| Foto kWh | photo upload |
 | ID PELANGGAN (ID PLN) | text |
 | Catatan Progres | textarea |
+
+Required for the final `KWH_DONE` completion check: File SLO, File NIDI, File Reg, File PK, Email BPUJL Request Date, BPUJL Acquired Date, Type Rate, ID Pelanggan, kWh Meter Installation Date, and Foto kWh.
 
 ### 6.3 CONSTRUCTION (mixed Admin prerequisite + Construction Sub-Con)
 
@@ -237,19 +300,26 @@ All fields required for auto-COMPLETED trigger.
 | Project Status | select / text |
 | Setup Approval Date | date |
 
-**Sub-con fields (all required for auto-COMPLETED trigger):**
+Only Cons WO Number controls the current lock check. Project Status and Setup Approval Date are admin-managed report fields.
+
+**Sub-con fields:**
 
 | Field | Input Type |
 |-------|-----------|
 | Cons Actual Start Date | date |
 | Cons Actual Done Date | date |
 | Machine SN (Serial Number) | text |
+| Foto Machine SN | photo upload |
 | Catatan Progres | textarea |
 | Foto Progres | multiple photo uploads |
+| Go LIVE Date (PLN bypass) | date |
+| Go LIVE Date (PLN) | date |
 
-### 6.4 BAST (filled by Construction Sub-Con)
+Current status progression uses these triggers: actual start date → `CONSTRUCTION`, machine serial number plus Foto Machine SN → `MACHINE_ONSITE`, actual done date → `DONE`, Go LIVE Date PLN → `LIVE`.
+
+### 6.4 BAST
 Same form for both EVCS and BSS sites. Output is labeled by site charging type.
-~50 photo checkpoints — all required for auto-COMPLETED trigger.
+The BAST assignment advances to `COMPLETED` when required cover fields and required photo checkpoints are present.
 
 | Field | Input Type |
 |-------|-----------|
@@ -262,7 +332,20 @@ Same form for both EVCS and BSS sites. Output is labeled by site charging type.
 | Installation date, commissioning date | date |
 | Customer | text |
 | Measurements (electrical readings) | JSON / structured |
-| ~50 installation verification photo checkpoints | photo upload |
+| Installation verification photo checkpoints | photo upload |
+
+Required for `COMPLETED`: `plant_name`, `installation_date`, `commissioning_date`, and these checkpoint photos:
+
+- device_front_view_open
+- device_front_view_close
+- sim_kartu_perdana
+- sim_installed_sim_card
+- grounding_rod_connection
+- grounding_cable_route
+- grounding_test_ac_panel
+- kwh_kwh_meter
+- ac_front_view_open
+- cable_spec
 
 ---
 
@@ -282,10 +365,10 @@ The Site Masterdata Edit UI is the primary interface for admins to complete and 
 - Location Name, Address, Province, City, Google Map URL, BD PIC
 
 **Section 2 — Survey & Technical Info**:
-- SS WO Number, Cable Length to Panel, Cable Length Panel to Charger, Charging Station Count, SS Report Submission Date, SSR URL, Parking Slot
+- SS WO Number, Cable Length to Panel, Cable Length Panel to Charger, Charging Station Count, SSR URL, Parking Slot
 
 **Section 3 — Permits & Legal**:
-- BPUJL Date Acquired, NIDI SLO / BPUJL URL, SIK URL
+- NIDI SLO / BPUJL URL, SIK URL
 
 **Section 4 — Notes**:
 - Latest Remark / Notes
@@ -321,12 +404,12 @@ The Site Masterdata Edit UI is the primary interface for admins to complete and 
 ## 9. Reports
 
 ### 9.1 Report Types
-- **SSR (Site Survey Report):** One row per verified Survey assignment. Survey activity data.
-- **BAST Report:** One row per verified BAST assignment. Exports the COMM-TEST XLSX per site (single file or ZIP for multiple).
+- **SSR (Site Survey Report):** One PDF per verified Survey assignment. A single selected assignment downloads as PDF; multiple selected assignments download as a ZIP of PDFs.
+- **BAST Report:** One COMM-TEST XLSX per verified BAST assignment. A single selected assignment downloads as XLSX; multiple selected assignments download as a ZIP of XLSX files.
 - **Daily Monitoring Report:** One row per **site** (not per assignment). Combines all activity data horizontally. Split into two sheets by site type: BSS and EVCS.
 
 ### 9.2 Daily Monitoring Report Format
-The Daily Report follows the reference XLSX format with 44 columns (A–AR) covering the full project lifecycle per site:
+The Daily Report follows the reference XLSX format with 44 base columns (A–AR) covering the full project lifecycle per site. Additional fields tagged `daily_extra` in activity field registries are appended after the base columns.
 
 | Col | Field | Source |
 |-----|-------|--------|
@@ -343,7 +426,7 @@ The Daily Report follows the reference XLSX format with 44 columns (A–AR) cove
 | K | BD PIC | sites.bd_pic |
 | L | SS WO Number | sites.ss_wo_number |
 | M | SS Date (Schedule w/ Landlord) | assignment_survey_data.ss_schedule_date |
-| N | SS Report Submission Date | sites.ss_report_submission_date |
+| N | SS Report Submission Date | assignment_survey_data.ss_report_submission_date |
 | O | Cable Length (kWh to Panel) | sites.cable_length_to_panel |
 | P | Cable Length (Panel to Charger) | sites.cable_length_panel_to_charger |
 | Q | Cable Pulling Type | assignment_survey_data.cable_pulling_type |
@@ -356,7 +439,7 @@ The Daily Report follows the reference XLSX format with 44 columns (A–AR) cove
 | X | Cons Actual Start Date | assignment_construction_data.cons_actual_start_date |
 | Y | Cons Actual Done Date | assignment_construction_data.cons_actual_done_date |
 | Z | NIDI SLO Date Acquired | assignment_pln_data.nidi_slo_date_acquired |
-| AA | BPUJL Date Acquired | sites.bpujl_date_acquired |
+| AA | BPUJL Date Acquired | assignment_pln_data.bpujl_acquired_date |
 | AB | NIDI SLO / BPUJL URL | sites.nidi_slo_bpujl_url |
 | AC | SIK URL | sites.sik_url |
 | AD | Type Rate | assignment_pln_data.type_rate |
@@ -376,11 +459,12 @@ The Daily Report follows the reference XLSX format with 44 columns (A–AR) cove
 | AR | Invoice URL | sites.invoice_url |
 
 ### 9.3 Report Generation
-- **Format:** XLSX (Excel)
+- **Format:** SSR = PDF/ZIP, BAST = XLSX/ZIP, Daily Monitoring = XLSX
 - **Who generates:** Admin
-- **Scope selection:** Admin picks which verified sites/assignments to include per export
+- **Scope selection:** Admin picks verified assignments to include per export
 - **Delivery:** Admin downloads and sends manually — no in-app client delivery
 - **Status update:** Assignments included in an export → status changes to REPORTED
+- **SSR side effect:** Survey data `ss_report_submission_date` is set to the current date when an SSR report is generated.
 
 ---
 
@@ -413,7 +497,7 @@ Auth, user management, configurable types, master data entities (MainContractor,
 Assignment creation via CSV upload, Sub-Con input forms for Survey, PLN Connection, Construction. Auto-complete logic. Revision workflow.
 
 ### Phase 3 — BAST + Reporting
-BAST form, admin verification dashboard, Site Masterdata Edit UI, XLS report generation and export (SSR, BAST, Daily Monitoring).
+BAST form, admin verification dashboard, Site Masterdata Edit UI, and report generation/export (SSR PDF, BAST XLSX, Daily Monitoring XLSX).
 
 ---
 

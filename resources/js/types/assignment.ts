@@ -1,6 +1,10 @@
 import type { User } from './auth';
 
-export type ActivityType = 'SURVEY' | 'PLN_CONNECTION' | 'CONSTRUCTION' | 'BAST';
+export type ActivityType =
+    | 'SURVEY'
+    | 'PLN_CONNECTION'
+    | 'CONSTRUCTION'
+    | 'BAST';
 
 export type AssignmentStatus =
     // Shared
@@ -83,6 +87,7 @@ export interface AssignmentPlnData {
     file_slo: string | null;
     file_nidi: string | null;
     file_reg: string | null;
+    file_pk: string | null;
     kwh_meter_installation_date: string | null;
     id_pelanggan: string | null;
     catatan_progres: string | null;

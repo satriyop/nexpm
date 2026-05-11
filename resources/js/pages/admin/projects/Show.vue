@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { AlertCircle, ArrowLeft, CheckCircle2, ClipboardList, Download, Eye, Pencil, Upload } from 'lucide-vue-next';
+import {
+    AlertCircle,
+    ArrowLeft,
+    CheckCircle2,
+    ClipboardList,
+    Download,
+    Eye,
+    Pencil,
+    Upload,
+} from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import * as AssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import * as AssignmentImport from '@/actions/App/Http/Controllers/Admin/AssignmentImportController';
@@ -11,7 +20,13 @@ import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -24,9 +39,18 @@ import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
 import type { PaginatedData } from '@/types';
 
-interface MainContractor { id: number; name: string }
-interface Client { id: number; name: string }
-interface SiteType { id: number; name: string }
+interface MainContractor {
+    id: number;
+    name: string;
+}
+interface Client {
+    id: number;
+    name: string;
+}
+interface SiteType {
+    id: number;
+    name: string;
+}
 interface Site {
     id: number;
     site_code: string;
@@ -54,7 +78,11 @@ interface ImportResult {
     errors: string[];
 }
 
-const props = defineProps<{ project: Project; sites: PaginatedData<Site>; import: ImportResult | null }>();
+const props = defineProps<{
+    project: Project;
+    sites: PaginatedData<Site>;
+    import: ImportResult | null;
+}>();
 const importResult = computed(() => props.import);
 
 defineOptions({
@@ -87,27 +115,41 @@ const previewOpen = ref(false);
 function detectDelimiter(sample: string): string {
     const semicolons = (sample.match(/;/g) ?? []).length;
     const commas = (sample.match(/,/g) ?? []).length;
+
     return semicolons >= commas ? ';' : ',';
 }
 
 function parseCsvText(text: string): string[][] {
     const sep = detectDelimiter(text.slice(0, 500));
+
     return text
         .split(/\r?\n/)
         .filter((line) => line.trim() && !line.startsWith('#'))
-        .map((line) => line.split(sep).map((cell) => cell.trim().replace(/^["']|["']$/g, '')));
+        .map((line) =>
+            line
+                .split(sep)
+                .map((cell) => cell.trim().replace(/^["']|["']$/g, '')),
+        );
 }
 
 function openPreview(type: PreviewType): void {
-    const fileRef = type === 'sites' ? siteFileRef.value : assignmentFileRef.value;
+    const fileRef =
+        type === 'sites' ? siteFileRef.value : assignmentFileRef.value;
     const file = fileRef?.files?.[0];
-    if (!file) return;
+
+    if (!file) {
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = (e) => {
         const text = e.target?.result as string;
         const allRows = parseCsvText(text);
-        if (allRows.length < 1) return;
+
+        if (allRows.length < 1) {
+            return;
+        }
+
         preview.value = {
             type,
             headers: allRows[0],
@@ -120,8 +162,12 @@ function openPreview(type: PreviewType): void {
 }
 
 function confirmImport(): void {
-    if (!preview.value) return;
+    if (!preview.value) {
+        return;
+    }
+
     previewOpen.value = false;
+
     if (preview.value.type === 'sites') {
         submitSiteImport();
     } else {
@@ -130,24 +176,43 @@ function confirmImport(): void {
 }
 
 function submitSiteImport() {
-    if (!siteFileRef.value?.files?.[0]) { return; }
+    if (!siteFileRef.value?.files?.[0]) {
+        return;
+    }
+
     siteForm.file = siteFileRef.value.files[0];
     siteForm.post(SiteImport.store(props.project).url, {
         forceFormData: true,
-        onSuccess: () => { siteForm.reset(); if (siteFileRef.value) { siteFileRef.value.value = ''; } },
+        onSuccess: () => {
+            siteForm.reset();
+
+            if (siteFileRef.value) {
+                siteFileRef.value.value = '';
+            }
+        },
     });
 }
 
 function submitAssignmentImport() {
-    if (!assignmentFileRef.value?.files?.[0]) { return; }
+    if (!assignmentFileRef.value?.files?.[0]) {
+        return;
+    }
+
     assignmentForm.file = assignmentFileRef.value.files[0];
     assignmentForm.post(AssignmentImport.store(props.project).url, {
         forceFormData: true,
-        onSuccess: () => { assignmentForm.reset(); if (assignmentFileRef.value) { assignmentFileRef.value.value = ''; } },
+        onSuccess: () => {
+            assignmentForm.reset();
+
+            if (assignmentFileRef.value) {
+                assignmentFileRef.value.value = '';
+            }
+        },
     });
 }
 
-const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleString('id-ID')}` : '—';
+const formatBudget = (val: string | null) =>
+    val ? `IDR ${Number(val).toLocaleString('id-ID')}` : '—';
 </script>
 
 <template>
@@ -157,11 +222,21 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-3">
                 <a :href="ProjectActions.index().url">
-                    <Button variant="ghost" size="icon"><ArrowLeft class="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon"
+                        ><ArrowLeft class="h-4 w-4"
+                    /></Button>
                 </a>
-                <h1 class="text-xl font-semibold md:text-2xl">{{ project.name }}</h1>
+                <h1 class="text-xl font-semibold md:text-2xl">
+                    {{ project.name }}
+                </h1>
             </div>
-            <a :href="AssignmentActions.index({ project_id: project.id }).url">
+            <a
+                :href="
+                    AssignmentActions.index({
+                        query: { project_id: project.id },
+                    }).url
+                "
+            >
                 <Button variant="outline" size="sm">
                     <ClipboardList class="mr-1.5 h-4 w-4" />
                     View Assignments
@@ -170,14 +245,30 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
         </div>
 
         <!-- Import result alert -->
-        <Alert v-if="importResult" :variant="importResult.errors.length ? 'destructive' : 'default'">
+        <Alert
+            v-if="importResult"
+            :variant="importResult.errors.length ? 'destructive' : 'default'"
+        >
             <CheckCircle2 v-if="!importResult.errors.length" class="h-4 w-4" />
             <AlertCircle v-else class="h-4 w-4" />
-            <AlertTitle>{{ importResult.type === 'sites' ? 'Sites' : 'Assignments' }} Import Complete</AlertTitle>
+            <AlertTitle
+                >{{
+                    importResult.type === 'sites' ? 'Sites' : 'Assignments'
+                }}
+                Import Complete</AlertTitle
+            >
             <AlertDescription>
-                <p>Created: {{ importResult.created }}, Updated: {{ importResult.updated }}</p>
-                <ul v-if="importResult.errors.length" class="mt-1 list-disc pl-4 text-xs">
-                    <li v-for="(err, i) in importResult.errors" :key="i">{{ err }}</li>
+                <p>
+                    Created: {{ importResult.created }}, Updated:
+                    {{ importResult.updated }}
+                </p>
+                <ul
+                    v-if="importResult.errors.length"
+                    class="mt-1 list-disc pl-4 text-xs"
+                >
+                    <li v-for="(err, i) in importResult.errors" :key="i">
+                        {{ err }}
+                    </li>
                 </ul>
             </AlertDescription>
         </Alert>
@@ -186,26 +277,38 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
         <Card>
             <CardHeader><CardTitle>Project Info</CardTitle></CardHeader>
             <CardContent>
-                <dl class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm md:grid-cols-3">
+                <dl
+                    class="grid grid-cols-2 gap-x-8 gap-y-3 text-sm md:grid-cols-3"
+                >
                     <div>
                         <dt class="text-muted-foreground">Main Contractor</dt>
-                        <dd class="font-medium">{{ project.main_contractor?.name ?? '—' }}</dd>
+                        <dd class="font-medium">
+                            {{ project.main_contractor?.name ?? '—' }}
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-muted-foreground">Client</dt>
-                        <dd class="font-medium">{{ project.client?.name ?? '—' }}</dd>
+                        <dd class="font-medium">
+                            {{ project.client?.name ?? '—' }}
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-muted-foreground">Budget</dt>
-                        <dd class="font-medium">{{ formatBudget(project.budget) }}</dd>
+                        <dd class="font-medium">
+                            {{ formatBudget(project.budget) }}
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-muted-foreground">Start Date</dt>
-                        <dd class="font-medium">{{ project.start_date ?? '—' }}</dd>
+                        <dd class="font-medium">
+                            {{ project.start_date ?? '—' }}
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-muted-foreground">End Date</dt>
-                        <dd class="font-medium">{{ project.end_date ?? '—' }}</dd>
+                        <dd class="font-medium">
+                            {{ project.end_date ?? '—' }}
+                        </dd>
                     </div>
                 </dl>
             </CardContent>
@@ -217,10 +320,18 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                 <CardHeader>
                     <div class="flex items-start justify-between gap-2">
                         <div>
-                            <CardTitle class="text-base">Import Sites</CardTitle>
-                            <CardDescription>Upload a CSV file to create or update sites for this project.</CardDescription>
+                            <CardTitle class="text-base"
+                                >Import Sites</CardTitle
+                            >
+                            <CardDescription
+                                >Upload a CSV file to create or update sites for
+                                this project.</CardDescription
+                            >
                         </div>
-                        <a :href="SiteImport.template(project).url" class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                        <a
+                            :href="SiteImport.template(project).url"
+                            class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        >
                             <Download class="h-3.5 w-3.5" />
                             Template
                         </a>
@@ -230,9 +341,19 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                     <div class="flex items-end gap-3">
                         <div class="grid flex-1 gap-1.5">
                             <Label>CSV File</Label>
-                            <input ref="siteFileRef" type="file" accept=".csv,.txt" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" />
+                            <input
+                                ref="siteFileRef"
+                                type="file"
+                                accept=".csv,.txt"
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                            />
                         </div>
-                        <Button type="button" :disabled="siteForm.processing" size="sm" @click="openPreview('sites')">
+                        <Button
+                            type="button"
+                            :disabled="siteForm.processing"
+                            size="sm"
+                            @click="openPreview('sites')"
+                        >
                             <Eye class="mr-1.5 h-3.5 w-3.5" />Preview
                         </Button>
                     </div>
@@ -243,10 +364,19 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                 <CardHeader>
                     <div class="flex items-start justify-between gap-2">
                         <div>
-                            <CardTitle class="text-base">Import Assignments</CardTitle>
-                            <CardDescription>Upload a CSV file to create or update assignments for this project's sites.</CardDescription>
+                            <CardTitle class="text-base"
+                                >Import Assignments</CardTitle
+                            >
+                            <CardDescription
+                                >Upload a CSV file to create or update
+                                assignments for this project's
+                                sites.</CardDescription
+                            >
                         </div>
-                        <a :href="AssignmentImport.template(project).url" class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                        <a
+                            :href="AssignmentImport.template(project).url"
+                            class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        >
                             <Download class="h-3.5 w-3.5" />
                             Template
                         </a>
@@ -256,9 +386,19 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                     <div class="flex items-end gap-3">
                         <div class="grid flex-1 gap-1.5">
                             <Label>CSV File</Label>
-                            <input ref="assignmentFileRef" type="file" accept=".csv,.txt" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" />
+                            <input
+                                ref="assignmentFileRef"
+                                type="file"
+                                accept=".csv,.txt"
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                            />
                         </div>
-                        <Button type="button" :disabled="assignmentForm.processing" size="sm" @click="openPreview('assignments')">
+                        <Button
+                            type="button"
+                            :disabled="assignmentForm.processing"
+                            size="sm"
+                            @click="openPreview('assignments')"
+                        >
                             <Eye class="mr-1.5 h-3.5 w-3.5" />Preview
                         </Button>
                     </div>
@@ -270,13 +410,23 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
         <Dialog v-model:open="previewOpen">
             <DialogContent class="max-w-4xl">
                 <DialogHeader>
-                    <DialogTitle>Preview: {{ preview?.type === 'sites' ? 'Sites' : 'Assignments' }} Import</DialogTitle>
+                    <DialogTitle
+                        >Preview:
+                        {{
+                            preview?.type === 'sites' ? 'Sites' : 'Assignments'
+                        }}
+                        Import</DialogTitle
+                    >
                     <DialogDescription>
-                        Showing {{ preview?.rows.length }} of {{ preview?.totalRows }} rows. Review before confirming.
+                        Showing {{ preview?.rows.length }} of
+                        {{ preview?.totalRows }} rows. Review before confirming.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div v-if="preview" class="max-h-[60vh] overflow-auto rounded-md border">
+                <div
+                    v-if="preview"
+                    class="max-h-[60vh] overflow-auto rounded-md border"
+                >
                     <table class="w-full text-xs">
                         <thead class="sticky top-0 bg-muted/90">
                             <tr>
@@ -309,13 +459,27 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" @click="previewOpen = false">Cancel</Button>
+                    <Button variant="outline" @click="previewOpen = false"
+                        >Cancel</Button
+                    >
                     <Button
-                        :disabled="(preview?.type === 'sites' ? siteForm : assignmentForm).processing"
+                        :disabled="
+                            (preview?.type === 'sites'
+                                ? siteForm
+                                : assignmentForm
+                            ).processing
+                        "
                         @click="confirmImport"
                     >
                         <Upload class="mr-1.5 h-4 w-4" />
-                        {{ (preview?.type === 'sites' ? siteForm : assignmentForm).processing ? 'Importing…' : 'Confirm Import' }}
+                        {{
+                            (preview?.type === 'sites'
+                                ? siteForm
+                                : assignmentForm
+                            ).processing
+                                ? 'Importing…'
+                                : 'Confirm Import'
+                        }}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -323,40 +487,88 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
 
         <!-- Sites table -->
         <Card>
-            <CardHeader><CardTitle>Sites ({{ sites.total }})</CardTitle></CardHeader>
+            <CardHeader
+                ><CardTitle>Sites ({{ sites.total }})</CardTitle></CardHeader
+            >
             <CardContent class="p-0">
                 <table class="w-full text-sm">
                     <thead class="border-b bg-muted/50">
                         <tr>
-                            <th class="px-4 py-3 text-left font-medium">Site Code</th>
-                            <th class="px-4 py-3 text-left font-medium">Location</th>
-                            <th class="px-4 py-3 text-left font-medium">City</th>
-                            <th class="px-4 py-3 text-left font-medium">Province</th>
-                            <th class="px-4 py-3 text-left font-medium">Type</th>
-                            <th class="px-4 py-3 text-left font-medium">Stations</th>
-                            <th class="px-4 py-3 text-left font-medium">Actions</th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Site Code
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Location
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                City
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Province
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Type
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Stations
+                            </th>
+                            <th class="px-4 py-3 text-left font-medium">
+                                Actions
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y">
-                        <tr v-for="site in sites.data" :key="site.id" class="hover:bg-muted/30">
-                            <td class="px-4 py-3 font-mono text-xs font-medium">{{ site.site_code }}</td>
-                            <td class="px-4 py-3 font-medium">{{ site.location_name }}</td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ site.city ?? '—' }}</td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ site.province ?? '—' }}</td>
-                            <td class="px-4 py-3">
-                                <Badge v-if="site.site_type" variant="secondary">{{ site.site_type.name }}</Badge>
-                                <span v-else class="text-muted-foreground">—</span>
+                        <tr
+                            v-for="site in sites.data"
+                            :key="site.id"
+                            class="hover:bg-muted/30"
+                        >
+                            <td class="px-4 py-3 font-mono text-xs font-medium">
+                                {{ site.site_code }}
                             </td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ site.charging_station_count ?? '—' }}</td>
+                            <td class="px-4 py-3 font-medium">
+                                {{ site.location_name }}
+                            </td>
+                            <td class="px-4 py-3 text-muted-foreground">
+                                {{ site.city ?? '—' }}
+                            </td>
+                            <td class="px-4 py-3 text-muted-foreground">
+                                {{ site.province ?? '—' }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <Badge
+                                    v-if="site.site_type"
+                                    variant="secondary"
+                                    >{{ site.site_type.name }}</Badge
+                                >
+                                <span v-else class="text-muted-foreground"
+                                    >—</span
+                                >
+                            </td>
+                            <td class="px-4 py-3 text-muted-foreground">
+                                {{ site.charging_station_count ?? '—' }}
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-1">
-                                    <a :href="`${SiteActions.edit(site).url}?tab=assignments`">
-                                        <Button variant="ghost" size="sm" title="Manage assignments">
-                                            <ClipboardList class="h-3.5 w-3.5" />
+                                    <a
+                                        :href="`${SiteActions.edit(site).url}?tab=assignments`"
+                                    >
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title="Manage assignments"
+                                        >
+                                            <ClipboardList
+                                                class="h-3.5 w-3.5"
+                                            />
                                         </Button>
                                     </a>
                                     <a :href="SiteActions.edit(site).url">
-                                        <Button variant="ghost" size="sm" title="Edit site">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title="Edit site"
+                                        >
                                             <Pencil class="h-3.5 w-3.5" />
                                         </Button>
                                     </a>
@@ -364,7 +576,12 @@ const formatBudget = (val: string | null) => val ? `IDR ${Number(val).toLocaleSt
                             </td>
                         </tr>
                         <tr v-if="!sites.data.length">
-                            <td colspan="7" class="px-4 py-8 text-center text-muted-foreground">No sites yet. Import a CSV to get started.</td>
+                            <td
+                                colspan="7"
+                                class="px-4 py-8 text-center text-muted-foreground"
+                            >
+                                No sites yet. Import a CSV to get started.
+                            </td>
                         </tr>
                     </tbody>
                 </table>

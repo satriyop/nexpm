@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('assignment_survey_data', function (Blueprint $table) {
             $table->id();
             $table->foreignId('assignment_id')->unique()->constrained()->cascadeOnDelete();
+            $table->string('ss_wo_number')->nullable();
             $table->string('surveyor_name')->nullable();
             $table->string('pic_location_name')->nullable();
             $table->string('pic_location_phone')->nullable();
@@ -22,12 +23,14 @@ return new class extends Migration
             $table->text('additional_info')->nullable();
             $table->string('photo_overall_site')->nullable();
             $table->string('photo_parking_evcs')->nullable();
-            $table->string('photo_other_angle')->nullable();
+            $table->string('photo_access_route')->nullable();
             $table->string('photo_pln_network')->nullable();
             $table->string('photo_satellite_gmaps')->nullable();
             $table->string('file_mockup_3d')->nullable();
+            $table->string('file_site_plan')->nullable();
             $table->string('file_ba_survey')->nullable();
             $table->string('parking_slot')->nullable();
+            $table->date('ss_report_submission_date')->nullable();
             $table->timestamps();
         });
     }

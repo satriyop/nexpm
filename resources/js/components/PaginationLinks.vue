@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { AcceptableValue } from 'reka-ui';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import type { PaginatedData } from '@/types';
 
 const props = defineProps<{
@@ -12,11 +19,18 @@ const props = defineProps<{
 
 const pageSizes = props.perPageOptions ?? [10, 25, 50, 100];
 
-function changePerPage(value: string): void {
+function changePerPage(value: AcceptableValue): void {
+    if (value == null) {
+        return;
+    }
+
     const url = new URL(window.location.href);
-    url.searchParams.set('per_page', value);
+    url.searchParams.set('per_page', String(value));
     url.searchParams.delete('page');
-    router.visit(url.toString(), { preserveState: true, preserveScroll: false });
+    router.visit(url.toString(), {
+        preserveState: true,
+        preserveScroll: false,
+    });
 }
 </script>
 
@@ -40,12 +54,20 @@ function changePerPage(value: string): void {
 
             <div v-if="perPage !== undefined" class="flex items-center gap-1.5">
                 <span class="text-xs text-muted-foreground">per page</span>
-                <Select :model-value="String(perPage)" @update:model-value="changePerPage">
+                <Select
+                    :model-value="String(perPage)"
+                    @update:model-value="changePerPage"
+                >
                     <SelectTrigger class="h-7 w-16 text-xs">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem v-for="size in pageSizes" :key="size" :value="String(size)" class="text-xs">
+                        <SelectItem
+                            v-for="size in pageSizes"
+                            :key="size"
+                            :value="String(size)"
+                            class="text-xs"
+                        >
                             {{ size }}
                         </SelectItem>
                     </SelectContent>
@@ -70,8 +92,9 @@ function changePerPage(value: string): void {
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
                     ]"
-                    v-html="link.label"
-                />
+                >
+                    <span v-html="link.label" />
+                </Link>
                 <span
                     v-else
                     class="inline-flex h-8 min-w-8 cursor-not-allowed items-center justify-center rounded-md border border-input px-2.5 text-xs font-medium text-muted-foreground opacity-60"
