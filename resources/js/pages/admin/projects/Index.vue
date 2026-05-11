@@ -67,7 +67,7 @@ const selectedMcId = ref('');
 const filteredClients = computed(() =>
     selectedMcId.value
         ? props.clients.filter(
-              (c) => String(c.main_contractor_id) === selectedMcId.value,
+              (c) => c.main_contractors?.some(mc => String(mc.id) === selectedMcId.value),
           )
         : props.clients,
 );
