@@ -20,7 +20,12 @@ class ClientController extends Controller
         $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 15;
 
         return Inertia::render('admin/clients/Index', [
-            'clients' => Client::query()->whereScopedToMainContractor()->with('mainContractor')->latest('id')->paginate($perPage)->withQueryString(),
+            'clients' => Client::query()
+                ->whereScopedToMainContractor()
+                ->with('mainContractors')
+                ->latest('id')
+                ->paginate($perPage)
+                ->withQueryString(),
             'per_page' => $perPage,
             'mainContractors' => MainContractor::query()
                 ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
@@ -32,31 +37,36 @@ class ClientController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = $this->currentUser();
-        $mainContractorId = $user->isSuperAdmin()
-            ? $request->integer('main_contractor_id')
-            : $user->main_contractor_id;
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'main_contractor_id' => [$user->isSuperAdmin() ? 'required' : 'nullable', Rule::exists('main_contractors', 'id')],
+            'main_contractor_ids' => ['required', 'array', 'min:1'],
+            'main_contractor_ids.*' => ['required', 'integer', Rule::exists('main_contractors', 'id')],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'pic' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $validated['main_contractor_id'] = $mainContractorId;
+        $client = Client::query()->create([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'] ?? null,
+            'email' => $validated['email'] ?? null,
+            'pic' => $validated['pic'] ?? null,
+        ]);
 
-        Client::query()->create($validated);
+        $client->mainContractors()->attach($validated['main_contractor_ids']);
 
         return back()->with('success', 'Client created.');
     }
 
     public function update(Request $request, Client $client): RedirectResponse
     {
-        $this->ensureCanAccessMainContractor($client->main_contractor_id);
+        $this->ensureCanAccessClient($client);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'main_contractor_ids' => ['required', 'array', 'min:1'],
+            'main_contractor_ids.*' => ['required', 'integer', Rule::exists('main_contractors', 'id')],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'pic' => ['nullable', 'string', 'max:255'],
@@ -72,8 +82,31 @@ class ClientController extends Controller
             unset($validated['logo']);
         }
 
-        $client->update($validated);
+        $client->update([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'] ?? null,
+            'email' => $validated['email'] ?? null,
+            'pic' => $validated['pic'] ?? null,
+            'logo' => $validated['logo'] ?? $client->logo,
+        ]);
+
+        $client->mainContractors()->sync($validated['main_contractor_ids']);
 
         return back()->with('success', 'Client updated.');
+    }
+
+    private function ensureCanAccessClient(Client $client): void
+    {
+        $user = $this->currentUser();
+
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        $hasAccess = $client->mainContractors()
+            ->where('main_contractors.id', $user->main_contractor_id)
+            ->exists();
+
+        abort_unless($hasAccess, 403, 'You do not have access to this client.');
     }
 }

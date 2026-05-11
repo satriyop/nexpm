@@ -40,7 +40,6 @@ erDiagram
 
     CLIENTS {
         bigint id PK
-        bigint main_contractor_id FK
         string name
         string phone
         string email
@@ -48,6 +47,12 @@ erDiagram
         string logo
         timestamps created_at
         timestamps updated_at
+    }
+
+    %% ── Pivot tables ───────────────────────────────────────────
+    CLIENT_MAIN_CONTRACTOR {
+        bigint client_id FK
+        bigint main_contractor_id FK
     }
 
     PROJECTS {
@@ -308,10 +313,8 @@ erDiagram
 
     %% ── Relationships ───────────────────────────────────────────────
 
-    MAIN_CONTRACTORS ||--o{ CLIENTS : "has many"
-    MAIN_CONTRACTORS ||--o{ PROJECTS : "has many"
-    MAIN_CONTRACTORS ||--o{ SUBCONTRACTORS : "has many"
-    MAIN_CONTRACTORS ||--o{ USERS : "has many"
+MAIN_CONTRACTORS ||--o{ CLIENT_MAIN_CONTRACTOR : ""
+    CLIENTS ||--o{ CLIENT_MAIN_CONTRACTOR : ""
 
     CLIENTS ||--o{ PROJECTS : "has many"
 

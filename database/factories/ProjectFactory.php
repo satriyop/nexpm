@@ -20,12 +20,14 @@ class ProjectFactory extends Factory
     public function definition(): array
     {
         $mainContractor = MainContractor::factory()->create();
+        $client = Client::factory()->create();
+        $client->mainContractors()->attach($mainContractor->id);
         $start = fake()->dateTimeBetween('-1 year', 'now');
         $end = fake()->dateTimeBetween($start, '+1 year');
 
         return [
             'main_contractor_id' => $mainContractor->id,
-            'client_id' => Client::factory()->for($mainContractor, 'mainContractor'),
+            'client_id' => $client->id,
             'name' => fake()->catchPhrase(),
             'start_date' => $start,
             'end_date' => $end,

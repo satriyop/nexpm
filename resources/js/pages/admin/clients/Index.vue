@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import { Briefcase, Pencil, Plus } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ClientController';
 import InputError from '@/components/InputError.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -16,13 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { dashboard } from '@/routes';
 import type { PaginatedData } from '@/types';
 
@@ -38,7 +32,7 @@ interface Client {
     email: string | null;
     logo: string | null;
     logo_url: string | null;
-    main_contractor: MainContractor | null;
+    main_contractors: MainContractor[];
 }
 
 const props = defineProps<{
@@ -60,13 +54,17 @@ defineOptions({
 const addOpen = ref(false);
 const addForm = useForm({
     name: '',
-    main_contractor_id: '',
+    main_contractor_ids: [] as number[],
     pic: '',
     phone: '',
     email: '',
 });
 
 function submitAdd() {
+    if (addForm.main_contractor_ids.length === 0) {
+        addForm.setError('main_contractor_ids', 'Select at least one main contractor');
+        return;
+    }
     addForm.post(Actions.store().url, {
         onSuccess: () => {
             addOpen.value = false;
@@ -75,21 +73,33 @@ function submitAdd() {
     });
 }
 
+function toggleMainContractor(id: number) {
+    const idx = addForm.main_contractor_ids.indexOf(id);
+    if (idx === -1) {
+        addForm.main_contractor_ids.push(id);
+    } else {
+        addForm.main_contractor_ids.splice(idx, 1);
+    }
+    addForm.clearErrors('main_contractor_ids');
+}
+
 // ── Edit modal ─────────────────────────────────────────────────
 const editOpen = ref(false);
 const editingClient = ref<Client | null>(null);
 const editForm = useForm<{
     name: string;
+    main_contractor_ids: number[];
     phone: string;
     email: string;
     pic: string;
     logo: File | null;
-}>({ name: '', phone: '', email: '', pic: '', logo: null });
+}>({ name: '', main_contractor_ids: [], phone: '', email: '', pic: '', logo: null });
 const logoPreview = ref<string | null>(null);
 
 function openEdit(client: Client) {
     editingClient.value = client;
     editForm.name = client.name;
+    editForm.main_contractor_ids = client.main_contractors.map(mc => mc.id);
     editForm.phone = client.phone ?? '';
     editForm.email = client.email ?? '';
     editForm.pic = client.pic ?? '';
@@ -106,8 +116,22 @@ function onLogoChange(e: Event) {
         : (editingClient.value?.logo_url ?? null);
 }
 
+function toggleEditMainContractor(id: number) {
+    const idx = editForm.main_contractor_ids.indexOf(id);
+    if (idx === -1) {
+        editForm.main_contractor_ids.push(id);
+    } else {
+        editForm.main_contractor_ids.splice(idx, 1);
+    }
+    editForm.clearErrors('main_contractor_ids');
+}
+
 function submitEdit() {
     if (!editingClient.value) {
+        return;
+    }
+    if (editForm.main_contractor_ids.length === 0) {
+        editForm.setError('main_contractor_ids', 'Select at least one main contractor');
         return;
     }
 
@@ -178,7 +202,16 @@ function submitEdit() {
                                 {{ client.name }}
                             </td>
                             <td class="px-4 py-3 text-muted-foreground">
-                                {{ client.main_contractor?.name ?? '—' }}
+                                <div class="flex flex-wrap gap-1">
+                                    <span
+                                        v-for="mc in client.main_contractors"
+                                        :key="mc.id"
+                                        class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                    >
+                                        {{ mc.name }}
+                                    </span>
+                                    <span v-if="!client.main_contractors.length" class="text-muted-foreground">—</span>
+                                </div>
                             </td>
                             <td class="px-4 py-3 text-muted-foreground">
                                 {{ client.pic ?? '—' }}
@@ -244,23 +277,29 @@ function submitEdit() {
                 </div>
                 <div class="grid gap-1.5">
                     <Label
-                        >Main Contractor
+                        >Main Contractor(s)
                         <span class="text-destructive">*</span></Label
                     >
-                    <Select v-model="addForm.main_contractor_id">
-                        <SelectTrigger
-                            ><SelectValue placeholder="Select contractor"
-                        /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="mc in mainContractors"
-                                :key="mc.id"
-                                :value="String(mc.id)"
-                                >{{ mc.name }}</SelectItem
+                    <div class="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
+                        <div
+                            v-for="mc in mainContractors"
+                            :key="mc.id"
+                            class="flex items-center gap-2"
+                        >
+                            <Checkbox
+                                :id="'add-mc-' + mc.id"
+                                :checked="addForm.main_contractor_ids.includes(mc.id)"
+                                @update:checked="toggleMainContractor(mc.id)"
+                            />
+                            <Label
+                                :for="'add-mc-' + mc.id"
+                                class="cursor-pointer font-normal"
                             >
-                        </SelectContent>
-                    </Select>
-                    <InputError :message="addForm.errors.main_contractor_id" />
+                                {{ mc.name }}
+                            </Label>
+                        </div>
+                    </div>
+                    <InputError :message="addForm.errors.main_contractor_ids" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label>PIC</Label>
@@ -300,6 +339,32 @@ function submitEdit() {
                     <Label>Name <span class="text-destructive">*</span></Label>
                     <Input v-model="editForm.name" autofocus />
                     <InputError :message="editForm.errors.name" />
+                </div>
+                <div class="grid gap-1.5">
+                    <Label
+                        >Main Contractor(s)
+                        <span class="text-destructive">*</span></Label
+                    >
+                    <div class="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
+                        <div
+                            v-for="mc in mainContractors"
+                            :key="mc.id"
+                            class="flex items-center gap-2"
+                        >
+                            <Checkbox
+                                :id="'edit-mc-' + mc.id"
+                                :checked="editForm.main_contractor_ids.includes(mc.id)"
+                                @update:checked="toggleEditMainContractor(mc.id)"
+                            />
+                            <Label
+                                :for="'edit-mc-' + mc.id"
+                                class="cursor-pointer font-normal"
+                            >
+                                {{ mc.name }}
+                            </Label>
+                        </div>
+                    </div>
+                    <InputError :message="editForm.errors.main_contractor_ids" />
                 </div>
                 <div class="grid gap-1.5">
                     <Label>PIC</Label>

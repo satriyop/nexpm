@@ -26,7 +26,7 @@ class ProjectController extends Controller
                 ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
-            'clients' => Client::query()->whereScopedToMainContractor()->orderBy('name')->get(['id', 'name', 'main_contractor_id']),
+            'clients' => Client::query()->whereScopedToMainContractor()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

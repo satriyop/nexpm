@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
@@ -24,11 +25,11 @@ class MainContractor extends Model
     }
 
     /**
-     * @return HasMany<Client, $this>
+     * @return BelongsToMany<Client, $this>
      */
-    public function clients(): HasMany
+    public function clients(): BelongsToMany
     {
-        return $this->hasMany(Client::class);
+        return $this->belongsToMany(Client::class, 'client_main_contractor');
     }
 
     /**

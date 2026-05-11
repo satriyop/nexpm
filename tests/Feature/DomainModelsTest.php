@@ -37,7 +37,8 @@ test('super admin seeder creates the super admin user', function () {
 
 test('main contractor has clients projects subcontractors and users', function () {
     $contractor = MainContractor::factory()->create();
-    $client = Client::factory()->for($contractor, 'mainContractor')->create();
+    $client = Client::factory()->create();
+    $client->mainContractors()->attach($contractor->id);
     $project = Project::factory()
         ->for($contractor, 'mainContractor')
         ->for($client)
