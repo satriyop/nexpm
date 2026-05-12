@@ -32,8 +32,8 @@ function completeSurveyUploadPayload(): array
         'photo_pln_network' => UploadedFile::fake()->image('pln.jpg'),
         'photo_satellite_gmaps' => UploadedFile::fake()->image('satellite.jpg'),
         'file_mockup_3d' => UploadedFile::fake()->create('mockup.pdf', 64, 'application/pdf'),
-        'file_site_plan' => UploadedFile::fake()->create('site-plan.pdf', 64, 'application/pdf'),
-        'file_ba_survey' => UploadedFile::fake()->create('ba-survey.pdf', 64, 'application/pdf'),
+        'file_site_plan' => UploadedFile::fake()->image('site-plan.jpg'),
+        'file_ba_survey' => UploadedFile::fake()->image('ba-survey.jpg'),
     ];
 }
 

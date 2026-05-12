@@ -124,8 +124,8 @@ const photoFields = computed<SurveyUploadField[]>(() => [
         isImage: true,
     },
     { key: 'file_mockup_3d', label: 'Mock Up 3D', isImage: false },
-    { key: 'file_site_plan', label: 'Site Plan', isImage: false },
-    { key: 'file_ba_survey', label: 'BA Survey', isImage: false },
+    { key: 'file_site_plan', label: 'Site Plan', isImage: true },
+    { key: 'file_ba_survey', label: 'BA Survey', isImage: true },
 ]);
 
 function currentUploadUrl(key: SurveyUploadKey): string | null {

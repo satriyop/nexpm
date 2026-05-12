@@ -232,21 +232,21 @@
         <td class="section-head">BA SURVEY</td>
     </tr>
     <tr>
-        <td style="padding:10px 14px; font-size:9.5pt;">
-            @if($baSurveyUrl)
-                <a href="{{ $baSurveyUrl }}" style="color:#1a56db;">{{ $baSurveyUrl }}</a>
+        <td style="padding:10px 14px; text-align:center;">
+            @if($baSurveyPath)
+                <img src="{{ $baSurveyPath }}" style="max-width:100%; max-height:280px;" alt="BA Survey">
             @else
-                <span style="color:#aaa; font-style:italic;">BA Survey document not uploaded</span>
+                <span style="color:#aaa; font-style:italic;">BA Survey image not uploaded</span>
             @endif
         </td>
     </tr>
 </table>
 
-{{-- ── AS PLAN DRAWING ──────────────────────────────────────── --}}
+{{-- ── SITE PLAN ─────────────────────────────────────────────── --}}
 <table class="section">
     <tr>
         <td class="section-head">
-            IDEAL REPORT <span style="font-weight:normal; font-size:8pt;">for mockup and quotation</span>
+            SITE PLAN
         </td>
     </tr>
     <tr>
@@ -258,17 +258,13 @@
                 {{ $site->location_name ?? $site->site_code }}
             </div>
 
-            @if($mockupPath)
+            @if($sitePlanPath)
                 <div style="text-align:center;">
-                    <img src="{{ $mockupPath }}" style="max-width:100%; max-height:220px;" alt="Site Plan">
+                    <img src="{{ $sitePlanPath }}" style="max-width:100%; max-height:220px;" alt="Site Plan">
                 </div>
-            @elseif($mockupUrl ?? null)
-                <p style="text-align:center; font-size:9pt;">
-                    Mock Up 3D: <a href="{{ $mockupUrl }}" style="color:#1a56db;">View File</a>
-                </p>
             @else
                 <table style="width:100%; height:140px; border:1px dashed #aaa; background:#f9f9f9;">
-                    <tr><td style="text-align:center; vertical-align:middle; color:#aaa; font-size:9pt;">Site plan / mockup not uploaded</td></tr>
+                    <tr><td style="text-align:center; vertical-align:middle; color:#aaa; font-size:9pt;">Site plan image not uploaded</td></tr>
                 </table>
             @endif
 
@@ -318,6 +314,26 @@
         </td>
     </tr>
 </table>
+
+{{-- ── MOCK UP 3D ───────────────────────────────────────────── --}}
+@if($mockupPath || $survey?->file_mockup_3d)
+<table class="section">
+    <tr>
+        <td class="section-head">MOCK UP 3D</td>
+    </tr>
+    <tr>
+        <td style="padding:10px 14px; text-align:center;">
+            @if($mockupPath)
+                <img src="{{ $mockupPath }}" style="max-width:100%; max-height:280px;" alt="Mock Up 3D">
+            @else
+                <a href="{{ url(Storage::url($survey->file_mockup_3d)) }}" style="color:#1a56db; font-size:9.5pt;">
+                    View Mock Up 3D File
+                </a>
+            @endif
+        </td>
+    </tr>
+</table>
+@endif
 
 @if($pdfFooterNote)
 <div style="margin-top:12px; padding:6px 10px; border-top:1px solid #ccc; font-size:7.5pt; color:#777; font-style:italic;">

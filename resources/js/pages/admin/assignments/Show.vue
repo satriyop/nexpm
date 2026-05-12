@@ -10,6 +10,7 @@ import {
     Download,
     ExternalLink,
     FileText,
+    ImageIcon,
     LockKeyhole,
     MapPin,
     Pencil,
@@ -898,9 +899,7 @@ onUnmounted(() => {
                                 <div class="flex flex-wrap gap-2">
                                     <a
                                         v-if="survey.file_mockup_3d"
-                                        :href="
-                                            storageUrl(survey.file_mockup_3d)
-                                        "
+                                        :href="storageUrl(survey.file_mockup_3d)"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
@@ -909,20 +908,29 @@ onUnmounted(() => {
                                         Mockup 3D
                                     </a>
                                     <a
-                                        v-if="survey.file_ba_survey"
-                                        :href="
-                                            storageUrl(survey.file_ba_survey)
-                                        "
+                                        v-if="survey.file_site_plan"
+                                        :href="storageUrl(survey.file_site_plan)"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
                                     >
-                                        <FileText class="size-3.5" />
+                                        <ImageIcon class="size-3.5" />
+                                        Site Plan
+                                    </a>
+                                    <a
+                                        v-if="survey.file_ba_survey"
+                                        :href="storageUrl(survey.file_ba_survey)"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
+                                    >
+                                        <ImageIcon class="size-3.5" />
                                         BA Survey
                                     </a>
                                     <span
                                         v-if="
                                             !survey.file_mockup_3d &&
+                                            !survey.file_site_plan &&
                                             !survey.file_ba_survey
                                         "
                                         class="text-xs text-muted-foreground"
@@ -1166,10 +1174,10 @@ onUnmounted(() => {
                                 >
                                 <div class="grid gap-3 sm:grid-cols-2">
                                     <div
-                                        v-for="[key, label] in [
-                                            ['file_mockup_3d', '3D Mockup'],
-                                            ['file_site_plan', 'Site Plan'],
-                                            ['file_ba_survey', 'BA Survey'],
+                                        v-for="[key, label, accept] in [
+                                            ['file_mockup_3d', '3D Mockup', '.pdf,.jpg,.jpeg,.png,.dwg'],
+                                            ['file_site_plan', 'Site Plan', 'image/*'],
+                                            ['file_ba_survey', 'BA Survey', 'image/*'],
                                         ] as const"
                                         :key="key"
                                         class="grid gap-1"
@@ -1187,7 +1195,7 @@ onUnmounted(() => {
                                         </a>
                                         <input
                                             type="file"
-                                            accept=".pdf,.jpg,.jpeg,.png,.dwg"
+                                            :accept="accept"
                                             class="text-xs"
                                             @change="
                                                 (e) => {

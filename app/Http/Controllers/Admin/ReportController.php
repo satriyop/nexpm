@@ -20,7 +20,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -318,8 +317,12 @@ class ReportController extends Controller
             }
         }
 
-        $baSurveyUrl = $survey?->file_ba_survey
-            ? url(Storage::url($survey->file_ba_survey))
+        $sitePlanPath = $survey?->file_site_plan
+            ? self::imageToDataUri(storage_path('app/public/'.$survey->file_site_plan))
+            : null;
+
+        $baSurveyPath = $survey?->file_ba_survey
+            ? self::imageToDataUri(storage_path('app/public/'.$survey->file_ba_survey))
             : null;
 
         // Left side of PDF header = Client (commissioning organisation, e.g. vGreen)
@@ -339,7 +342,7 @@ class ReportController extends Controller
         $pdfFooterNote = AppSetting::get('pdf.footer_note', '');
 
         $data = compact(
-            'assignment', 'survey', 'site', 'photos', 'mockupPath', 'baSurveyUrl',
+            'assignment', 'survey', 'site', 'photos', 'mockupPath', 'sitePlanPath', 'baSurveyPath',
             'clientName', 'clientLogoAbs', 'contractorName', 'contractorLogoAbs', 'pdfFooterNote'
         );
 
