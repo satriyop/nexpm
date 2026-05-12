@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
+use App\Models\AssignmentSurveyData;
 use App\Models\MachineType;
 use App\Models\Site;
 use App\Models\SiteType;
@@ -69,7 +70,19 @@ class SiteController extends Controller
             'invoice_url' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $powerKvaChanged = ($validated['power_kva'] ?? null) !== $site->power_kva;
+
         $site->update($validated);
+
+        if ($powerKvaChanged && $site->power_kva !== null) {
+            AssignmentSurveyData::query()
+                ->whereIn('assignment_id', $site->assignments()->select('id'))
+                ->get()
+                ->each(function (AssignmentSurveyData $surveyData) use ($site) {
+                    $surveyData->power_kva = $site->power_kva;
+                    $surveyData->save();
+                });
+        }
 
         return redirect()->route('admin.sites.edit', $site)->with('success', 'Site updated.');
     }

@@ -138,3 +138,37 @@ test('verified completed survey can generate and download ssr report', function 
         ->assertSuccessful()
         ->assertHeader('Content-Type', 'application/pdf');
 });
+
+test('setting power_kva on site after survey submission advances status to document', function () {
+    Storage::fake('public');
+
+    $assignment = surveyWorkflowAssignment();
+    $assignment->site->update(['power_kva' => null]);
+
+    $subcontractorUser = User::factory()->create([
+        'role' => Role::Subcontractor,
+        'subcontractor_id' => $assignment->subcontractor_id,
+    ]);
+
+    $this->actingAs($subcontractorUser)
+        ->post(route('subcontractor.assignments.survey', $assignment), completeSurveyUploadPayload())
+        ->assertRedirect();
+
+    expect($assignment->refresh()->status)->toBe(AssignmentStatus::Survey);
+
+    $admin = User::factory()->create(['role' => Role::SuperAdmin]);
+
+    $site = $assignment->site;
+    $this->actingAs($admin)
+        ->patch(route('admin.sites.update', $site), [
+            'location_name' => $site->location_name,
+            'address' => $site->address ?? 'Test Address',
+            'province' => $site->province ?? 'Test Province',
+            'city' => $site->city ?? 'Test City',
+            'power_kva' => '50kVA',
+        ])
+        ->assertRedirect();
+
+    expect($assignment->refresh()->status)->toBe(AssignmentStatus::Document);
+    expect($assignment->surveyData()->value('power_kva'))->toBe('50kVA');
+});
