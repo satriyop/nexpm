@@ -26,7 +26,7 @@ export type AssignmentStatus =
     | 'CONNECTION'
     | 'KWH_DONE'
     // BAST
-    | 'COMPLETED'
+    | 'SUBMITTED'
     | 'REVISION';
 
 export interface SiteType {

@@ -133,7 +133,7 @@ const statusOptions: { value: AssignmentStatus; label: string }[] = [
     { value: 'CONNECTION', label: 'Connection' },
     { value: 'KWH_DONE', label: 'KWH Done' },
     // BAST
-    { value: 'COMPLETED', label: 'Completed' },
+    { value: 'SUBMITTED', label: 'Submitted' },
     { value: 'REVISION', label: 'Revision' },
     // Shared final
     { value: 'VERIFIED', label: 'Verified' },
@@ -234,7 +234,7 @@ const statusDotMap: Record<string, string> = {
     BILLING: 'bg-cyan-500',
     CONNECTION: 'bg-blue-500',
     KWH_DONE: 'bg-violet-500',
-    COMPLETED: 'bg-blue-500',
+    SUBMITTED: 'bg-blue-500',
     REVISION: 'bg-amber-500',
     VERIFIED: 'bg-emerald-500',
     REPORTED: 'bg-purple-500',
@@ -253,7 +253,7 @@ const statusLabelMap: Record<string, string> = {
     BILLING: 'Billing',
     CONNECTION: 'Connection',
     KWH_DONE: 'KWH Done',
-    COMPLETED: 'Completed',
+    SUBMITTED: 'Submitted',
     REVISION: 'Revision',
     VERIFIED: 'Verified',
     REPORTED: 'Reported',

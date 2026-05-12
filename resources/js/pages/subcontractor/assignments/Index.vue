@@ -70,7 +70,7 @@ const statusOptions: { value: AssignmentStatus; label: string }[] = [
     { value: 'BILLING', label: 'Billing' },
     { value: 'CONNECTION', label: 'Connection' },
     { value: 'KWH_DONE', label: 'KWH Done' },
-    { value: 'COMPLETED', label: 'Completed' },
+    { value: 'SUBMITTED', label: 'Submitted' },
     { value: 'REVISION', label: 'Revision' },
     { value: 'VERIFIED', label: 'Verified' },
     { value: 'REPORTED', label: 'Reported' },

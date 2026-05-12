@@ -3,7 +3,7 @@
 **Application:** NexPM  
 **Owner:** PT Nusantara Energi Khatulistiwa (nex)  
 **Client context:** vGreen (https://vgreencharge.id) EV Charging Station rollout  
-**Last updated:** 2026-05-12
+**Last updated:** 2026-05-13
 
 ---
 
@@ -16,7 +16,7 @@ NexPM is a project management web application that coordinates the rollout of EV
 1. Super Admin imports site master data via CSV and completes additional masterdata fields through the admin UI.
 2. Admin reviews and completes site masterdata (WO numbers, cable specs, invoice tracking, etc.).
 3. Sub-Contractors log in and fill their assigned activity forms (Survey, PLN Connection, Construction, BAST), except admin-owned site/master fields such as Survey power are read-only.
-4. The system advances each assignment through activity-specific progress statuses as required fields are saved.
+4. The system advances each assignment through activity-specific progress statuses as required fields are saved. BAST assignments advance to `SUBMITTED` only via an explicit "Submit for Review" action by the Sub-Contractor.
 5. Admin verifies eligible assignments, sends BAST revisions when needed, and archives or restores assignments that leave scope.
 6. Admin exports SSR PDF, BAST COMM-TEST XLSX/ZIP, or Daily Monitoring XLSX reports.
 
@@ -148,7 +148,7 @@ The core work unit: one Site × one Activity × one SubContractor.
 | site_id                   | FK → Site               |                                                                                                                                                                 |
 | activity_type             | enum                    | SURVEY, PLN_CONNECTION, CONSTRUCTION, BAST                                                                                                                      |
 | subcontractor_id          | FK → SubContractor      |                                                                                                                                                                 |
-| status                    | enum                    | PENDING, DROP, VERIFIED, REPORTED, SURVEY, DOCUMENT, CONSTRUCTION, MACHINE_ONSITE, DONE, LIVE, REGISTRATION, BILLING, CONNECTION, KWH_DONE, COMPLETED, REVISION |
+| status                    | enum                    | PENDING, DROP, VERIFIED, REPORTED, SURVEY, DOCUMENT, CONSTRUCTION, MACHINE_ONSITE, DONE, LIVE, REGISTRATION, BILLING, CONNECTION, KWH_DONE, SUBMITTED, REVISION |
 | revision_comment          | text                    | Filled by Admin when sending back for revision                                                                                                                  |
 | verified_at / verified_by | timestamp / FK users.id | Filled when Admin verifies                                                                                                                                      |
 | reported_at               | timestamp               | Filled when included in a generated report                                                                                                                      |
@@ -190,7 +190,7 @@ PENDING
                     └─► LIVE (PLN go-live date saved)
 ```
 
-Construction currently progresses through operational statuses but is not included in `AssignmentStatus::verifiableStatuses()`. Only `DOCUMENT` and BAST `COMPLETED` are verifiable in code.
+Construction currently progresses through operational statuses but is not included in `AssignmentStatus::verifiableStatuses()`. Only `DOCUMENT`, BAST `SUBMITTED`, `LIVE`, and `KWH_DONE` are verifiable in code.
 
 **PLN Connection**
 
@@ -208,14 +208,14 @@ PLN currently progresses through operational statuses but is not included in `As
 
 ```
 PENDING
-  └─► COMPLETED  (required BAST fields and required photo checkpoints saved)
+  └─► SUBMITTED  (Sub-contractor explicitly clicks "Submit for Review")
         ├─► VERIFIED
         │     └─► REPORTED
-        └─► REVISION   (Admin sends comment)
-              └─► COMPLETED  (complete BAST data is saved again)
+        └─► REVISION   (Admin sends comment + revision note)
+              └─► SUBMITTED  (Sub-contractor clicks "Submit for Review" again)
 ```
 
-Statuses are forward-only for activity progress. Clearing a required field after a status advances does not roll the assignment back. Admin-locked statuses (`VERIFIED`, `REPORTED`, `DROP`, `REVISION`) are not overwritten automatically, except BAST `REVISION` can return to `COMPLETED` once complete BAST data is saved again.
+Statuses are forward-only for activity progress. Clearing a required field after a status advances does not roll the assignment back. Admin-locked statuses (`VERIFIED`, `REPORTED`, `DROP`, `REVISION`) are not overwritten automatically by the observer. BAST status advances only via the explicit **Submit for Review** action — the observer never auto-advances BAST status. Photos and form data continue to save immediately as uploaded.
 
 - Verification is **per assignment**, not per site.
 - A site is considered complete when all of its existing active assignments are verified/reported, not when all four activity types exist.
@@ -231,7 +231,7 @@ Statuses are forward-only for activity progress. Clearing a required field after
 | Wrong subcontractor                   | Admin can reassign. Existing activity data is deleted and the assignment is reset to `PENDING`.                   |
 | Pending assignment created by mistake | Admin can delete only assignments that are still `PENDING`.                                                       |
 | Verified or reported assignment       | Subcontractor edits are blocked. Admin actions are limited by controller rules.                                   |
-| BAST revision                         | Only BAST assignments in `COMPLETED` can be sent to `REVISION`. The revision comment is stored on the assignment. |
+| BAST revision                         | Only BAST assignments in `SUBMITTED` can be sent to `REVISION`. The revision comment is stored on the assignment. |
 
 ### 5.3 Activity Assignment Rules
 
@@ -336,33 +336,20 @@ Current status progression uses these triggers: actual start date → `CONSTRUCT
 ### 6.4 BAST
 
 Same form for both EVCS and BSS sites. Output is labeled by site charging type.
-The BAST assignment advances to `COMPLETED` when required cover fields and required photo checkpoints are present.
 
-| Field                                                 | Input Type        |
-| ----------------------------------------------------- | ----------------- |
-| Nomor SIM Card                                        | text              |
-| Go LIVE Date (PLN bypass)                             | date              |
-| Go LIVE Date (PLN)                                    | date              |
-| Plant name, address, coordinate, gmaps link           | text / url        |
-| Charger type, SN unit, ID PLN                         | text              |
-| SIM provider, installation vendor, PIC vendor contact | text              |
-| Installation date, commissioning date                 | date              |
-| Customer                                              | text              |
-| Measurements (electrical readings)                    | JSON / structured |
-| Installation verification photo checkpoints           | photo upload      |
+**Plant Information (read-only — derived from relationships):** Plant name, address, coordinate, Google Maps link, charger type, SN unit, ID PLN, installation vendor, PIC vendor contact, installation date, customer, Go LIVE Date (PLN bypass), Go LIVE Date (PLN). These are resolved from `sites`, `projects`, `main_contractors`, and the sibling `assignment_construction_data` record. They are **not stored** in `assignment_bast_data`.
 
-Required for `COMPLETED`: `plant_name`, `installation_date`, `commissioning_date`, and these checkpoint photos:
+**Editable fields (stored in `assignment_bast_data`):**
 
-- device_front_view_open
-- device_front_view_close
-- sim_kartu_perdana
-- sim_installed_sim_card
-- grounding_rod_connection
-- grounding_cable_route
-- grounding_test_ac_panel
-- kwh_kwh_meter
-- ac_front_view_open
-- cable_spec
+| Field                               | Input Type        |
+| ----------------------------------- | ----------------- |
+| Provider SIM Card (sim_provider)    | text              |
+| Nomor SIM Card                      | text              |
+| Commissioning Date                  | date              |
+| Measurements (electrical readings)  | JSON / structured |
+| Installation verification photos    | photo upload      |
+
+**Submission:** There is no auto-advance. The Sub-contractor explicitly clicks **Submit for Review** to move the assignment to `SUBMITTED`. This button is visible when the assignment is in `PENDING` or `REVISION` state. Photos upload immediately on file selection. The admin can also upload/delete BAST checkpoint photos directly from the admin view.
 
 ---
 
@@ -479,8 +466,8 @@ The Daily Report follows the reference XLSX format with 44 base columns (A–AR)
 | AF  | Machine SN (Serial Number)          | assignment_construction_data.machine_serial_number  |
 | AG  | ID PELANGGAN (ID PLN)               | assignment_pln_data.id_pelanggan                    |
 | AH  | Nomor SIM Card                      | assignment_bast_data.nomor_simcard                  |
-| AI  | Go LIVE Date (PLN bypass)           | assignment_bast_data.go_live_date_pln_pass          |
-| AJ  | Go LIVE Date (PLN)                  | assignment_bast_data.go_live_date_pln               |
+| AI  | Go LIVE Date (PLN bypass)           | assignment_construction_data.go_live_date_pln_pass  |
+| AJ  | Go LIVE Date (PLN)                  | assignment_construction_data.go_live_date_pln       |
 | AK  | Latest Remark / Notes               | sites.latest_remark                                 |
 | AL  | Tanggal Pengajuan Invoice (DP)      | sites.invoice_submission_date                       |
 | AM  | DP 35% Date                         | sites.dp_35_date                                    |

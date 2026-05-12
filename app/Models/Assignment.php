@@ -142,14 +142,14 @@ class Assignment extends Model
             ActivityType::Survey => $this->surveyData?->isComplete() ?? false,
             ActivityType::PlnConnection => $this->plnData?->isComplete() ?? false,
             ActivityType::Construction => $this->constructionData?->isComplete() ?? false,
-            ActivityType::Bast => $this->bastData?->isComplete() ?? false,
+            ActivityType::Bast => $this->status === AssignmentStatus::Submitted,
             default => false,
         };
     }
 
-    public function markCompleted(): void
+    public function markSubmitted(): void
     {
-        $this->status = AssignmentStatus::Completed;
+        $this->status = AssignmentStatus::Submitted;
         $this->save();
 
         $this->load('site.project');

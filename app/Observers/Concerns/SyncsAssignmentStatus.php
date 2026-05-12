@@ -5,7 +5,6 @@ namespace App\Observers\Concerns;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Models\Assignment;
-use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
@@ -21,19 +20,7 @@ trait SyncsAssignmentStatus
             return;
         }
 
-        // BAST exception: REVISION + complete data re-advances to COMPLETED.
-        if (
-            $assignment->status === AssignmentStatus::Revision
-            && $model instanceof AssignmentBastData
-            && $model->isComplete()
-        ) {
-            $assignment->status = AssignmentStatus::Completed;
-            $assignment->saveQuietly();
-
-            return;
-        }
-
-        // Never auto-overwrite other admin-set statuses.
+        // Never auto-overwrite admin-set statuses.
         if (in_array($assignment->status, AssignmentStatus::adminLocked(), true)) {
             return;
         }
@@ -42,7 +29,7 @@ trait SyncsAssignmentStatus
             ActivityType::Survey => $this->computeSurveyStatus($model),
             ActivityType::PlnConnection => $this->computePlnStatus($model),
             ActivityType::Construction => $this->computeConstructionStatus($model),
-            ActivityType::Bast => $this->computeBastStatus($model),
+            ActivityType::Bast => AssignmentStatus::Pending,
         };
 
         if (
@@ -126,15 +113,6 @@ trait SyncsAssignmentStatus
         return AssignmentStatus::Pending;
     }
 
-    private function computeBastStatus(Model $data): AssignmentStatus
-    {
-        if (! $data instanceof AssignmentBastData) {
-            return AssignmentStatus::Pending;
-        }
-
-        return $data->isComplete() ? AssignmentStatus::Completed : AssignmentStatus::Pending;
-    }
-
     /**
      * Returns true when $candidate is a higher status than $current for the given activity.
      * Ensures status only ever advances forward.
@@ -165,7 +143,7 @@ trait SyncsAssignmentStatus
             ],
             ActivityType::Bast => [
                 AssignmentStatus::Pending,
-                AssignmentStatus::Completed,
+                AssignmentStatus::Submitted,
             ],
         };
 

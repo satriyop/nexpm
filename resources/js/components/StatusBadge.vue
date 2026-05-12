@@ -37,7 +37,7 @@ const styles: Record<string, string> = {
     KWH_DONE:
         'border-transparent bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-200',
     // BAST
-    COMPLETED:
+    SUBMITTED:
         'border-transparent bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200',
     REVISION:
         'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
@@ -58,7 +58,7 @@ const labelMap: Record<string, string> = {
     BILLING: 'Billing',
     CONNECTION: 'Connection',
     KWH_DONE: 'KWH Done',
-    COMPLETED: 'Completed',
+    SUBMITTED: 'Submitted',
     REVISION: 'Revision',
 };
 

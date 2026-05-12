@@ -111,13 +111,13 @@ const verifyForm = useForm({});
 const canVerify = computed(
     () =>
         props.assignment.status === 'DOCUMENT' ||
-        props.assignment.status === 'COMPLETED',
+        props.assignment.status === 'SUBMITTED',
 );
 
 const canRevise = computed(
     () =>
         props.assignment.activity_type === 'BAST' &&
-        props.assignment.status === 'COMPLETED',
+        props.assignment.status === 'SUBMITTED',
 );
 
 const isDropped = computed(() => props.assignment.status === 'DROP');
@@ -1883,7 +1883,7 @@ onUnmounted(() => {
                         <CardTitle>BAST Commissioning Data</CardTitle>
                         <a
                             v-if="
-                                ['COMPLETED', 'VERIFIED', 'REPORTED'].includes(
+                                ['SUBMITTED', 'VERIFIED', 'REPORTED'].includes(
                                     assignment.status,
                                 )
                             "

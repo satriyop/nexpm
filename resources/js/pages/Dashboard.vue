@@ -48,7 +48,7 @@ interface StatusCounts {
     CONNECTION?: number;
     KWH_DONE?: number;
     // BAST
-    COMPLETED?: number;
+    SUBMITTED?: number;
     REVISION?: number;
     // Shared final
     VERIFIED?: number;
@@ -356,8 +356,8 @@ const statuses: {
         bgClass: 'bg-violet-50 dark:bg-violet-900/20',
     },
     {
-        key: 'COMPLETED',
-        label: 'Completed',
+        key: 'SUBMITTED',
+        label: 'Submitted',
         borderClass: 'border-l-blue-500',
         textClass: 'text-blue-600 dark:text-blue-400',
         dotClass: 'bg-blue-500',
@@ -430,7 +430,7 @@ const INTERMEDIATE_STATUSES: (keyof StatusCounts)[] = [
     'BILLING',
     'CONNECTION',
     'KWH_DONE',
-    'COMPLETED',
+    'SUBMITTED',
     'REVISION',
 ];
 
@@ -501,7 +501,7 @@ function cellHighlight(statusKey: string, count: number): string {
     const highlights: Record<string, string> = {
         REVISION:
             'bg-amber-50 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
-        COMPLETED:
+        SUBMITTED:
             'bg-blue-50 font-semibold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
         LIVE: 'bg-green-50 font-semibold text-green-700 dark:bg-green-900/20 dark:text-green-400',
         KWH_DONE:
@@ -603,9 +603,9 @@ const statusDescriptions: {
         description: 'kWh meter installed and verified.',
     },
     {
-        key: 'COMPLETED',
-        label: 'Completed',
-        description: 'All required data submitted; pending admin verification.',
+        key: 'SUBMITTED',
+        label: 'Submitted',
+        description: 'Subcontractor submitted for admin review.',
     },
     {
         key: 'REVISION',
@@ -666,7 +666,7 @@ const statusLabelMapFull: Record<string, string> = {
     BILLING: 'Billing',
     CONNECTION: 'Connection',
     KWH_DONE: 'KWH Done',
-    COMPLETED: 'Completed',
+    SUBMITTED: 'Submitted',
     REVISION: 'Revision',
 };
 

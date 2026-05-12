@@ -4,8 +4,6 @@ use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Enums\Role;
 use App\Models\Assignment;
-use App\Models\AssignmentBastData;
-use App\Models\AssignmentBastPhoto;
 use App\Models\AssignmentSurveyData;
 use App\Models\User;
 
@@ -79,7 +77,7 @@ test('admin can verify an assignment from a verifiable status', function () {
 
 test('admin can send BAST assignment to revision with comment', function () {
     $assignment = Assignment::factory()->bast()->create([
-        'status' => AssignmentStatus::Completed,
+        'status' => AssignmentStatus::Submitted,
     ]);
 
     $assignment->sendToRevision('Please re-upload the satellite photo.');
@@ -88,31 +86,22 @@ test('admin can send BAST assignment to revision with comment', function () {
         ->and($assignment->revision_comment)->toBe('Please re-upload the satellite photo.');
 });
 
-test('completing BAST data after revision auto-flips status back to COMPLETED', function () {
-    $assignment = Assignment::factory()->bast()->create([
-        'status' => AssignmentStatus::Revision,
+test('subcontractor can submit BAST assignment for review from PENDING or REVISION', function () {
+    $assignment = Assignment::factory()->bast()->create(['status' => AssignmentStatus::Pending]);
+    $user = User::factory()->create([
+        'role' => Role::Subcontractor,
+        'subcontractor_id' => $assignment->subcontractor_id,
     ]);
 
-    // Create BAST data record without the complete state
-    $bast = AssignmentBastData::create(['assignment_id' => $assignment->id]);
+    $this->actingAs($user)->post(route('subcontractor.assignments.submit', $assignment));
 
-    // Upload all required photos (mirrors the subcontractor photo upload flow)
-    foreach (AssignmentBastData::REQUIRED_CHECKPOINTS as $key) {
-        AssignmentBastPhoto::create([
-            'assignment_bast_data_id' => $bast->id,
-            'section' => 'required',
-            'checkpoint_key' => $key,
-            'photo_path' => 'bast/test/'.$key.'.jpg',
-        ]);
-    }
+    expect($assignment->refresh()->status)->toBe(AssignmentStatus::Submitted);
 
-    // Saving the BAST data record triggers the observer, which now sees all photos
-    $bast->plant_name = 'Test Plant';
-    $bast->installation_date = now()->toDateString();
-    $bast->commissioning_date = now()->toDateString();
-    $bast->save();
+    // After revision, subcontractor can re-submit
+    $assignment->update(['status' => AssignmentStatus::Revision]);
+    $this->actingAs($user)->post(route('subcontractor.assignments.submit', $assignment));
 
-    expect($assignment->refresh()->status)->toBe(AssignmentStatus::Completed);
+    expect($assignment->refresh()->status)->toBe(AssignmentStatus::Submitted);
 });
 
 test('survey revision is not a valid admin revision action', function () {
@@ -154,7 +143,7 @@ test('activity type and status enum labels and colors are wired', function () {
         ->and(ActivityType::Construction->label())->toBe('Construction')
         ->and(ActivityType::Bast->label())->toBe('BAST')
         ->and(AssignmentStatus::Pending->color())->toBe('gray')
-        ->and(AssignmentStatus::Completed->color())->toBe('blue')
+        ->and(AssignmentStatus::Submitted->color())->toBe('blue')
         ->and(AssignmentStatus::Document->color())->toBe('indigo')
         ->and(AssignmentStatus::Revision->color())->toBe('amber')
         ->and(AssignmentStatus::Verified->color())->toBe('green')

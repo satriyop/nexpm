@@ -27,7 +27,7 @@ enum AssignmentStatus: string
     case KwhDone = 'KWH_DONE';
 
     // BAST-specific
-    case Completed = 'COMPLETED';
+    case Submitted = 'SUBMITTED';
     case Revision = 'REVISION';
 
     public function label(): string
@@ -47,7 +47,7 @@ enum AssignmentStatus: string
             self::Billing => 'Billing',
             self::Connection => 'Connection',
             self::KwhDone => 'KWH Done',
-            self::Completed => 'Completed',
+            self::Submitted => 'Submitted',
             self::Revision => 'Revision',
         };
     }
@@ -69,7 +69,7 @@ enum AssignmentStatus: string
             self::Billing => 'cyan',
             self::Connection => 'blue',
             self::KwhDone => 'violet',
-            self::Completed => 'blue',
+            self::Submitted => 'blue',
             self::Revision => 'amber',
         };
     }
@@ -77,7 +77,7 @@ enum AssignmentStatus: string
     /** Returns statuses where the admin Verify button should be available. */
     public static function verifiableStatuses(): array
     {
-        return [self::Document, self::Completed, self::Live, self::KwhDone];
+        return [self::Document, self::Submitted, self::Live, self::KwhDone];
     }
 
     /** Returns statuses that are set by admin and must not be auto-overwritten. */

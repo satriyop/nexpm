@@ -360,7 +360,7 @@ class DashboardController extends Controller
                 $statusOrder = [
                     'PENDING', 'SURVEY', 'DOCUMENT', 'CONSTRUCTION', 'MACHINE_ONSITE',
                     'DONE', 'LIVE', 'REGISTRATION', 'BILLING', 'CONNECTION',
-                    'KWH_DONE', 'COMPLETED', 'REVISION',
+                    'KWH_DONE', 'SUBMITTED', 'REVISION',
                 ];
 
                 $cells = [];
@@ -391,7 +391,7 @@ class DashboardController extends Controller
             'workloadDistribution' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
                 $inProgressStatuses = [
                     'SURVEY', 'DOCUMENT', 'CONSTRUCTION', 'MACHINE_ONSITE', 'DONE', 'LIVE',
-                    'REGISTRATION', 'BILLING', 'CONNECTION', 'KWH_DONE', 'COMPLETED',
+                    'REGISTRATION', 'BILLING', 'CONNECTION', 'KWH_DONE', 'SUBMITTED',
                 ];
 
                 $rows = DB::table('assignments')

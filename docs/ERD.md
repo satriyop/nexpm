@@ -1,6 +1,6 @@
 # NexPM — Entity Relationship Diagram
 
-**Last updated:** 2026-05-12
+**Last updated:** 2026-05-13
 
 ---
 
@@ -153,7 +153,7 @@ erDiagram
         bigint site_id FK
         bigint subcontractor_id FK
         enum activity_type "SURVEY|PLN_CONNECTION|CONSTRUCTION|BAST"
-        enum status "PENDING|DROP|VERIFIED|REPORTED|SURVEY|DOCUMENT|CONSTRUCTION|MACHINE_ONSITE|DONE|LIVE|REGISTRATION|BILLING|CONNECTION|KWH_DONE|COMPLETED|REVISION"
+        enum status "PENDING|DROP|VERIFIED|REPORTED|SURVEY|DOCUMENT|CONSTRUCTION|MACHINE_ONSITE|DONE|LIVE|REGISTRATION|BILLING|CONNECTION|KWH_DONE|SUBMITTED|REVISION"
         text revision_comment "nullable"
         timestamp verified_at "nullable"
         bigint verified_by FK "nullable → users.id"
@@ -248,23 +248,10 @@ erDiagram
     ASSIGNMENT_BAST_DATA {
         bigint id PK
         bigint assignment_id FK UK
-        string plant_name
-        text plant_address
-        string plant_coordinate
-        string gmaps_link
-        string charger_type
-        string sn_unit
-        string id_pln
-        string sim_provider
-        string installation_vendor
-        string pic_vendor_contact
-        date installation_date
-        date commissioning_date
-        string customer
-        json measurements
-        string nomor_simcard
-        date go_live_date_pln_pass
-        date go_live_date_pln
+        string sim_provider "editable — stored"
+        string nomor_simcard "editable — stored"
+        date commissioning_date "editable — stored"
+        json measurements "electrical readings"
         timestamps created_at
         timestamps updated_at
     }
@@ -409,3 +396,9 @@ If an existing Site + Activity is imported with a different subcontractor, the a
 `report_assignments` is a many-to-many join between a Report and the Assignments it includes.
 
 **Why:** Admin selects specific verified assignments per export. One assignment could theoretically appear in multiple historical reports.
+
+### 10. BAST Masterdata — Read-Live (Option B)
+
+`assignment_bast_data` stores only three editable fields: `sim_provider`, `nomor_simcard`, and `commissioning_date`. All other cover-sheet values (plant name, address, charger type, SN unit, go-live dates, customer, etc.) are derived at display/export time from the related `sites`, `projects`, `main_contractors`, and sibling `assignment_construction_data` relationships.
+
+**Why:** Storing derived masterdata creates sync drift — if the site or project record changes after the BAST was saved, the BAST record holds stale values. Reading live from relationships eliminates this entirely. The BAST Excel exporter and the subcontractor UI both resolve cover-sheet values from relationships instead of from stored BAST columns.

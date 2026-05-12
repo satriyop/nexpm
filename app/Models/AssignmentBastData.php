@@ -19,23 +19,6 @@ class AssignmentBastData extends Model
     protected $table = 'assignment_bast_data';
 
     /**
-     * Checkpoints required for the form to be considered complete.
-     * Keys must exist in bastPhotos for isComplete() to return true.
-     */
-    public const REQUIRED_CHECKPOINTS = [
-        'device_front_view_open',
-        'device_front_view_close',
-        'sim_kartu_perdana',
-        'sim_installed_sim_card',
-        'grounding_rod_connection',
-        'grounding_cable_route',
-        'grounding_test_ac_panel',
-        'kwh_kwh_meter',
-        'ac_front_view_open',
-        'cable_spec',
-    ];
-
-    /**
      * @var list<string>
      */
     protected $fillable = [
@@ -71,22 +54,5 @@ class AssignmentBastData extends Model
     public function bastPhotos(): HasMany
     {
         return $this->hasMany(AssignmentBastPhoto::class);
-    }
-
-    public function isComplete(): bool
-    {
-        if (! $this->commissioning_date) {
-            return false;
-        }
-
-        $uploadedKeys = $this->bastPhotos()->pluck('checkpoint_key')->all();
-
-        foreach (self::REQUIRED_CHECKPOINTS as $key) {
-            if (! in_array($key, $uploadedKeys, true)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

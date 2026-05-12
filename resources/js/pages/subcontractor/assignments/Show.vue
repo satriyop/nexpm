@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
-import { AlertTriangle, CheckCircle, Lock } from 'lucide-vue-next';
+import { useForm, Head } from '@inertiajs/vue3';
+import { AlertTriangle, CheckCircle, Lock, Send } from 'lucide-vue-next';
 import { computed } from 'vue';
-import * as SubAssignmentIndex from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
+import * as SubAssignmentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
 import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
 import ConstructionForm from '@/components/activities/ConstructionForm.vue';
 import PlnForm from '@/components/activities/PlnForm.vue';
@@ -11,6 +11,7 @@ import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import AssignmentStepper from '@/components/AssignmentStepper.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import type { Assignment, AssignmentConstructionData } from '@/types';
 
 const props = defineProps<{
@@ -22,7 +23,7 @@ const props = defineProps<{
 defineOptions({
     layout: (page: { assignment: Assignment }) => ({
         breadcrumbs: [
-            { title: 'My Assignments', href: SubAssignmentIndex.index().url },
+            { title: 'My Assignments', href: SubAssignmentActions.index().url },
             { title: page.assignment.site.site_code, href: '#' },
         ],
     }),
@@ -31,6 +32,19 @@ defineOptions({
 const isReadOnly = computed(() =>
     ['VERIFIED', 'REPORTED', 'DROP'].includes(props.assignment.status),
 );
+
+const canSubmit = computed(
+    () =>
+        props.assignment.activity_type === 'BAST' &&
+        (props.assignment.status === 'PENDING' ||
+            props.assignment.status === 'REVISION'),
+);
+
+const submitForm = useForm({});
+
+function submitForReview() {
+    submitForm.post(SubAssignmentActions.submitForReview(props.assignment).url);
+}
 </script>
 
 <template>
@@ -109,6 +123,20 @@ const isReadOnly = computed(() =>
                 >. No further changes can be made.
             </AlertDescription>
         </Alert>
+
+        <!-- Submit for Review button (BAST only) -->
+        <div
+            v-if="canSubmit && !isLocked"
+            class="flex justify-end"
+        >
+            <Button
+                :disabled="submitForm.processing"
+                @click="submitForReview"
+            >
+                <Send class="mr-2 h-4 w-4" />
+                {{ submitForm.processing ? 'Submitting…' : 'Submit for Review' }}
+            </Button>
+        </div>
 
         <!-- Activity-specific forms -->
         <template v-if="!isLocked">

@@ -200,7 +200,7 @@ class AssignmentController extends Controller
         abort_unless(
             in_array($assignment->status, AssignmentStatus::verifiableStatuses(), true),
             422,
-            'Assignment must be in Document or Completed state before verifying.',
+            'Assignment must be in Document, Submitted, Live, or KWH Done state before verifying.',
         );
 
         $assignment->markVerified($this->currentUser());
@@ -221,9 +221,9 @@ class AssignmentController extends Controller
 
         abort_unless(
             $assignment->activity_type === ActivityType::Bast
-            && $assignment->status === AssignmentStatus::Completed,
+            && $assignment->status === AssignmentStatus::Submitted,
             422,
-            'Only BAST assignments in Completed state can be sent for revision.',
+            'Only BAST assignments in Submitted state can be sent for revision.',
         );
 
         $validated = $request->validate([
@@ -621,9 +621,9 @@ class AssignmentController extends Controller
 
         abort_unless($assignment->activity_type === ActivityType::Bast, 422, 'Only BAST assignments have a commissioning report.');
         abort_unless(
-            in_array($assignment->status, [AssignmentStatus::Completed, AssignmentStatus::Verified, AssignmentStatus::Reported], true),
+            in_array($assignment->status, [AssignmentStatus::Submitted, AssignmentStatus::Verified, AssignmentStatus::Reported], true),
             422,
-            'Report is only available once the assignment is completed.'
+            'Report is only available once the assignment is submitted.'
         );
 
         $spreadsheet = $exportService->generate($assignment);
