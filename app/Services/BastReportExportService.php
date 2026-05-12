@@ -2,16 +2,12 @@
 
 namespace App\Services;
 
-use App\ActivityFields\BastFields;
 use App\Enums\ActivityType;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
 class BastReportExportService
@@ -165,7 +161,6 @@ class BastReportExportService
         $this->fillCoverSheet($spreadsheet, $bastData, $assignment, $siblingConstruction);
         $this->fillMeasurements($spreadsheet, $bastData, $isBss);
         $this->embedPhotos($spreadsheet, $bastData, $isBss);
-        $this->fillSupplementalFields($spreadsheet, $bastData, $siblingConstruction);
 
         return $spreadsheet;
     }
@@ -189,7 +184,7 @@ class BastReportExportService
             'D9' => $site->machineType?->name,
             'D10' => $siblingConstruction?->machine_serial_number,
             'D11' => null,
-            'D12' => $bastData?->sim_provider,
+            'D12' => implode(' / ', array_filter([$bastData?->sim_provider, $bastData?->nomor_simcard])),
             'D13' => $vendor,
             'D14' => $site->project?->mainContractor?->pic,
             'D15' => $siblingConstruction?->cons_actual_done_date?->format('d/m/Y'),
@@ -220,53 +215,6 @@ class BastReportExportService
         // Grounding resistance on the Grounding sheet
         $groundingSheet = $spreadsheet->getSheetByName('Grounding');
         $groundingSheet?->setCellValue(self::GROUNDING_OHM_CELL, ($measurements['grounding_resistance'] ?? '').' Ω');
-    }
-
-    private function fillSupplementalFields(Spreadsheet $spreadsheet, ?AssignmentBastData $bastData, ?AssignmentConstructionData $siblingConstruction): void
-    {
-        $supplementalFields = BastFields::supplementalFields();
-
-        $constructionRows = [
-            ['label' => 'Go Live Date (PLN Bypass)', 'value' => $siblingConstruction?->go_live_date_pln_pass?->format('d/m/Y')],
-            ['label' => 'Go Live Date (PLN)', 'value' => $siblingConstruction?->go_live_date_pln?->format('d/m/Y')],
-        ];
-
-        $hasData = ! empty($supplementalFields) || $siblingConstruction !== null;
-
-        if (! $hasData) {
-            return;
-        }
-
-        $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Additional Data');
-
-        $headers = ['Field', 'Value'];
-        foreach ($headers as $col => $header) {
-            $cell = $sheet->getCell(Coordinate::stringFromColumnIndex($col + 1).'1');
-            $cell->setValue($header);
-            $cell->getStyle()->getFont()->setBold(true);
-            $cell->getStyle()->getFill()
-                ->setFillType(Fill::FILL_SOLID)
-                ->getStartColor()->setRGB('D9E1F2');
-            $cell->getStyle()->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        }
-
-        $rowNum = 2;
-
-        foreach ($supplementalFields as $field) {
-            $sheet->getCell('A'.$rowNum)->setValue($field['label']);
-            $sheet->getCell('B'.$rowNum)->setValue($bastData?->{$field['key']} ?? '');
-            $rowNum++;
-        }
-
-        foreach ($constructionRows as $row) {
-            $sheet->getCell('A'.$rowNum)->setValue($row['label']);
-            $sheet->getCell('B'.$rowNum)->setValue($row['value'] ?? '');
-            $rowNum++;
-        }
-
-        $sheet->getColumnDimension('A')->setWidth(30);
-        $sheet->getColumnDimension('B')->setAutoSize(true);
     }
 
     private function embedPhotos(Spreadsheet $spreadsheet, ?AssignmentBastData $bastData, bool $isBss): void
