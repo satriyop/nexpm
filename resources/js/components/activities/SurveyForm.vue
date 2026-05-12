@@ -300,7 +300,8 @@ function currentUploadUrl(key: SurveyUploadKey): string | null {
                                 v-else
                                 :model-value="(surveyForm as any)[field.key]"
                                 :current-url="currentUploadUrl(field.key)"
-                                accept=".pdf,.doc,.docx,image/*"
+                                accept=".pdf,.doc,.docx,.dwg,image/*"
+                                :max-size-kb="20480"
                                 :readonly="isReadOnly"
                                 :test-id="`survey-${field.key}`"
                                 @update:model-value="
