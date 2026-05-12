@@ -1996,6 +1996,11 @@ onUnmounted(() => {
                                 :assignment="assignment"
                                 :is-read-only="false"
                                 :sibling-construction="siblingConstruction"
+                                :submit-url="
+                                    AdminAssignmentActions.updateBastData(
+                                        assignment,
+                                    ).url
+                                "
                                 :store-photo-url="
                                     AdminAssignmentActions.storeBastPhoto(
                                         assignment,

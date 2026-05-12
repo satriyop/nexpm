@@ -13,6 +13,7 @@ import type { Assignment } from '@/types';
 const props = defineProps<{
     assignment: Assignment;
     isReadOnly: boolean;
+    submitUrl?: string;
     storePhotoUrl?: string;
     deletePhotoUrlFn?: (photoId: number) => string;
     siblingConstruction?: import('@/types').AssignmentConstructionData | null;
@@ -51,7 +52,9 @@ const bastForm = useForm({
 });
 
 function submitBast() {
-    bastForm.patch(SubActions.updateBastData(props.assignment).url);
+    bastForm.patch(
+        props.submitUrl ?? SubActions.updateBastData(props.assignment).url,
+    );
 }
 
 const bastPhotos = computed(
