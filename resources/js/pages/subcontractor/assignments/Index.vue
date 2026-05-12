@@ -20,10 +20,13 @@ import type { Assignment, AssignmentStatus, PaginatedData } from '@/types';
 type Filters = {
     search?: string;
     status?: string;
+    activity_type?: string;
+    project_id?: string;
 };
 
 const props = defineProps<{
     assignments: PaginatedData<Assignment>;
+    projects: { id: number; name: string }[];
     filters: Filters;
 }>();
 
@@ -42,12 +45,16 @@ const ALL = '__all__';
 
 const search = ref<string>(props.filters.search ?? '');
 const status = ref<string>(props.filters.status ?? ALL);
+const activityType = ref<string>(props.filters.activity_type ?? ALL);
+const projectId = ref<string>(props.filters.project_id ?? ALL);
 
 watch(
     () => props.filters,
     (next) => {
         search.value = next.search ?? '';
         status.value = next.status ?? ALL;
+        activityType.value = next.activity_type ?? ALL;
+        projectId.value = next.project_id ?? ALL;
     },
 );
 
@@ -71,7 +78,11 @@ const statusOptions: { value: AssignmentStatus; label: string }[] = [
 ];
 
 const hasActiveFilters = computed(
-    () => search.value !== '' || status.value !== ALL,
+    () =>
+        search.value !== '' ||
+        status.value !== ALL ||
+        activityType.value !== ALL ||
+        projectId.value !== ALL,
 );
 
 function applyFilters(): void {
@@ -85,6 +96,14 @@ function applyFilters(): void {
         query.status = status.value;
     }
 
+    if (activityType.value !== ALL) {
+        query.activity_type = activityType.value;
+    }
+
+    if (projectId.value !== ALL) {
+        query.project_id = projectId.value;
+    }
+
     router.get(SubAssignmentActions.index().url, query, {
         preserveState: true,
         preserveScroll: true,
@@ -95,6 +114,8 @@ function applyFilters(): void {
 function resetFilters(): void {
     search.value = '';
     status.value = ALL;
+    activityType.value = ALL;
+    projectId.value = ALL;
     applyFilters();
 }
 
@@ -193,7 +214,7 @@ function daysStalled(assignment: Assignment): number | null {
             class="flex flex-col gap-3 rounded-xl border border-sidebar-border/70 bg-card p-4 sm:flex-row sm:items-end dark:border-sidebar-border"
         >
             <div
-                class="grid flex-1 grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2"
+                class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
             >
                 <div class="grid gap-1.5">
                     <label class="text-xs font-medium text-muted-foreground"
@@ -214,6 +235,30 @@ function daysStalled(assignment: Assignment): number | null {
                 </div>
                 <div class="grid gap-1.5">
                     <label class="text-xs font-medium text-muted-foreground"
+                        >Activity</label
+                    >
+                    <Select
+                        v-model="activityType"
+                        @update:model-value="applyFilters"
+                    >
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="All activities" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All activities</SelectItem>
+                            <SelectItem value="SURVEY">Survey</SelectItem>
+                            <SelectItem value="PLN_CONNECTION"
+                                >PLN Connection</SelectItem
+                            >
+                            <SelectItem value="CONSTRUCTION"
+                                >Construction</SelectItem
+                            >
+                            <SelectItem value="BAST">BAST</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid gap-1.5">
+                    <label class="text-xs font-medium text-muted-foreground"
                         >Status</label
                     >
                     <Select v-model="status" @update:model-value="applyFilters">
@@ -228,6 +273,29 @@ function daysStalled(assignment: Assignment): number | null {
                                 :value="opt.value"
                             >
                                 {{ opt.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid gap-1.5">
+                    <label class="text-xs font-medium text-muted-foreground"
+                        >Project</label
+                    >
+                    <Select
+                        v-model="projectId"
+                        @update:model-value="applyFilters"
+                    >
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="All projects" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All projects</SelectItem>
+                            <SelectItem
+                                v-for="project in projects"
+                                :key="project.id"
+                                :value="String(project.id)"
+                            >
+                                {{ project.name }}
                             </SelectItem>
                         </SelectContent>
                     </Select>

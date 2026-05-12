@@ -17,6 +17,7 @@ use App\Models\AssignmentBastPhoto;
 use App\Models\AssignmentConstructionPhoto;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
+use App\Models\Project;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -47,11 +48,25 @@ class AssignmentController extends Controller
             $query->where('status', $request->string('status'));
         }
 
+        if ($request->filled('activity_type')) {
+            $query->where('activity_type', $request->string('activity_type'));
+        }
+
+        if ($request->filled('project_id')) {
+            $query->whereHas('site', fn ($q) => $q->where('project_id', $request->integer('project_id')));
+        }
+
         $assignments = $query->latest('id')->paginate(25)->withQueryString();
+
+        $projects = Project::query()
+            ->whereHas('sites.assignments', fn ($q) => $q->where('subcontractor_id', $user->subcontractor_id))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return Inertia::render('subcontractor/assignments/Index', [
             'assignments' => $assignments,
-            'filters' => $request->only(['search', 'status']),
+            'projects' => $projects,
+            'filters' => $request->only(['search', 'status', 'activity_type', 'project_id']),
         ]);
     }
 
