@@ -10,6 +10,7 @@ use App\Models\Assignment;
 use App\Models\AssignmentAuditLog;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
+use App\Models\AssignmentConstructionPhoto;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
 use App\Models\MainContractor;
@@ -20,6 +21,7 @@ use App\Services\BastReportExportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -434,6 +436,45 @@ class AssignmentController extends Controller
         ]);
 
         return back()->with('success', 'Construction data updated.');
+    }
+
+    public function storeConstructionPhoto(Request $request, Assignment $assignment): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+        abort_unless($assignment->activity_type === ActivityType::Construction, 422, 'Activity type mismatch.');
+
+        $request->validate([
+            'photo' => ['required', 'file', 'image', 'max:10240'],
+        ]);
+
+        $constructionData = $assignment->constructionData()->firstOrCreate([]);
+
+        $path = $request->file('photo')->store('construction', 'public');
+
+        AssignmentConstructionPhoto::query()->create([
+            'assignment_construction_data_id' => $constructionData->id,
+            'path' => $path,
+        ]);
+
+        $constructionData->touch();
+
+        return back()->with('success', 'Photo uploaded.');
+    }
+
+    public function destroyConstructionPhoto(Assignment $assignment, AssignmentConstructionPhoto $photo): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+        abort_unless($assignment->activity_type === ActivityType::Construction, 422, 'Activity type mismatch.');
+
+        $constructionData = $photo->constructionData;
+        abort_unless($constructionData->assignment_id === $assignment->id, 403);
+
+        Storage::disk('public')->delete($photo->path);
+        $photo->delete();
+
+        $constructionData->touch();
+
+        return back()->with('success', 'Photo removed.');
     }
 
     public function updateBastData(Request $request, Assignment $assignment): RedirectResponse

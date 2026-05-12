@@ -67,6 +67,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::match(['post', 'patch'], 'assignments/{assignment}/admin-survey', [Admin\AssignmentController::class, 'updateSurveyData'])->name('assignments.admin-survey');
     Route::patch('assignments/{assignment}/admin-pln', [Admin\AssignmentController::class, 'updatePlnData'])->name('assignments.admin-pln');
     Route::patch('assignments/{assignment}/admin-construction', [Admin\AssignmentController::class, 'updateConstructionSubconData'])->name('assignments.admin-construction');
+    Route::post('assignments/{assignment}/construction/photos', [Admin\AssignmentController::class, 'storeConstructionPhoto'])->name('assignments.construction.photos');
+    Route::delete('assignments/{assignment}/construction/photos/{photo}', [Admin\AssignmentController::class, 'destroyConstructionPhoto'])->name('assignments.construction.photos.destroy');
     Route::patch('assignments/{assignment}/admin-bast', [Admin\AssignmentController::class, 'updateBastData'])->name('assignments.admin-bast');
     Route::patch('assignments/{assignment}/reassign', [Admin\AssignmentController::class, 'reassign'])->name('assignments.reassign');
 

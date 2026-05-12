@@ -16,6 +16,7 @@ import {
     Pencil,
     RefreshCw,
     RotateCw,
+    X,
 } from 'lucide-vue-next';
 import { computed, onUnmounted, ref } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
@@ -48,6 +49,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import PhotoUpload from '@/components/PhotoUpload.vue';
 import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
 import type { Assignment } from '@/types';
@@ -319,6 +321,33 @@ function submitAdminConstruction(): void {
                 showConstructionEdit.value = false;
             },
         },
+    );
+}
+
+// --- Admin construction photo upload ---
+const constructionUploadingPhoto = ref(false);
+const constructionUploadKey = ref(0);
+
+function onAdminConstructionPhotoSelected(file: File | null): void {
+    if (!file) return;
+    const uploadForm = useForm({ photo: file });
+    constructionUploadingPhoto.value = true;
+    uploadForm.post(AdminAssignmentActions.storeConstructionPhoto(props.assignment).url, {
+        forceFormData: true,
+        onFinish: () => {
+            constructionUploadingPhoto.value = false;
+            constructionUploadKey.value++;
+        },
+    });
+}
+
+function deleteAdminConstructionPhoto(photoId: number): void {
+    router.delete(
+        AdminAssignmentActions.destroyConstructionPhoto({
+            assignment: props.assignment.id,
+            photo: photoId,
+        }).url,
+        { preserveScroll: true },
     );
 }
 
@@ -1664,32 +1693,47 @@ onUnmounted(() => {
                                     Progress Photos
                                 </h3>
                                 <div
-                                    v-if="
-                                        construction.construction_photos
-                                            .length === 0
-                                    "
-                                    class="text-sm text-muted-foreground"
+                                    v-if="construction.construction_photos.length === 0"
+                                    class="mb-3 text-sm text-muted-foreground"
                                 >
                                     No progress photos uploaded.
                                 </div>
                                 <div
                                     v-else
-                                    class="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                                    class="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4"
                                 >
-                                    <a
+                                    <div
                                         v-for="photo in construction.construction_photos"
                                         :key="photo.id"
-                                        :href="storageUrl(photo.path)"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                        class="group relative"
                                     >
-                                        <img
-                                            :src="storageUrl(photo.path)"
-                                            class="h-24 w-full rounded-md border border-sidebar-border/70 object-cover dark:border-sidebar-border"
-                                            alt="Construction progress"
-                                        />
-                                    </a>
+                                        <a
+                                            :href="storageUrl(photo.path)"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <img
+                                                :src="storageUrl(photo.path)"
+                                                class="h-24 w-full rounded-md border border-sidebar-border/70 object-cover dark:border-sidebar-border"
+                                                alt="Construction progress"
+                                            />
+                                        </a>
+                                        <button
+                                            type="button"
+                                            class="absolute top-1 right-1 hidden size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground group-hover:flex"
+                                            title="Remove photo"
+                                            @click="deleteAdminConstructionPhoto(photo.id)"
+                                        >
+                                            <X class="size-3" />
+                                        </button>
+                                    </div>
                                 </div>
+                                <PhotoUpload
+                                    :key="constructionUploadKey"
+                                    :model-value="null"
+                                    :readonly="false"
+                                    @update:model-value="onAdminConstructionPhotoSelected"
+                                />
                             </div>
                             <Separator />
                             <div class="flex justify-end">
