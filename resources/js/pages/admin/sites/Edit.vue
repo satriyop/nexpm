@@ -548,6 +548,18 @@ function removeAssignment(assignment: Assignment): void {
                         />
                     </div>
                     <div class="grid gap-1.5">
+                        <Label>Power / Daya (kVA)</Label>
+                        <Select v-model="form.power_kva">
+                            <SelectTrigger><SelectValue placeholder="Select power" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="7.7kVA">7.7 kVA</SelectItem>
+                                <SelectItem value="22kVA">22 kVA</SelectItem>
+                                <SelectItem value="50kVA">50 kVA</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="form.errors.power_kva" />
+                    </div>
+                    <div class="grid gap-1.5">
                         <Label for="ssr_url">SSR URL</Label>
                         <Input id="ssr_url" v-model="form.ssr_url" type="url" />
                         <InputError :message="form.errors.ssr_url" />

@@ -1,6 +1,6 @@
 # NexPM — Entity Relationship Diagram
 
-**Last updated:** 2026-05-11
+**Last updated:** 2026-05-12
 
 ---
 
@@ -95,6 +95,7 @@ erDiagram
         string ssr_url
         string nidi_slo_bpujl_url
         string sik_url
+        string power_kva
         text latest_remark
         date invoice_submission_date
         date dp_35_date
@@ -322,6 +323,7 @@ erDiagram
     MAIN_CONTRACTORS ||--o{ MAIN_CONTRACTOR_SUBCONTRACTOR : ""
     SUBCONTRACTORS ||--o{ MAIN_CONTRACTOR_SUBCONTRACTOR : ""
 
+    MAIN_CONTRACTORS ||--o{ PROJECTS : "owns"
     CLIENTS ||--o{ PROJECTS : "has many"
 
     PROJECTS ||--o{ SITES : "has many"
@@ -390,7 +392,19 @@ A site's activity scope is defined by which assignments exist on it — not by a
 
 The current implementation scopes selectable subcontractors through `main_contractor_subcontractor`. It does not enforce activity compatibility by subcontractor type because that table/column no longer exists.
 
-### 7. Reports via Junction Table
+### 7. Site Power is the Survey Power Source of Truth
+
+`sites.power_kva` is managed by Admin or Super Admin on the Site masterdata screen. The Survey form displays it read-only to Subcontractors. When Survey data is saved, the backend mirrors the current site value into `assignment_survey_data.power_kva` so existing completion checks and report exporters can keep reading the Survey data table.
+
+**Why:** Power / daya is controlled by Admin-side site masterdata, but Survey completion and historical reports already depend on the Survey data record.
+
+### 8. Assignment Import Uses Site + Activity Upsert
+
+Assignment CSV import treats Site + Activity as the unique work scope. Blank subcontractor rows are skipped, so an initial template can assign only Survey and a later import can fill Construction, PLN, or BAST for the same site.
+
+If an existing Site + Activity is imported with a different subcontractor, the assignment is updated and the import result includes a warning. The import does not delete existing activity data; the UI reassignment action is the destructive reset path.
+
+### 9. Reports via Junction Table
 
 `report_assignments` is a many-to-many join between a Report and the Assignments it includes.
 

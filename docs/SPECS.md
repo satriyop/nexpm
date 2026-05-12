@@ -3,7 +3,7 @@
 **Application:** NexPM  
 **Owner:** PT Nusantara Energi Khatulistiwa (nex)  
 **Client context:** vGreen (https://vgreencharge.id) EV Charging Station rollout  
-**Last updated:** 2026-05-11
+**Last updated:** 2026-05-12
 
 ---
 
@@ -15,7 +15,7 @@ NexPM is a project management web application that coordinates the rollout of EV
 
 1. Super Admin imports site master data via CSV and completes additional masterdata fields through the admin UI.
 2. Admin reviews and completes site masterdata (WO numbers, cable specs, invoice tracking, etc.).
-3. Sub-Contractors log in and fill their assigned activity forms (Survey, PLN Connection, Construction, BAST).
+3. Sub-Contractors log in and fill their assigned activity forms (Survey, PLN Connection, Construction, BAST), except admin-owned site/master fields such as Survey power are read-only.
 4. The system advances each assignment through activity-specific progress statuses as required fields are saved.
 5. Admin verifies eligible assignments, sends BAST revisions when needed, and archives or restores assignments that leave scope.
 6. Admin exports SSR PDF, BAST COMM-TEST XLSX/ZIP, or Daily Monitoring XLSX reports.
@@ -40,7 +40,7 @@ NexPM is a project management web application that coordinates the rollout of EV
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Super Admin**         | System owner. Manages all Main Contractors. Uploads Site master data CSV and Sub-Con assignment CSV. Creates Admin accounts. Edits all site masterdata fields including invoice/payment columns.                                                                                                                                                          |
 | **Admin**               | Scoped to one Main Contractor. Manages day-to-day operations: completes and edits site masterdata fields, monitors assignment progress, fills Construction prerequisites, verifies eligible activities, sends BAST revision requests, edits sub-con data directly, generates reports, creates Sub-Contractor accounts, and edits invoice/payment columns. |
-| **Sub-Contractor User** | One account per Sub-Contractor company. Logs in via web app to fill assigned activity forms. All field workers at a company share the same account.                                                                                                                                                                                                       |
+| **Sub-Contractor User** | One account per Sub-Contractor company. Logs in via web app to fill assigned activity forms. Site/master fields managed by Admin or Super Admin, such as power kVA, are visible but read-only. All field workers at a company share the same account.                                                                                                  |
 | **Client**              | No portal access in current implementation. Receives exported report files sent manually by Admin.                                                                                                                                                                                                                                                        |
 
 ---
@@ -75,7 +75,8 @@ NexPM is a project management web application that coordinates the rollout of EV
 | phone              | string              |
 | email              | string              |
 | pic                | string              |
-| main_contractor_id | FK → MainContractor |
+
+Clients are linked to one or more Main Contractors through `client_main_contractor`. A Project still belongs to one Client and one Main Contractor.
 
 #### Project
 
@@ -115,6 +116,7 @@ Masterdata fields marked **[Admin]** are filled by Admin or Super Admin via the 
 | ssr_url                       | string           | **[Admin]**             | SS Report & Quotation URL                 |
 | nidi_slo_bpujl_url            | string           | **[Admin]**             | NIDI SLO / BPUJL document URL             |
 | sik_url                       | string           | **[Admin]**             | SIK document URL                          |
+| power_kva                     | string           | **[Admin]**             | Survey power / daya source of truth       |
 | latest_remark                 | text             | **[Admin]**             | Free-form notes / latest status remark    |
 | invoice_submission_date       | date             | **[Admin/Super Admin]** | Tanggal Pengajuan Invoice (DP)            |
 | dp_35_date                    | date             | **[Admin/Super Admin]** | DP 35% payment received date              |
@@ -133,8 +135,9 @@ Masterdata fields marked **[Admin]** are filled by Admin or Super Admin via the 
 | phone              | string              |
 | email              | string              |
 | pic                | string              |
-| main_contractor_id | FK → MainContractor |
 | code               | string (unique)     |
+
+Subcontractors are linked to one or more Main Contractors through `main_contractor_subcontractor`. A single Subcontractor can serve multiple Main Contractors, but an Assignment still points to exactly one Subcontractor.
 
 #### Assignment
 
@@ -263,7 +266,7 @@ The Survey assignment advances to `DOCUMENT` when all required Survey fields/pho
 | Jenis Charger (BSS / EVCS)             | text         |
 | SS Date — Schedule with Landlord       | date         |
 | Cable Pulling Type                     | text         |
-| Power / Daya (kVA)                     | text         |
+| Power / Daya (kVA)                     | read-only text from Site |
 | Tipe Jaringan PLN (1 phase / 3 phase)  | text         |
 | Parking Slot                           | text         |
 | Foto tampak keseluruhan site           | photo upload |
@@ -277,7 +280,9 @@ The Survey assignment advances to `DOCUMENT` when all required Survey fields/pho
 | BA Survey                              | file upload  |
 | SS Report Submission Date              | date         |
 
-Required for `DOCUMENT`: surveyor name, PIC location name, PIC location phone, charger type, SS schedule date, cable pulling type, power kVA, PLN network type, parking slot, and the five photo fields. The document uploads and additional info are stored and can appear in SSR output but are not part of the `isComplete()` check.
+Power / Daya (kVA) is read-only in the Survey form. Admin or Super Admin manages it on the Site masterdata screen (`sites.power_kva`). When Admin or Subcontractor saves Survey data, the backend copies the current site value into `assignment_survey_data.power_kva` for historical/report compatibility and ignores any submitted/tampered `power_kva` value.
+
+Required for `DOCUMENT`: surveyor name, PIC location name, PIC location phone, charger type, SS schedule date, cable pulling type, power kVA, PLN network type, parking slot, and the five photo fields. Because power kVA is required for `DOCUMENT`, Admin/Super Admin must fill `sites.power_kva` before the Survey can be considered complete. The document uploads and additional info are stored and can appear in SSR output but are not part of the `isComplete()` check.
 
 ### 6.2 PLN CONNECTION
 
@@ -381,7 +386,7 @@ The Site Masterdata Edit UI is the primary interface for admins to complete and 
 
 **Section 2 — Survey & Technical Info**:
 
-- SS WO Number, Cable Length to Panel, Cable Length Panel to Charger, Charging Station Count, SSR URL, Parking Slot
+- SS WO Number, Cable Length to Panel, Cable Length Panel to Charger, Charging Station Count, SSR URL, Parking Slot, Power / Daya (kVA)
 
 **Section 3 — Permits & Legal**:
 
@@ -411,7 +416,7 @@ The Site Masterdata Edit UI is the primary interface for admins to complete and 
 ### 8.2 Sub-Contractor Assignment CSV
 
 - **Who uploads:** Super Admin or Admin
-- **Behavior:** UPSERT — update existing assignment if match found, otherwise create new Assignment
+- **Behavior:** UPSERT by Site + Activity — update existing assignment if match found, otherwise create new Assignment
 - **Columns:**
 
 | Column             | Description                                   |
@@ -420,7 +425,9 @@ The Site Masterdata Edit UI is the primary interface for admins to complete and 
 | activity_type      | SURVEY / PLN_CONNECTION / CONSTRUCTION / BAST |
 | subcontractor_code | Matches SubContractor unique identifier       |
 
-The imported subcontractor must be linked to the imported site's project Main Contractor. Blank `subcontractor_code` rows are skipped so a template can be partially filled, and reassigning an existing site/activity to a different subcontractor returns a warning in the import result.
+The imported subcontractor must be linked to the imported site's project Main Contractor. Blank `subcontractor_code` rows are skipped so a template can be partially filled, and a later import can fill the other activities for the same site.
+
+There is no parallel subcontractor assignment for the same Site + Activity. If an imported row targets an existing Site + Activity with a different subcontractor, the assignment's `subcontractor_id` is updated and the import result returns a warning showing the old and new subcontractor. CSV reassignment preserves existing activity data and status; use the assignment reassign action in the UI when the intent is to reset activity data to `PENDING`.
 
 ---
 
@@ -455,7 +462,7 @@ The Daily Report follows the reference XLSX format with 44 base columns (A–AR)
 | O   | Cable Length (kWh to Panel)         | sites.cable_length_to_panel                         |
 | P   | Cable Length (Panel to Charger)     | sites.cable_length_panel_to_charger                 |
 | Q   | Cable Pulling Type                  | assignment_survey_data.cable_pulling_type           |
-| R   | Power (Daya kVA)                    | assignment_survey_data.power_kva                    |
+| R   | Power (Daya kVA)                    | sites.power_kva, mirrored to assignment_survey_data.power_kva on Survey save |
 | S   | SSR URL                             | sites.ssr_url                                       |
 | T   | Parking Slot                        | assignment_survey_data.parking_slot                 |
 | U   | Charging Station Count              | sites.charging_station_count                        |
@@ -539,5 +546,11 @@ BAST form, admin verification dashboard, Site Masterdata Edit UI, and report gen
 | Frontend | Vue 3 + Inertia.js v3 |
 | Styling  | Tailwind CSS v4       |
 | Auth     | Laravel Fortify       |
-| Testing  | Pest v4               |
+| Testing  | Pest v4, Pest Browser, Playwright |
 | Routing  | Laravel Wayfinder     |
+
+### 13.1 Test Coverage Notes
+
+- Feature tests cover the Survey workflow end to end: Admin/Subcontractor upload request, backend file storage, power kVA tamper protection, automatic `DOCUMENT` status transition, Admin verification, SSR report creation, and PDF download.
+- Pest Browser + Playwright are installed for browser smoke coverage. Browser tests currently validate page rendering, survey upload file selection UI, and JavaScript errors.
+- Pest Browser's internal Laravel HTTP server does not currently hydrate multipart file uploads into Laravel's uploaded files bag, so browser tests do not assert backend file persistence. File persistence is covered by feature tests instead.

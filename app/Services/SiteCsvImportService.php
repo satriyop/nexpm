@@ -77,6 +77,7 @@ class SiteCsvImportService
                 'ss_wo_number' => $row['ss_wo_number'] ?: null,
                 'cable_length_to_panel' => $row['cable_length_to_panel'] !== '' ? $row['cable_length_to_panel'] : null,
                 'charging_station_count' => $row['charging_station_count'] !== '' ? (int) $row['charging_station_count'] : null,
+                'power_kva' => $row['power_kva'] ?: null,
             ];
 
             $existing = Site::query()->where('site_code', $row['site_code'])->first();

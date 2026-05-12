@@ -30,6 +30,7 @@ class SiteMasterDataImport
         'ss_wo_number',
         'cable_length_to_panel',
         'charging_station_count',
+        'power_kva',
     ];
 
     /**
