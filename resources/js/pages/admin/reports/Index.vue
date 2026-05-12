@@ -205,6 +205,10 @@ const form = useForm({
     assignment_ids: [] as number[],
 });
 
+const dailyForm = useForm({
+    report_type: 'DAILY' as const,
+});
+
 function generateReport(): void {
     if (activeTab.value === 'HISTORY') {
         return;
@@ -217,6 +221,10 @@ function generateReport(): void {
             selectedIds.value = [];
         },
     });
+}
+
+function generateDailyReport(): void {
+    dailyForm.post(AdminReportActions.store().url);
 }
 
 const regeneratingId = ref<number | null>(null);
@@ -293,9 +301,32 @@ function formatDate(iso: string): string {
             </button>
         </div>
 
-        <!-- Assignment table (SSR / BAST / DAILY tabs) -->
+        <!-- Daily Report tab — one-click, no selection needed -->
         <div
-            v-if="activeTab !== 'HISTORY'"
+            v-if="activeTab === 'DAILY'"
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div class="flex flex-col gap-4 px-6 py-8 text-center">
+                <div class="flex flex-col items-center gap-2">
+                    <FileText class="size-10 text-muted-foreground/60" />
+                    <h2 class="text-base font-semibold">Daily Monitoring Report</h2>
+                    <p class="max-w-md text-sm text-muted-foreground">
+                        Generates a snapshot of <strong>all sites</strong> regardless of status.
+                        No selection needed — click to export instantly.
+                    </p>
+                </div>
+                <div class="flex justify-center">
+                    <Button :disabled="dailyForm.processing" @click="generateDailyReport">
+                        <FileText class="size-4" />
+                        {{ dailyForm.processing ? 'Generating…' : 'Generate Daily Report' }}
+                    </Button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assignment table (SSR / BAST tabs) -->
+        <div
+            v-else-if="activeTab !== 'HISTORY'"
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div

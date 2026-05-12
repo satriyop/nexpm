@@ -30,7 +30,7 @@ test('admin can generate a report from verified assignments', function () {
 
     $this->actingAs($admin)
         ->post(route('admin.reports.store'), [
-            'report_type' => 'DAILY',
+            'report_type' => 'SSR',
             'assignment_ids' => $ids,
         ])
         ->assertRedirect(route('admin.reports.index'));
@@ -52,10 +52,26 @@ test('store rejects non-verified assignments', function () {
 
     $this->actingAs($admin)
         ->post(route('admin.reports.store'), [
-            'report_type' => 'DAILY',
+            'report_type' => 'SSR',
             'assignment_ids' => [$pending->id],
         ])
         ->assertStatus(422);
+});
+
+test('admin can generate daily report without selecting assignments', function () {
+    $admin = User::factory()->create(['role' => Role::SuperAdmin]);
+
+    Assignment::factory()->count(3)->create(['status' => AssignmentStatus::Verified]);
+    Assignment::factory()->create(['status' => AssignmentStatus::Pending]);
+    Assignment::factory()->create(['status' => AssignmentStatus::Drop]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.reports.store'), ['report_type' => 'DAILY'])
+        ->assertRedirect(route('admin.reports.index'));
+
+    expect(Report::count())->toBe(1);
+    // 4 non-DROPPED assignments should be attached
+    expect(Report::first()->assignments()->count())->toBe(4);
 });
 
 test('store requires at least one assignment id', function () {

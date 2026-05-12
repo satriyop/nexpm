@@ -101,9 +101,31 @@ class ReportController extends Controller
     {
         $validated = $request->validate([
             'report_type' => ['required', 'string', 'in:SSR,BAST,DAILY'],
-            'assignment_ids' => ['required', 'array', 'min:1'],
+            'assignment_ids' => ['required_unless:report_type,DAILY', 'array', 'min:1'],
             'assignment_ids.*' => ['integer', 'exists:assignments,id'],
         ]);
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        if ($validated['report_type'] === 'DAILY') {
+            $assignments = Assignment::query()
+                ->where('status', '!=', AssignmentStatus::Drop)
+                ->whereHas('site.project', fn ($query) => $query->whereScopedToMainContractor())
+                ->get();
+
+            $report = Report::create([
+                'name' => 'Daily Report '.now()->format('Y-m-d H:i'),
+                'report_type' => 'DAILY',
+                'exported_by' => $user->id,
+            ]);
+
+            $report->assignments()->attach($assignments->modelKeys());
+
+            return redirect()->route('admin.reports.index')
+                ->with('success', 'Daily Report generated successfully.')
+                ->with('download_url', route('admin.reports.download', $report));
+        }
 
         $assignmentIds = $validated['assignment_ids'];
 
@@ -133,13 +155,9 @@ class ReportController extends Controller
             'Selected assignments do not match the requested report type.'
         );
 
-        /** @var User $user */
-        $user = auth()->user();
-
         $typeLabel = match ($validated['report_type']) {
             'SSR' => 'SSR Report',
             'BAST' => 'BAST Report',
-            'DAILY' => 'Daily Report',
             default => 'Report',
         };
 

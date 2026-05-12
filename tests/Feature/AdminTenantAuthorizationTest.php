@@ -75,7 +75,7 @@ test('admin cannot generate report from another main contractor assignment', fun
 
     $this->actingAs($admin)
         ->post(route('admin.reports.store'), [
-            'report_type' => 'DAILY',
+            'report_type' => 'SSR',
             'assignment_ids' => [$otherAssignment->id],
         ])
         ->assertForbidden();
