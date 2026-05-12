@@ -51,6 +51,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::delete('assignments/{assignment}', [Admin\AssignmentController::class, 'destroy'])->name('assignments.destroy');
     Route::get('assignments/{assignment}', [Admin\AssignmentController::class, 'show'])->name('assignments.show');
     Route::post('assignments/{assignment}/verify', [Admin\AssignmentController::class, 'verify'])->name('assignments.verify');
+    Route::post('assignments/{assignment}/submit', [Admin\AssignmentController::class, 'submitForReview'])->name('assignments.submit');
     Route::post('assignments/{assignment}/revise', [Admin\AssignmentController::class, 'revise'])->name('assignments.revise');
     Route::patch('assignments/{assignment}/drop', [Admin\AssignmentController::class, 'drop'])->name('assignments.drop');
     Route::patch('assignments/{assignment}/restore', [Admin\AssignmentController::class, 'restore'])->name('assignments.restore');

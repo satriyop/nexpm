@@ -215,6 +215,22 @@ class AssignmentController extends Controller
         return back()->with('success', 'Assignment verified.');
     }
 
+    public function submitForReview(Assignment $assignment): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+
+        abort_unless($assignment->activity_type === ActivityType::Bast, 422, 'Only BAST assignments can be submitted.');
+        abort_unless(
+            in_array($assignment->status, [AssignmentStatus::Pending, AssignmentStatus::Revision], true),
+            422,
+            'Assignment is not in a submittable state.'
+        );
+
+        $assignment->markSubmitted();
+
+        return back()->with('success', 'Submitted for review.');
+    }
+
     public function revise(Request $request, Assignment $assignment): RedirectResponse
     {
         $this->ensureCanAccessAssignment($assignment);

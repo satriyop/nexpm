@@ -16,6 +16,7 @@ import {
     Pencil,
     RefreshCw,
     RotateCw,
+    Send,
     X,
 } from 'lucide-vue-next';
 import { computed, onUnmounted, ref } from 'vue';
@@ -103,6 +104,23 @@ const isConstruction = computed(
 const isWoMissing = computed(
     () => isConstruction.value && !construction.value?.cons_wo_number,
 );
+
+// --- Submit for Review (admin on behalf of subcon) ---
+const canSubmitForReview = computed(
+    () =>
+        props.assignment.activity_type === 'BAST' &&
+        (props.assignment.status === 'PENDING' ||
+            props.assignment.status === 'REVISION'),
+);
+
+const submitForReviewForm = useForm({});
+
+function submitForReview(): void {
+    submitForReviewForm.post(
+        AdminAssignmentActions.submitForReview(props.assignment.id).url,
+        { preserveScroll: true },
+    );
+}
 
 // --- Verify dialog ---
 const verifyOpen = ref(false);
@@ -2216,6 +2234,29 @@ onUnmounted(() => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="flex flex-col gap-4">
+                        <div
+                            v-if="canSubmitForReview"
+                            class="flex flex-col gap-2"
+                        >
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="w-full"
+                                :disabled="submitForReviewForm.processing"
+                                @click="submitForReview"
+                            >
+                                <Send class="size-4" />
+                                {{
+                                    submitForReviewForm.processing
+                                        ? 'Submitting…'
+                                        : 'Submit for Review'
+                                }}
+                            </Button>
+                            <p class="text-xs text-muted-foreground">
+                                Submit on behalf of the sub-contractor.
+                            </p>
+                        </div>
+
                         <div
                             v-if="canVerify || assignment.status === 'REVISION'"
                             class="flex flex-col gap-2"
