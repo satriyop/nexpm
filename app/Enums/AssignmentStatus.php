@@ -77,7 +77,7 @@ enum AssignmentStatus: string
     /** Returns statuses where the admin Verify button should be available. */
     public static function verifiableStatuses(): array
     {
-        return [self::Document, self::Completed];
+        return [self::Document, self::Completed, self::Live, self::KwhDone];
     }
 
     /** Returns statuses that are set by admin and must not be auto-overwritten. */
