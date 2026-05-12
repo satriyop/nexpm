@@ -9,6 +9,7 @@ use App\Http\Resources\Admin\SiteRowResource;
 use App\Models\Assignment;
 use App\Models\AssignmentAuditLog;
 use App\Models\AssignmentBastData;
+use App\Models\AssignmentBastPhoto;
 use App\Models\AssignmentConstructionData;
 use App\Models\AssignmentConstructionPhoto;
 use App\Models\AssignmentPlnData;
@@ -473,6 +474,60 @@ class AssignmentController extends Controller
         $photo->delete();
 
         $constructionData->touch();
+
+        return back()->with('success', 'Photo removed.');
+    }
+
+    public function storeBastPhoto(Request $request, Assignment $assignment): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+        abort_unless($assignment->activity_type === ActivityType::Bast, 422, 'Activity type mismatch.');
+
+        $request->validate([
+            'section' => ['required', 'string'],
+            'checkpoint_key' => ['required', 'string'],
+            'photo' => ['required', 'file', 'image', 'max:10240'],
+        ]);
+
+        $bastData = $assignment->bastData()->firstOrCreate([]);
+
+        $existing = AssignmentBastPhoto::query()
+            ->where('assignment_bast_data_id', $bastData->id)
+            ->where('section', $request->string('section'))
+            ->where('checkpoint_key', $request->string('checkpoint_key'))
+            ->first();
+
+        if ($existing) {
+            Storage::disk('public')->delete($existing->photo_path);
+            $existing->delete();
+        }
+
+        $path = $request->file('photo')->store('bast', 'public');
+
+        AssignmentBastPhoto::query()->create([
+            'assignment_bast_data_id' => $bastData->id,
+            'section' => $request->string('section'),
+            'checkpoint_key' => $request->string('checkpoint_key'),
+            'photo_path' => $path,
+        ]);
+
+        $bastData->touch();
+
+        return back()->with('success', 'Photo uploaded.');
+    }
+
+    public function destroyBastPhoto(Assignment $assignment, AssignmentBastPhoto $photo): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+        abort_unless($assignment->activity_type === ActivityType::Bast, 422, 'Activity type mismatch.');
+
+        $bastData = $photo->bastData;
+        abort_unless($bastData->assignment_id === $assignment->id, 403);
+
+        Storage::disk('public')->delete($photo->photo_path);
+        $photo->delete();
+
+        $bastData->touch();
 
         return back()->with('success', 'Photo removed.');
     }

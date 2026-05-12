@@ -13,6 +13,8 @@ import type { Assignment } from '@/types';
 const props = defineProps<{
     assignment: Assignment;
     isReadOnly: boolean;
+    storePhotoUrl?: string;
+    deletePhotoUrlFn?: (photoId: number) => string;
 }>();
 
 const siteTypeName = computed(
@@ -63,7 +65,10 @@ function uploadBastPhoto(section: string, checkpointKey: string, file: File) {
         checkpoint_key: checkpointKey,
         photo: file,
     });
-    form.post(SubActions.storeBastPhoto(props.assignment).url, {
+    const url =
+        props.storePhotoUrl ??
+        SubActions.storeBastPhoto(props.assignment).url;
+    form.post(url, {
         forceFormData: true,
         onFinish: () => {
             uploadingCheckpoint.value = null;
@@ -73,12 +78,13 @@ function uploadBastPhoto(section: string, checkpointKey: string, file: File) {
 
 function destroyBastPhoto(photoId: number) {
     const form = useForm({});
-    form.delete(
+    const url =
+        props.deletePhotoUrlFn?.(photoId) ??
         SubActions.destroyBastPhoto({
             assignment: props.assignment.id,
             photo: photoId,
-        }).url,
-    );
+        }).url;
+    form.delete(url);
 }
 
 function storageUrl(path: string) {
