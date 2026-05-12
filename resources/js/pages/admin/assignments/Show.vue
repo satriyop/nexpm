@@ -272,6 +272,8 @@ const adminPlnForm = useForm({
     file_slo: null as File | null,
     file_nidi: null as File | null,
     file_reg: null as File | null,
+    file_pk: null as File | null,
+    foto_kwh: null as File | null,
 });
 
 function submitAdminPln(): void {
@@ -296,26 +298,19 @@ const adminConstructionForm = useForm({
     cons_actual_done_date: construction.value?.cons_actual_done_date ?? '',
     machine_serial_number: construction.value?.machine_serial_number ?? '',
     catatan_progres: construction.value?.catatan_progres ?? '',
+    go_live_date_pln: construction.value?.go_live_date_pln ?? '',
+    go_live_date_pln_pass: construction.value?.go_live_date_pln_pass ?? '',
+    foto_machine_sn: null as File | null,
 });
 
 function submitAdminConstruction(): void {
     isSaving.value = true;
-    router.visit(
+    adminConstructionForm.patch(
         AdminAssignmentActions.updateConstructionSubconData(props.assignment)
             .url,
         {
-            method: 'patch',
-            data: { ...adminConstructionForm.data() },
             preserveScroll: true,
-            onError: (errors) => {
-                adminConstructionForm.setError(errors);
-            },
-            onStart: () => {
-                adminConstructionForm.processing = true;
-                adminConstructionForm.clearErrors();
-            },
             onFinish: () => {
-                adminConstructionForm.processing = false;
                 isSaving.value = false;
             },
             onSuccess: () => {
@@ -1276,16 +1271,46 @@ onUnmounted(() => {
                                         <FileText class="size-3.5" />
                                         Registration
                                     </a>
+                                    <a
+                                        v-if="pln.file_pk"
+                                        :href="storageUrl(pln.file_pk)"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
+                                    >
+                                        <FileText class="size-3.5" />
+                                        PK
+                                    </a>
                                     <span
                                         v-if="
                                             !pln.file_slo &&
                                             !pln.file_nidi &&
-                                            !pln.file_reg
+                                            !pln.file_reg &&
+                                            !pln.file_pk
                                         "
                                         class="text-xs text-muted-foreground"
                                     >
                                         No files uploaded.
                                     </span>
+                                </div>
+                                <div
+                                    v-if="pln.foto_kwh"
+                                    class="mt-3"
+                                >
+                                    <p class="mb-1 text-xs text-muted-foreground">
+                                        KWH Meter Photo
+                                    </p>
+                                    <a
+                                        :href="storageUrl(pln.foto_kwh)"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <img
+                                            :src="storageUrl(pln.foto_kwh)"
+                                            class="h-24 w-24 rounded border object-cover"
+                                            alt="KWH meter"
+                                        />
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -1399,12 +1424,13 @@ onUnmounted(() => {
                                     class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                     >Files</Label
                                 >
-                                <div class="grid gap-3 sm:grid-cols-3">
+                                <div class="grid gap-3 sm:grid-cols-4">
                                     <div
                                         v-for="[key, label] in [
                                             ['file_slo', 'SLO'],
                                             ['file_nidi', 'NIDI'],
                                             ['file_reg', 'Registration'],
+                                            ['file_pk', 'PK'],
                                         ] as const"
                                         :key="key"
                                         class="grid gap-1"
@@ -1439,6 +1465,33 @@ onUnmounted(() => {
                                         />
                                     </div>
                                 </div>
+                            </div>
+                            <div class="grid gap-1.5 sm:col-span-2">
+                                <Label>KWH Meter Photo</Label>
+                                <a
+                                    v-if="pln?.foto_kwh"
+                                    :href="storageUrl(pln.foto_kwh)"
+                                    target="_blank"
+                                    class="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                                >
+                                    Current photo
+                                </a>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    class="text-xs"
+                                    @change="
+                                        (e) => {
+                                            const f = (
+                                                e.target as HTMLInputElement
+                                            ).files?.[0];
+                                            if (f) adminPlnForm.foto_kwh = f;
+                                        }
+                                    "
+                                />
+                                <InputError
+                                    :message="adminPlnForm.errors.foto_kwh"
+                                />
                             </div>
                             <div class="flex justify-end sm:col-span-2">
                                 <Button
@@ -1720,6 +1773,36 @@ onUnmounted(() => {
                                         "
                                     />
                                 </div>
+                                <div class="grid gap-1.5">
+                                    <Label>Go Live Date PLN</Label>
+                                    <Input
+                                        v-model="
+                                            adminConstructionForm.go_live_date_pln
+                                        "
+                                        type="date"
+                                    />
+                                    <InputError
+                                        :message="
+                                            adminConstructionForm.errors
+                                                .go_live_date_pln
+                                        "
+                                    />
+                                </div>
+                                <div class="grid gap-1.5">
+                                    <Label>Go Live Date PLN Pass</Label>
+                                    <Input
+                                        v-model="
+                                            adminConstructionForm.go_live_date_pln_pass
+                                        "
+                                        type="date"
+                                    />
+                                    <InputError
+                                        :message="
+                                            adminConstructionForm.errors
+                                                .go_live_date_pln_pass
+                                        "
+                                    />
+                                </div>
                                 <div class="grid gap-1.5 sm:col-span-2">
                                     <Label>Catatan Progres</Label>
                                     <textarea
@@ -1733,6 +1816,42 @@ onUnmounted(() => {
                                         :message="
                                             adminConstructionForm.errors
                                                 .catatan_progres
+                                        "
+                                    />
+                                </div>
+                                <div class="grid gap-1.5 sm:col-span-2">
+                                    <Label>Machine S/N Photo</Label>
+                                    <a
+                                        v-if="construction?.foto_machine_sn"
+                                        :href="
+                                            storageUrl(
+                                                construction.foto_machine_sn,
+                                            )
+                                        "
+                                        target="_blank"
+                                        class="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                                    >
+                                        Current photo
+                                    </a>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        class="text-xs"
+                                        @change="
+                                            (e) => {
+                                                const f = (
+                                                    e.target as HTMLInputElement
+                                                ).files?.[0];
+                                                if (f)
+                                                    adminConstructionForm.foto_machine_sn =
+                                                        f;
+                                            }
+                                        "
+                                    />
+                                    <InputError
+                                        :message="
+                                            adminConstructionForm.errors
+                                                .foto_machine_sn
                                         "
                                     />
                                 </div>
