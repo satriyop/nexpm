@@ -1636,11 +1636,21 @@ onUnmounted(() => {
                                     </div>
                                 </div>
                                 <PhotoUpload
+                                    v-if="
+                                        construction.construction_photos
+                                            .length < 2
+                                    "
                                     :key="constructionUploadKey"
                                     :model-value="null"
                                     :readonly="false"
                                     @update:model-value="onAdminConstructionPhotoSelected"
                                 />
+                                <p
+                                    v-else
+                                    class="text-xs text-muted-foreground"
+                                >
+                                    Maximum of 2 progress photos reached.
+                                </p>
                             </div>
                             <Separator />
                             <div class="flex justify-end">

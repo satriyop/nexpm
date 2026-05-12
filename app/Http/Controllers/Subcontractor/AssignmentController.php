@@ -163,6 +163,7 @@ class AssignmentController extends Controller
 
         $constructionData = $assignment->constructionData()->firstOrCreate([]);
         abort_unless($constructionData->isPrerequisiteMet(), 423, 'Awaiting WO Number from admin.');
+        abort_if($constructionData->constructionPhotos()->count() >= 2, 422, 'Maximum of 2 progress photos allowed.');
 
         $path = $request->file('photo')->store('construction', 'public');
 

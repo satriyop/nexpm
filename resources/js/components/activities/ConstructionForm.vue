@@ -239,7 +239,14 @@ function storageUrl(path: string) {
                     No photos uploaded yet.
                 </p>
 
-                <div v-if="!isReadOnly" class="grid gap-1.5">
+                <div
+                    v-if="
+                        !isReadOnly &&
+                        (assignment.construction_data?.construction_photos
+                            ?.length ?? 0) < 2
+                    "
+                    class="grid gap-1.5"
+                >
                     <Label>Upload Progress Photo</Label>
                     <PhotoUpload
                         :key="constructionUploadKey"
@@ -248,6 +255,16 @@ function storageUrl(path: string) {
                         @update:model-value="onConstructionPhotoSelected"
                     />
                 </div>
+                <p
+                    v-else-if="
+                        !isReadOnly &&
+                        (assignment.construction_data?.construction_photos
+                            ?.length ?? 0) >= 2
+                    "
+                    class="text-xs text-muted-foreground"
+                >
+                    Maximum of 2 progress photos reached.
+                </p>
             </CardContent>
         </Card>
     </div>
