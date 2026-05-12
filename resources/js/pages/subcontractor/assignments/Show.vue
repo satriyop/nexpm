@@ -11,11 +11,12 @@ import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import AssignmentStepper from '@/components/AssignmentStepper.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { Assignment } from '@/types';
+import type { Assignment, AssignmentConstructionData } from '@/types';
 
 const props = defineProps<{
     assignment: Assignment;
     isLocked: boolean;
+    siblingConstruction: AssignmentConstructionData | null;
 }>();
 
 defineOptions({
@@ -130,6 +131,7 @@ const isReadOnly = computed(() =>
                 v-else-if="assignment.activity_type === 'BAST'"
                 :assignment="assignment"
                 :is-read-only="isReadOnly"
+                :sibling-construction="siblingConstruction"
             />
         </template>
     </div>

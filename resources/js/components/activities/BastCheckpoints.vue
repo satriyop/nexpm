@@ -15,6 +15,7 @@ const props = defineProps<{
     isReadOnly: boolean;
     storePhotoUrl?: string;
     deletePhotoUrlFn?: (photoId: number) => string;
+    siblingConstruction?: import('@/types').AssignmentConstructionData | null;
 }>();
 
 const siteTypeName = computed(
@@ -22,24 +23,31 @@ const siteTypeName = computed(
 );
 const isBss = computed(() => siteTypeName.value === 'BSS');
 
-const bastForm = useForm({
-    plant_name: props.assignment.bast_data?.plant_name ?? '',
-    plant_address: props.assignment.bast_data?.plant_address ?? '',
-    plant_coordinate: props.assignment.bast_data?.plant_coordinate ?? '',
-    gmaps_link: props.assignment.bast_data?.gmaps_link ?? '',
-    charger_type: props.assignment.bast_data?.charger_type ?? '',
-    sn_unit: props.assignment.bast_data?.sn_unit ?? '',
-    id_pln: props.assignment.bast_data?.id_pln ?? '',
-    sim_provider: props.assignment.bast_data?.sim_provider ?? '',
-    installation_vendor: props.assignment.bast_data?.installation_vendor ?? '',
-    pic_vendor_contact: props.assignment.bast_data?.pic_vendor_contact ?? '',
-    installation_date: props.assignment.bast_data?.installation_date ?? '',
-    commissioning_date: props.assignment.bast_data?.commissioning_date ?? '',
-    customer: props.assignment.bast_data?.customer ?? '',
-    nomor_simcard: props.assignment.bast_data?.nomor_simcard ?? '',
+const derivedFields = computed(() => ({
+    plant_name: props.assignment.site.location_name,
+    plant_address: props.assignment.site.address,
+    plant_coordinate:
+        props.assignment.site.latitude && props.assignment.site.longitude
+            ? `${props.assignment.site.latitude}, ${props.assignment.site.longitude}`
+            : null,
+    gmaps_link: props.assignment.site.google_map_url,
+    charger_type: props.assignment.site.machine_type?.name ?? null,
+    installation_vendor:
+        props.assignment.site.project?.main_contractor?.name ?? null,
+    pic_vendor_contact:
+        props.assignment.site.project?.main_contractor?.pic ?? null,
+    customer: props.assignment.site.project?.client?.name ?? null,
+    sn_unit: props.siblingConstruction?.machine_serial_number ?? null,
+    installation_date: props.siblingConstruction?.cons_actual_done_date ?? null,
+    go_live_date_pln: props.siblingConstruction?.go_live_date_pln ?? null,
     go_live_date_pln_pass:
-        props.assignment.bast_data?.go_live_date_pln_pass ?? '',
-    go_live_date_pln: props.assignment.bast_data?.go_live_date_pln ?? '',
+        props.siblingConstruction?.go_live_date_pln_pass ?? null,
+}));
+
+const bastForm = useForm({
+    sim_provider: props.assignment.bast_data?.sim_provider ?? '',
+    nomor_simcard: props.assignment.bast_data?.nomor_simcard ?? '',
+    commissioning_date: props.assignment.bast_data?.commissioning_date ?? '',
 });
 
 function submitBast() {
@@ -288,122 +296,107 @@ const cableCheckpoints: Checkpoint[] = [
                     >
                 </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent class="space-y-6">
+                <!-- Read-only fields derived from masterdata / sibling construction -->
+                <dl class="grid gap-3 text-sm sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <dt class="font-medium text-muted-foreground">
+                            Plant Name
+                        </dt>
+                        <dd>{{ derivedFields.plant_name || '—' }}</dd>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <dt class="font-medium text-muted-foreground">
+                            Plant Address
+                        </dt>
+                        <dd class="whitespace-pre-line">
+                            {{ derivedFields.plant_address || '—' }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            Plant Coordinate
+                        </dt>
+                        <dd>{{ derivedFields.plant_coordinate || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            GMaps Link
+                        </dt>
+                        <dd>
+                            <a
+                                v-if="derivedFields.gmaps_link"
+                                :href="derivedFields.gmaps_link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-blue-600 underline hover:text-blue-800"
+                                >Open Map</a
+                            >
+                            <span v-else>—</span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            {{ isBss ? 'BSS' : 'EV Charger' }} Type
+                        </dt>
+                        <dd>{{ derivedFields.charger_type || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            Serial Number Unit
+                        </dt>
+                        <dd>{{ derivedFields.sn_unit || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            Installation Vendor
+                        </dt>
+                        <dd>{{ derivedFields.installation_vendor || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            PIC Vendor Contact
+                        </dt>
+                        <dd>{{ derivedFields.pic_vendor_contact || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            Installation Date
+                        </dt>
+                        <dd>{{ derivedFields.installation_date || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            Customer
+                        </dt>
+                        <dd>{{ derivedFields.customer || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            Go LIVE Date (PLN Bypass)
+                        </dt>
+                        <dd>{{ derivedFields.go_live_date_pln_pass || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted-foreground">
+                            Go LIVE Date (PLN)
+                        </dt>
+                        <dd>{{ derivedFields.go_live_date_pln || '—' }}</dd>
+                    </div>
+                </dl>
+
+                <!-- Editable fields -->
                 <form class="space-y-4" @submit.prevent="submitBast">
                     <div class="grid gap-4 sm:grid-cols-2">
-                        <div class="grid gap-1.5 sm:col-span-2">
-                            <Label>Plant Name</Label>
-                            <Input
-                                v-model="bastForm.plant_name"
-                                :disabled="isReadOnly"
-                                placeholder="Nama Plant"
-                            />
-                            <InputError :message="bastForm.errors.plant_name" />
-                        </div>
-                        <div class="grid gap-1.5 sm:col-span-2">
-                            <Label>Plant Address</Label>
-                            <textarea
-                                v-model="bastForm.plant_address"
-                                :disabled="isReadOnly"
-                                rows="2"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                placeholder="Alamat Plant"
-                            />
-                        </div>
                         <div class="grid gap-1.5">
-                            <Label>Plant Coordinate</Label>
-                            <Input
-                                v-model="bastForm.plant_coordinate"
-                                :disabled="isReadOnly"
-                                placeholder="-6.123, 106.456"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>GMaps Link</Label>
-                            <Input
-                                v-model="bastForm.gmaps_link"
-                                :disabled="isReadOnly"
-                                placeholder="https://maps.google.com/..."
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label
-                                >{{ isBss ? 'BSS' : 'EV Charger' }} Type</Label
-                            >
-                            <Input
-                                v-model="bastForm.charger_type"
-                                :disabled="isReadOnly"
-                                placeholder="Type / Model"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>Serial Number Unit</Label>
-                            <Input
-                                v-model="bastForm.sn_unit"
-                                :disabled="isReadOnly"
-                                placeholder="S/N"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>ID PLN / Kode Billing</Label>
-                            <Input
-                                v-model="bastForm.id_pln"
-                                :disabled="isReadOnly"
-                                placeholder="ID PLN"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>Provider / No SIM</Label>
+                            <Label>Provider Sim Card</Label>
                             <Input
                                 v-model="bastForm.sim_provider"
                                 :disabled="isReadOnly"
-                                placeholder="Telkomsel / 0812-xxx"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>Installation Vendor</Label>
-                            <Input
-                                v-model="bastForm.installation_vendor"
-                                :disabled="isReadOnly"
-                                placeholder="Nama Vendor"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>PIC Vendor Contact</Label>
-                            <Input
-                                v-model="bastForm.pic_vendor_contact"
-                                :disabled="isReadOnly"
-                                placeholder="Nama / No. HP"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>Installation Date</Label>
-                            <Input
-                                v-model="bastForm.installation_date"
-                                type="date"
-                                :disabled="isReadOnly"
+                                placeholder="Telkomsel / XL / dll"
                             />
                             <InputError
-                                :message="bastForm.errors.installation_date"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>Commissioning Date</Label>
-                            <Input
-                                v-model="bastForm.commissioning_date"
-                                type="date"
-                                :disabled="isReadOnly"
-                            />
-                            <InputError
-                                :message="bastForm.errors.commissioning_date"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>Customer</Label>
-                            <Input
-                                v-model="bastForm.customer"
-                                :disabled="isReadOnly"
-                                placeholder="Nama Customer"
+                                :message="bastForm.errors.sim_provider"
                             />
                         </div>
                         <div class="grid gap-1.5">
@@ -418,25 +411,14 @@ const cableCheckpoints: Checkpoint[] = [
                             />
                         </div>
                         <div class="grid gap-1.5">
-                            <Label>Go LIVE Date (PLN Bypass)</Label>
+                            <Label>Commissioning Date</Label>
                             <Input
-                                v-model="bastForm.go_live_date_pln_pass"
+                                v-model="bastForm.commissioning_date"
                                 type="date"
                                 :disabled="isReadOnly"
                             />
                             <InputError
-                                :message="bastForm.errors.go_live_date_pln_pass"
-                            />
-                        </div>
-                        <div class="grid gap-1.5">
-                            <Label>Go LIVE Date (PLN)</Label>
-                            <Input
-                                v-model="bastForm.go_live_date_pln"
-                                type="date"
-                                :disabled="isReadOnly"
-                            />
-                            <InputError
-                                :message="bastForm.errors.go_live_date_pln"
+                                :message="bastForm.errors.commissioning_date"
                             />
                         </div>
                     </div>

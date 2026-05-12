@@ -53,7 +53,7 @@ import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
 import PhotoUpload from '@/components/PhotoUpload.vue';
 import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
-import type { Assignment } from '@/types';
+import type { Assignment, AssignmentConstructionData } from '@/types';
 
 interface SubcontractorOption {
     id: number;
@@ -73,6 +73,7 @@ const props = defineProps<{
     assignment: Assignment;
     subcontractors: SubcontractorOption[];
     auditLogs: AuditLog[] | null;
+    siblingConstruction: AssignmentConstructionData | null;
 }>();
 
 defineOptions({
@@ -1994,6 +1995,7 @@ onUnmounted(() => {
                             <BastCheckpoints
                                 :assignment="assignment"
                                 :is-read-only="false"
+                                :sibling-construction="siblingConstruction"
                                 :store-photo-url="
                                     AdminAssignmentActions.storeBastPhoto(
                                         assignment,

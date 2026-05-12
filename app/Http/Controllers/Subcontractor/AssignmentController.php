@@ -76,16 +76,27 @@ class AssignmentController extends Controller
 
         $assignment->load([
             'site.siteType',
+            'site.machineType',
             'site.project.mainContractor',
+            'site.project.client',
             'surveyData',
             'plnData',
             'constructionData.constructionPhotos',
             'bastData.bastPhotos',
         ]);
 
+        $siblingConstruction = $assignment->activity_type === ActivityType::Bast
+            ? Assignment::query()
+                ->where('site_id', $assignment->site_id)
+                ->where('activity_type', ActivityType::Construction)
+                ->with('constructionData')
+                ->first()?->constructionData
+            : null;
+
         return Inertia::render('subcontractor/assignments/Show', [
             'assignment' => $assignment,
             'isLocked' => $assignment->isLocked(),
+            'siblingConstruction' => $siblingConstruction,
         ]);
     }
 

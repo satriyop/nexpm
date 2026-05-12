@@ -37,12 +37,19 @@ export interface SiteType {
 export interface MainContractor {
     id: number;
     name: string;
+    pic: string | null;
+}
+
+export interface Client {
+    id: number;
+    name: string;
 }
 
 export interface Project {
     id: number;
     name: string;
     main_contractor: MainContractor | null;
+    client: Client | null;
 }
 
 export interface Site {
@@ -52,8 +59,11 @@ export interface Site {
     address: string;
     province: string;
     city: string;
+    latitude: string | null;
+    longitude: string | null;
     google_map_url: string | null;
     site_type: SiteType | null;
+    machine_type: { id: number; name: string } | null;
     project: Project | null;
     power_kva: string | null;
 }
@@ -143,23 +153,10 @@ export interface AssignmentBastData {
     id: number;
     assignment_id: number;
     updated_at: string | null;
-    plant_name: string | null;
-    plant_address: string | null;
-    plant_coordinate: string | null;
-    gmaps_link: string | null;
-    charger_type: string | null;
-    sn_unit: string | null;
-    id_pln: string | null;
     sim_provider: string | null;
-    installation_vendor: string | null;
-    pic_vendor_contact: string | null;
-    installation_date: string | null;
-    commissioning_date: string | null;
-    customer: string | null;
-    measurements: Record<string, string | null> | null;
     nomor_simcard: string | null;
-    go_live_date_pln_pass: string | null;
-    go_live_date_pln: string | null;
+    commissioning_date: string | null;
+    measurements: Record<string, string | null> | null;
     bast_photos: AssignmentBastPhoto[];
 }
 

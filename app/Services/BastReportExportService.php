@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\ActivityFields\BastFields;
+use App\Enums\ActivityType;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
+use App\Models\AssignmentConstructionData;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -137,7 +139,13 @@ class BastReportExportService
 
     public function generate(Assignment $assignment): Spreadsheet
     {
-        $assignment->loadMissing(['site.siteType', 'bastData.bastPhotos']);
+        $assignment->loadMissing([
+            'site.siteType',
+            'site.machineType',
+            'site.project.mainContractor',
+            'site.project.client',
+            'bastData.bastPhotos',
+        ]);
 
         $isBss = strtoupper($assignment->site->siteType?->name ?? 'EVCS') === 'BSS';
         $templatePath = $isBss
@@ -148,38 +156,46 @@ class BastReportExportService
 
         $bastData = $assignment->bastData;
 
-        $this->fillCoverSheet($spreadsheet, $bastData, $assignment);
+        $siblingConstruction = Assignment::query()
+            ->where('site_id', $assignment->site_id)
+            ->where('activity_type', ActivityType::Construction)
+            ->with('constructionData')
+            ->first()?->constructionData;
+
+        $this->fillCoverSheet($spreadsheet, $bastData, $assignment, $siblingConstruction);
         $this->fillMeasurements($spreadsheet, $bastData, $isBss);
         $this->embedPhotos($spreadsheet, $bastData, $isBss);
-        $this->fillSupplementalFields($spreadsheet, $bastData);
+        $this->fillSupplementalFields($spreadsheet, $bastData, $siblingConstruction);
 
         return $spreadsheet;
     }
 
-    private function fillCoverSheet(Spreadsheet $spreadsheet, ?AssignmentBastData $bastData, Assignment $assignment): void
+    private function fillCoverSheet(Spreadsheet $spreadsheet, ?AssignmentBastData $bastData, Assignment $assignment, ?AssignmentConstructionData $siblingConstruction): void
     {
         $sheet = $spreadsheet->getSheetByName('Cover');
 
-        if ($sheet === null || $bastData === null) {
+        if ($sheet === null) {
             return;
         }
 
+        $site = $assignment->site;
+        $vendor = $site->project?->mainContractor?->name;
+
         $values = [
-            'D5' => $bastData->plant_name,
-            'D6' => $bastData->plant_address,
-            'D7' => $bastData->plant_coordinate,
-            'D8' => $bastData->gmaps_link,
-            'D9' => $bastData->charger_type,
-            'D10' => $bastData->sn_unit,
-            'D11' => $bastData->id_pln,
-            'D12' => $bastData->sim_provider,
-            'D13' => $bastData->installation_vendor,
-            'D14' => $bastData->pic_vendor_contact,
-            'D15' => $bastData->installation_date?->format('d/m/Y'),
-            'D16' => $bastData->commissioning_date?->format('d/m/Y'),
-            'D17' => $bastData->customer,
-            // Vendor column (F3) — filled from installation_vendor
-            'G3' => $bastData->installation_vendor,
+            'D5' => $site->location_name,
+            'D6' => $site->address,
+            'D7' => ($site->latitude && $site->longitude) ? "{$site->latitude}, {$site->longitude}" : null,
+            'D8' => $site->google_map_url,
+            'D9' => $site->machineType?->name,
+            'D10' => $siblingConstruction?->machine_serial_number,
+            'D11' => null,
+            'D12' => $bastData?->sim_provider,
+            'D13' => $vendor,
+            'D14' => $site->project?->mainContractor?->pic,
+            'D15' => $siblingConstruction?->cons_actual_done_date?->format('d/m/Y'),
+            'D16' => $bastData?->commissioning_date?->format('d/m/Y'),
+            'D17' => $site->project?->client?->name,
+            'G3' => $vendor,
         ];
 
         foreach ($values as $coordinate => $value) {
@@ -206,11 +222,18 @@ class BastReportExportService
         $groundingSheet?->setCellValue(self::GROUNDING_OHM_CELL, ($measurements['grounding_resistance'] ?? '').' Ω');
     }
 
-    private function fillSupplementalFields(Spreadsheet $spreadsheet, ?AssignmentBastData $bastData): void
+    private function fillSupplementalFields(Spreadsheet $spreadsheet, ?AssignmentBastData $bastData, ?AssignmentConstructionData $siblingConstruction): void
     {
         $supplementalFields = BastFields::supplementalFields();
 
-        if (empty($supplementalFields) || $bastData === null) {
+        $constructionRows = [
+            ['label' => 'Go Live Date (PLN Bypass)', 'value' => $siblingConstruction?->go_live_date_pln_pass?->format('d/m/Y')],
+            ['label' => 'Go Live Date (PLN)', 'value' => $siblingConstruction?->go_live_date_pln?->format('d/m/Y')],
+        ];
+
+        $hasData = ! empty($supplementalFields) || $siblingConstruction !== null;
+
+        if (! $hasData) {
             return;
         }
 
@@ -228,10 +251,18 @@ class BastReportExportService
             $cell->getStyle()->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
 
-        foreach ($supplementalFields as $row => $field) {
-            $rowNum = $row + 2;
+        $rowNum = 2;
+
+        foreach ($supplementalFields as $field) {
             $sheet->getCell('A'.$rowNum)->setValue($field['label']);
-            $sheet->getCell('B'.$rowNum)->setValue($bastData->{$field['key']} ?? '');
+            $sheet->getCell('B'.$rowNum)->setValue($bastData?->{$field['key']} ?? '');
+            $rowNum++;
+        }
+
+        foreach ($constructionRows as $row) {
+            $sheet->getCell('A'.$rowNum)->setValue($row['label']);
+            $sheet->getCell('B'.$rowNum)->setValue($row['value'] ?? '');
+            $rowNum++;
         }
 
         $sheet->getColumnDimension('A')->setWidth(30);

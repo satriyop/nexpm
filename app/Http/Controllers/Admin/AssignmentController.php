@@ -149,6 +149,9 @@ class AssignmentController extends Controller
 
         $assignment->load([
             'site.siteType',
+            'site.machineType',
+            'site.project.mainContractor',
+            'site.project.client',
             'subcontractor',
             'verifiedBy',
             'surveyData',
@@ -159,8 +162,17 @@ class AssignmentController extends Controller
 
         $mainContractorId = $assignment->site->project->main_contractor_id;
 
+        $siblingConstruction = $assignment->activity_type === ActivityType::Bast
+            ? Assignment::query()
+                ->where('site_id', $assignment->site_id)
+                ->where('activity_type', ActivityType::Construction)
+                ->with('constructionData')
+                ->first()?->constructionData
+            : null;
+
         return Inertia::render('admin/assignments/Show', [
             'assignment' => $assignment,
+            'siblingConstruction' => $siblingConstruction,
             'subcontractors' => Subcontractor::query()
                 ->whereHas('mainContractors', fn ($query) => $query->whereKey($mainContractorId))
                 ->orderBy('name')
@@ -538,22 +550,9 @@ class AssignmentController extends Controller
         $this->ensureCanAccessAssignment($assignment);
 
         $validated = $request->validate([
-            'plant_name' => ['nullable', 'string', 'max:255'],
-            'plant_address' => ['nullable', 'string'],
-            'plant_coordinate' => ['nullable', 'string', 'max:255'],
-            'gmaps_link' => ['nullable', 'string', 'max:500'],
-            'charger_type' => ['nullable', 'string', 'max:255'],
-            'sn_unit' => ['nullable', 'string', 'max:255'],
-            'id_pln' => ['nullable', 'string', 'max:255'],
             'sim_provider' => ['nullable', 'string', 'max:255'],
-            'installation_vendor' => ['nullable', 'string', 'max:255'],
-            'pic_vendor_contact' => ['nullable', 'string', 'max:255'],
-            'installation_date' => ['nullable', 'date'],
-            'commissioning_date' => ['nullable', 'date'],
-            'customer' => ['nullable', 'string', 'max:255'],
             'nomor_simcard' => ['nullable', 'string', 'max:255'],
-            'go_live_date_pln_pass' => ['nullable', 'date'],
-            'go_live_date_pln' => ['nullable', 'date'],
+            'commissioning_date' => ['nullable', 'date'],
             'measurements' => ['nullable', 'array'],
             'measurements.*' => ['nullable', 'string', 'max:255'],
         ]);
