@@ -79,7 +79,7 @@ class ClearTrialData extends Command
 
         // ── Confirm ──────────────────────────────────────────────────────────
         if (! $this->option('force')) {
-            $answer = $this->ask('  Type <fg=red>yes</> to proceed');
+            $answer = $this->ask('Type "yes" to proceed');
 
             if ($answer !== 'yes') {
                 $this->info('  Aborted.');
