@@ -196,7 +196,7 @@ class ManualProjectCsvImportService
 
                 // Assignment: find-or-create by (site_id, activity_type)
                 $activityType = ActivityType::from($row['activity_type']);
-                $status = $row['status'] !== '' ? AssignmentStatus::from($row['status']) : AssignmentStatus::Reported;
+                $status = $row['status'] !== '' ? AssignmentStatus::from(strtoupper($row['status'])) : AssignmentStatus::Reported;
                 $subcontractor = $lookups['subcontractors']->first(
                     fn ($s) => $s->code === trim($row['subcontractor_code'])
                 );
@@ -359,10 +359,12 @@ class ManualProjectCsvImportService
         if (($row['status'] ?? '') !== '') {
             $statusEnum = AssignmentStatus::tryFrom(strtoupper($row['status']));
             if ($statusEnum === null) {
+                $valid = implode(', ', array_column(AssignmentStatus::cases(), 'value'));
+
                 return [
                     ...$base,
                     'status' => 'error',
-                    'message' => "Row {$rowNumber}: invalid status '{$row['status']}'.",
+                    'message' => "Row {$rowNumber}: invalid status '{$row['status']}'. Valid: {$valid}.",
                 ];
             }
         }

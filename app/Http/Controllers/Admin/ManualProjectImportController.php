@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\ActivityType;
+use App\Enums\AssignmentStatus;
 use App\Http\Controllers\Controller;
 use App\Imports\ManualProjectImport;
 use App\Services\ManualProjectCsvImportService;
@@ -29,6 +31,12 @@ class ManualProjectImportController extends Controller
 
         $sep = ';';
         $handle = fopen('php://memory', 'w');
+
+        // Header comment rows (skipped by the importer — lines starting with #).
+        $validStatuses = implode(', ', array_column(AssignmentStatus::cases(), 'value'));
+        $validActivities = implode(', ', array_column(ActivityType::cases(), 'value'));
+        fwrite($handle, "# Valid activity_type: {$validActivities}\r\n");
+        fwrite($handle, "# Valid status (default REPORTED if blank): {$validStatuses}\r\n");
 
         fputcsv($handle, ManualProjectImport::COLUMNS, $sep);
 
