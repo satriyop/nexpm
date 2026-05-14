@@ -571,8 +571,11 @@ function removeAssignment(assignment: Assignment): void {
                             <SelectTrigger><SelectValue placeholder="Select power" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="7.7kVA">7.7 kVA</SelectItem>
-                                <SelectItem value="22kVA">22 kVA</SelectItem>
-                                <SelectItem value="50kVA">50 kVA</SelectItem>
+                                <SelectItem value="11kVA">11 kVA</SelectItem>
+                                <SelectItem value="23kVA">23 kVA</SelectItem>
+                                <SelectItem value="33kVA">33 kVA</SelectItem>
+                                <SelectItem value="66kVA">66 kVA</SelectItem>
+                                <SelectItem value="132kVA">132 kVA</SelectItem>
                             </SelectContent>
                         </Select>
                         <InputError :message="form.errors.power_kva" />
