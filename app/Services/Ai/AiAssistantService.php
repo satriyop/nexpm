@@ -360,6 +360,22 @@ class AiAssistantService
                 /** @var Assignment $first */
                 $first = $subconAssignments->first();
 
+                $topAssignments = $subconAssignments
+                    ->sortByDesc(fn (Assignment $a): int => $this->assignmentRiskScore($a))
+                    ->take(15)
+                    ->map(fn (Assignment $a): array => [
+                        'id' => $a->id,
+                        'site_code' => $a->site?->site_code,
+                        'site_name' => $a->site?->location_name,
+                        'project' => $a->site?->project?->name,
+                        'activity_type' => $a->activity_type->value,
+                        'status' => $a->status->value,
+                        'age_days' => (int) $a->updated_at->diffInDays(now()),
+                        'url' => route('admin.assignments.show', $a),
+                    ])
+                    ->values()
+                    ->all();
+
                 return [
                     'subcontractor_id' => $first->subcontractor?->id,
                     'subcontractor' => $first->subcontractor?->name ?? 'Tanpa subcon',
@@ -368,6 +384,7 @@ class AiAssistantService
                     'oldest_age_days' => (int) $subconAssignments->max(fn (Assignment $assignment): int => (int) $assignment->updated_at->diffInDays(now())),
                     'status_counts' => $this->countAssignmentsBy($subconAssignments, 'status'),
                     'activity_counts' => $this->countAssignmentsBy($subconAssignments, 'activity_type'),
+                    'top_assignments' => $topAssignments,
                 ];
             })
             ->sortByDesc('blocker_score')
