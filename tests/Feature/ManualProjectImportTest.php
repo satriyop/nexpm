@@ -505,3 +505,105 @@ test('superadmin can delete a legacy report and its file is removed from storage
     expect(AssignmentLegacyReport::find($report->id))->toBeNull();
     Storage::disk('public')->assertMissing($filePath);
 });
+
+// ── Date format handling ───────────────────────────────────────────────────────
+
+test('store accepts DD/MM/YYYY date format (Indonesian Excel locale)', function () {
+    Storage::fake('local');
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $mc = MainContractor::factory()->create(['name' => 'PT Kontraktor A']);
+    Client::factory()->create(['name' => 'PLN']);
+    $sub = Subcontractor::factory()->create(['code' => 'SUB-001']);
+    $sub->mainContractors()->attach($mc->id);
+
+    $csv = buildCsv([[
+        'project_name' => 'Proyek Tanggal',
+        'client_name' => 'PLN',
+        'main_contractor_name' => 'PT Kontraktor A',
+        'project_start_date' => '01/01/2025',   // DD/MM/YYYY
+        'project_end_date' => '31/12/2026',      // DD/MM/YYYY — this was the crashing input
+        'site_code' => 'SITE-DATE',
+        'location_name' => 'Lokasi',
+        'activity_type' => 'CONSTRUCTION',
+        'subcontractor_code' => 'SUB-001',
+        'status' => 'REPORTED',
+        'cons_actual_start_date' => '01/02/2025',
+        'cons_actual_done_date' => '28/03/2025',
+        'go_live_date_pln' => '05/04/2025',
+    ]]);
+
+    $tempPath = 'temp/manual-import/date-format.csv';
+    Storage::disk('local')->put($tempPath, $csv);
+
+    $this->actingAs($superAdmin)
+        ->post(route('admin.manual-import.store'), ['temp_path' => $tempPath])
+        ->assertRedirect(route('admin.projects.index'));
+
+    $project = Project::where('name', 'Proyek Tanggal')->first();
+    expect($project)->not->toBeNull()
+        ->and($project->start_date->format('Y-m-d'))->toBe('2025-01-01')
+        ->and($project->end_date->format('Y-m-d'))->toBe('2026-12-31');
+
+    $data = AssignmentConstructionData::first();
+    expect($data->cons_actual_start_date->format('Y-m-d'))->toBe('2025-02-01')
+        ->and($data->cons_actual_done_date->format('Y-m-d'))->toBe('2025-03-28')
+        ->and($data->go_live_date_pln->format('Y-m-d'))->toBe('2025-04-05');
+});
+
+test('preview flags unparseable date format as error', function () {
+    Storage::fake('local');
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    MainContractor::factory()->create(['name' => 'PT Kontraktor A']);
+    Client::factory()->create(['name' => 'PLN']);
+
+    $csv = buildCsv([[
+        'project_name' => 'Test',
+        'client_name' => 'PLN',
+        'main_contractor_name' => 'PT Kontraktor A',
+        'site_code' => 'SITE-BAD',
+        'location_name' => 'Lokasi',
+        'activity_type' => 'SURVEY',
+        'project_start_date' => '2025-13-01',   // month 13 — invalid
+    ]]);
+
+    $this->actingAs($superAdmin)
+        ->post(route('admin.manual-import.preview'), ['file' => csvFile($csv)])
+        ->assertInertia(fn ($page) => $page
+            ->where('previewSummary.errors', 1)
+            ->where('previewSummary.ok', 0)
+        );
+});
+
+test('store accepts YYYY-MM-DD date format and stores correctly', function () {
+    Storage::fake('local');
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $mc = MainContractor::factory()->create(['name' => 'PT Kontraktor A']);
+    Client::factory()->create(['name' => 'PLN']);
+    $sub = Subcontractor::factory()->create(['code' => 'SUB-001']);
+    $sub->mainContractors()->attach($mc->id);
+
+    $csv = buildCsv([[
+        'project_name' => 'Proyek ISO Date',
+        'client_name' => 'PLN',
+        'main_contractor_name' => 'PT Kontraktor A',
+        'site_code' => 'SITE-ISO',
+        'location_name' => 'Lokasi',
+        'activity_type' => 'PLN_CONNECTION',
+        'subcontractor_code' => 'SUB-001',
+        'kwh_meter_installation_date' => '2025-03-15',
+        'nidi_slo_date_acquired' => '2025-02-28',
+    ]]);
+
+    $tempPath = 'temp/manual-import/iso-date.csv';
+    Storage::disk('local')->put($tempPath, $csv);
+
+    $this->actingAs($superAdmin)
+        ->post(route('admin.manual-import.store'), ['temp_path' => $tempPath]);
+
+    $data = AssignmentPlnData::first();
+    expect($data->kwh_meter_installation_date->format('Y-m-d'))->toBe('2025-03-15')
+        ->and($data->nidi_slo_date_acquired->format('Y-m-d'))->toBe('2025-02-28');
+});

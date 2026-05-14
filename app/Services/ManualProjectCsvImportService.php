@@ -17,6 +17,7 @@ use App\Models\Project;
 use App\Models\Site;
 use App\Models\SiteType;
 use App\Models\Subcontractor;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -138,8 +139,8 @@ class ManualProjectCsvImportService
                             'name' => trim($row['project_name']),
                             'main_contractor_id' => $mainContractor?->id,
                             'client_id' => $client?->id,
-                            'start_date' => ($row['project_start_date'] ?? '') ?: now()->toDateString(),
-                            'end_date' => ($row['project_end_date'] ?? '') ?: null,
+                            'start_date' => $this->parseDate($row['project_start_date'] ?? '') ?? now()->toDateString(),
+                            'end_date' => $this->parseDate($row['project_end_date'] ?? ''),
                         ]);
 
                         $createdProjects++;
@@ -382,6 +383,26 @@ class ManualProjectCsvImportService
             }
         }
 
+        // Validate all date-typed columns so bad formats show as preview errors.
+        $dateColumns = [
+            'project_start_date', 'project_end_date',
+            'ss_schedule_date', 'ss_report_submission_date',
+            'setup_approval_date', 'cons_actual_start_date', 'cons_actual_done_date',
+            'go_live_date_pln', 'go_live_date_pln_pass',
+            'kwh_meter_installation_date', 'nidi_slo_date_acquired', 'bpujl_acquired_date',
+        ];
+
+        foreach ($dateColumns as $col) {
+            $val = $row[$col] ?? '';
+            if ($val !== '' && $this->parseDate($val) === null) {
+                return [
+                    ...$base,
+                    'status' => 'error',
+                    'message' => "Row {$rowNumber}: invalid date '{$val}' for {$col}. Use YYYY-MM-DD or DD/MM/YYYY.",
+                ];
+            }
+        }
+
         return [
             ...$base,
             'status' => 'ok',
@@ -410,8 +431,8 @@ class ManualProjectCsvImportService
         AssignmentSurveyData::query()->updateOrCreate(
             ['assignment_id' => $assignment->id],
             array_filter([
-                'ss_schedule_date' => $row['ss_schedule_date'] ?: null,
-                'ss_report_submission_date' => $row['ss_report_submission_date'] ?: null,
+                'ss_schedule_date' => $this->parseDate($row['ss_schedule_date'] ?? ''),
+                'ss_report_submission_date' => $this->parseDate($row['ss_report_submission_date'] ?? ''),
                 'cable_pulling_type' => $row['cable_pulling_type'] ?: null,
                 'parking_slot' => $row['parking_slot'] ?: null,
             ], fn ($v) => $v !== null)
@@ -427,12 +448,12 @@ class ManualProjectCsvImportService
             ['assignment_id' => $assignment->id],
             array_filter([
                 'cons_wo_number' => $row['cons_wo_number'] ?: null,
-                'setup_approval_date' => $row['setup_approval_date'] ?: null,
-                'cons_actual_start_date' => $row['cons_actual_start_date'] ?: null,
-                'cons_actual_done_date' => $row['cons_actual_done_date'] ?: null,
+                'setup_approval_date' => $this->parseDate($row['setup_approval_date'] ?? ''),
+                'cons_actual_start_date' => $this->parseDate($row['cons_actual_start_date'] ?? ''),
+                'cons_actual_done_date' => $this->parseDate($row['cons_actual_done_date'] ?? ''),
                 'machine_serial_number' => $row['machine_serial_number'] ?: null,
-                'go_live_date_pln' => $row['go_live_date_pln'] ?: null,
-                'go_live_date_pln_pass' => $row['go_live_date_pln_pass'] ?: null,
+                'go_live_date_pln' => $this->parseDate($row['go_live_date_pln'] ?? ''),
+                'go_live_date_pln_pass' => $this->parseDate($row['go_live_date_pln_pass'] ?? ''),
             ], fn ($v) => $v !== null)
         );
     }
@@ -445,11 +466,11 @@ class ManualProjectCsvImportService
         AssignmentPlnData::query()->updateOrCreate(
             ['assignment_id' => $assignment->id],
             array_filter([
-                'kwh_meter_installation_date' => $row['kwh_meter_installation_date'] ?: null,
+                'kwh_meter_installation_date' => $this->parseDate($row['kwh_meter_installation_date'] ?? ''),
                 'type_rate' => $row['type_rate'] ?: null,
                 'id_pelanggan' => $row['id_pelanggan'] ?: null,
-                'nidi_slo_date_acquired' => $row['nidi_slo_date_acquired'] ?: null,
-                'bpujl_acquired_date' => $row['bpujl_acquired_date'] ?: null,
+                'nidi_slo_date_acquired' => $this->parseDate($row['nidi_slo_date_acquired'] ?? ''),
+                'bpujl_acquired_date' => $this->parseDate($row['bpujl_acquired_date'] ?? ''),
             ], fn ($v) => $v !== null)
         );
     }
@@ -520,5 +541,35 @@ class ManualProjectCsvImportService
             ->pluck('name')
             ->map(fn ($n) => mb_strtolower($n))
             ->flip();
+    }
+
+    /**
+     * Parse a date string into YYYY-MM-DD, accepting multiple input formats.
+     *
+     * Accepts: YYYY-MM-DD, DD/MM/YYYY, D/M/YYYY, DD-MM-YYYY, YYYY/MM/DD.
+     * Returns null for empty input or unrecognisable format.
+     */
+    private function parseDate(string $value): ?string
+    {
+        $v = trim($value);
+        if ($v === '') {
+            return null;
+        }
+
+        $formats = ['Y-m-d', 'd/m/Y', 'd-m-Y', 'Y/m/d'];
+
+        foreach ($formats as $format) {
+            try {
+                $dt = Carbon::createFromFormat($format, $v);
+                // Strict check: createFromFormat is lenient; verify round-trip to reject garbage.
+                if ($dt !== false && $dt->format($format) === $v) {
+                    return $dt->format('Y-m-d');
+                }
+            } catch (\Exception) {
+                // Try next format.
+            }
+        }
+
+        return null;
     }
 }
