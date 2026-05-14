@@ -354,11 +354,32 @@ class AiAssistantService
     {
         $assignments = $this->riskCandidateAssignments($context);
 
+        $subcontractorIds = $assignments
+            ->pluck('subcontractor_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        // Total assignment counts per subcontractor across ALL statuses (not just blocked)
+        $totalCounts = DB::table('assignments')
+            ->whereIn('subcontractor_id', $subcontractorIds)
+            ->selectRaw('subcontractor_id, count(*) as total, status')
+            ->groupBy('subcontractor_id', 'status')
+            ->get()
+            ->groupBy('subcontractor_id')
+            ->map(fn ($rows) => [
+                'total' => $rows->sum('total'),
+                'all_status_counts' => $rows->pluck('total', 'status')->all(),
+            ]);
+
         $subcontractors = $assignments
             ->groupBy(fn (Assignment $assignment): string => (string) ($assignment->subcontractor?->id ?? 0))
-            ->map(function (Collection $subconAssignments): array {
+            ->map(function (Collection $subconAssignments) use ($totalCounts): array {
                 /** @var Assignment $first */
                 $first = $subconAssignments->first();
+                $subconId = (string) ($first->subcontractor?->id ?? 0);
+                $totals = $totalCounts->get($subconId);
 
                 $topAssignments = $subconAssignments
                     ->sortByDesc(fn (Assignment $a): int => $this->assignmentRiskScore($a))
@@ -380,11 +401,13 @@ class AiAssistantService
                     'subcontractor_id' => $first->subcontractor?->id,
                     'subcontractor' => $first->subcontractor?->name ?? 'Tanpa subcon',
                     'blocker_score' => $this->riskScore($subconAssignments),
+                    'total_assignments' => $totals['total'] ?? $subconAssignments->count(),
                     'blocked_assignments' => $subconAssignments->count(),
                     'oldest_age_days' => (int) $subconAssignments->max(fn (Assignment $assignment): int => (int) $assignment->updated_at->diffInDays(now())),
-                    'status_counts' => $this->countAssignmentsBy($subconAssignments, 'status'),
+                    'blocked_status_counts' => $this->countAssignmentsBy($subconAssignments, 'status'),
+                    'all_status_counts' => $totals['all_status_counts'] ?? [],
                     'activity_counts' => $this->countAssignmentsBy($subconAssignments, 'activity_type'),
-                    'top_assignments' => $topAssignments,
+                    'top_blocked_assignments' => $topAssignments,
                 ];
             })
             ->sortByDesc('blocker_score')
