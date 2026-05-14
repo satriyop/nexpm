@@ -477,7 +477,7 @@ class ReportController extends Controller
                 $site?->siteType?->name ?? '—',
                 $construction?->constructionData?->project_status ?? '—',
                 $pln?->plnData?->pln_status ?? '—',
-                ($site?->location_name ?? '').' ['.($site?->site_code ?? '').']',
+                $site?->location_name ?? '',
                 $site?->address ?? '',
                 $site?->google_map_url ?? '',
                 $site?->province ?? '',
