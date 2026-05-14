@@ -434,9 +434,9 @@ class ReportController extends Controller
             'kWh Meter PLN Installation Date', 'Machine SN (Serial Number)',
             'ID PELANGGAN (ID PLN)', 'Nomor SIM Card', 'Go LIVE Date (PLN Bypass)',
             'Go LIVE Date (PLN)', 'Latest Remark / Notes',
-            'Tanggal Pengajuan Invoice (DP)', 'DP 35% Date',
-            'Tanggal Pengajuan Invoice (60%)', '60% Payment Date',
-            'Tanggal Pengajuan Invoice (5%)', '5% Payment Date', 'Invoice URL',
+            'Tanggal Pengajuan Invoice (DP)', 'DP 35% Date', 'DP 35% Inv Number', 'DP 35% DPP Amount',
+            'Tanggal Pengajuan Invoice (60%)', '60% Payment Date', 'Invoice 60% Inv Number', 'Invoice 60% DPP Amount',
+            'Tanggal Pengajuan Invoice (5%)', '5% Payment Date', 'Invoice 5% Inv Number', 'Invoice 5% DPP Amount', 'Invoice URL',
         ];
 
         $extraHeaders = array_merge(
@@ -511,10 +511,16 @@ class ReportController extends Controller
                 $site?->latest_remark ?? '',
                 $site?->invoice_submission_date?->format('d-M-y') ?? '',
                 $site?->dp_35_date?->format('d-M-y') ?? '',
+                $site?->dp_35_inv_number ?? '',
+                $site?->dp_35_dpp_amount ?? '',
                 $site?->invoice_60_submission_date?->format('d-M-y') ?? '',
                 $site?->payment_60_date?->format('d-M-y') ?? '',
+                $site?->invoice_60_inv_number ?? '',
+                $site?->invoice_60_dpp_amount ?? '',
                 $site?->invoice_5_submission_date?->format('d-M-y') ?? '',
                 $site?->payment_5_date?->format('d-M-y') ?? '',
+                $site?->invoice_5_inv_number ?? '',
+                $site?->invoice_5_dpp_amount ?? '',
                 $site?->invoice_url ?? '',
             ];
 
