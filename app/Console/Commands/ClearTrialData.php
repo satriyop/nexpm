@@ -18,7 +18,7 @@ class ClearTrialData extends Command
      * Storage directories that hold trial-uploaded files.
      * logos/ is intentionally excluded — contractor and client logos are kept.
      */
-    private const UPLOAD_DIRS = ['survey', 'pln', 'construction', 'bast'];
+    private const UPLOAD_DIRS = ['survey', 'pln', 'construction', 'bast', 'legacy-reports'];
 
     public function handle(): int
     {
@@ -100,6 +100,7 @@ class ClearTrialData extends Command
             DB::table('assignment_construction_data')->delete();
             DB::table('assignment_survey_data')->delete();
             DB::table('assignment_pln_data')->delete();
+            DB::table('assignment_legacy_reports')->delete();
             DB::table('report_assignments')->delete();
             DB::table('reports')->delete();
             DB::table('assignment_audit_logs')->delete();

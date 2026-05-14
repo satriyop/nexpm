@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Notification;
 
@@ -112,6 +113,14 @@ class Assignment extends Model
     public function bastData(): HasOne
     {
         return $this->hasOne(AssignmentBastData::class);
+    }
+
+    /**
+     * @return HasMany<AssignmentLegacyReport, $this>
+     */
+    public function legacyReports(): HasMany
+    {
+        return $this->hasMany(AssignmentLegacyReport::class);
     }
 
     /**

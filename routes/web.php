@@ -74,6 +74,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::delete('assignments/{assignment}/bast/photos/{photo}', [Admin\AssignmentController::class, 'destroyBastPhoto'])->name('assignments.bast.photos.destroy');
     Route::patch('assignments/{assignment}/admin-bast', [Admin\AssignmentController::class, 'updateBastData'])->name('assignments.admin-bast');
     Route::patch('assignments/{assignment}/reassign', [Admin\AssignmentController::class, 'reassign'])->name('assignments.reassign');
+    Route::post('assignments/{assignment}/legacy-reports', [Admin\AssignmentController::class, 'storeLegacyReport'])->name('assignments.legacy-reports.store');
+    Route::delete('assignments/{assignment}/legacy-reports/{legacy_report}', [Admin\AssignmentController::class, 'destroyLegacyReport'])->name('assignments.legacy-reports.destroy');
 
     Route::get('reports', [Admin\ReportController::class, 'index'])->name('reports.index');
     Route::post('reports', [Admin\ReportController::class, 'store'])->name('reports.store');
@@ -82,6 +84,11 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
 
     Route::get('company-settings', [Admin\CompanySettingController::class, 'index'])->name('company-settings.index');
     Route::post('company-settings', [Admin\CompanySettingController::class, 'update'])->name('company-settings.update');
+
+    Route::get('manual-import', [Admin\ManualProjectImportController::class, 'index'])->name('manual-import.index');
+    Route::get('manual-import/template', [Admin\ManualProjectImportController::class, 'template'])->name('manual-import.template');
+    Route::post('manual-import/preview', [Admin\ManualProjectImportController::class, 'preview'])->name('manual-import.preview');
+    Route::post('manual-import/store', [Admin\ManualProjectImportController::class, 'store'])->name('manual-import.store');
 });
 
 Route::middleware(['auth', 'verified', 'role:subcontractor'])->prefix('subcontractor')->name('subcontractor.')->group(function () {

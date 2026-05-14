@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { Eye, FolderKanban, Plus } from 'lucide-vue-next';
+import { Eye, FileSpreadsheet, FolderKanban, Plus } from 'lucide-vue-next';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ProjectController';
+import * as ImportActions from '@/actions/App/Http/Controllers/Admin/ManualProjectImportController';
 import InputError from '@/components/InputError.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Button } from '@/components/ui/button';
@@ -106,9 +107,16 @@ function submit() {
     <div class="space-y-6 p-6">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-semibold">Projects</h1>
-            <Button @click="open = true"
-                ><Plus class="mr-1.5 h-4 w-4" />New Project</Button
-            >
+            <div class="flex items-center gap-2">
+                <Button variant="outline" as-child>
+                    <Link :href="ImportActions.index().url">
+                        <FileSpreadsheet class="mr-1.5 h-4 w-4" />Import Manual Projects
+                    </Link>
+                </Button>
+                <Button @click="open = true"
+                    ><Plus class="mr-1.5 h-4 w-4" />New Project</Button
+                >
+            </div>
         </div>
 
         <Card>

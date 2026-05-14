@@ -12,6 +12,7 @@ use App\Models\AssignmentBastData;
 use App\Models\AssignmentBastPhoto;
 use App\Models\AssignmentConstructionData;
 use App\Models\AssignmentConstructionPhoto;
+use App\Models\AssignmentLegacyReport;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
 use App\Models\MainContractor;
@@ -158,6 +159,7 @@ class AssignmentController extends Controller
             'plnData',
             'constructionData.constructionPhotos',
             'bastData.bastPhotos',
+            'legacyReports',
         ]);
 
         $mainContractorId = $assignment->site->project->main_contractor_id;
@@ -816,5 +818,41 @@ class AssignmentController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
+    }
+
+    public function storeLegacyReport(Request $request, Assignment $assignment): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+        abort_unless($this->currentUser()->isSuperAdmin(), 403, 'Super admin access required.');
+
+        $validated = $request->validate([
+            'report_type' => ['required', 'string', 'in:SSR,BAST,CONSTRUCTION'],
+            'file' => ['required', 'file', 'mimes:pdf,xlsx,xls,jpg,jpeg,png', 'max:20480'],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store('legacy-reports', 'public');
+
+        AssignmentLegacyReport::query()->create([
+            'assignment_id' => $assignment->id,
+            'report_type' => $validated['report_type'],
+            'file_path' => $path,
+            'original_filename' => $file->getClientOriginalName(),
+            'uploaded_by' => $this->currentUser()->id,
+        ]);
+
+        return back()->with('success', 'Legacy report uploaded.');
+    }
+
+    public function destroyLegacyReport(Assignment $assignment, AssignmentLegacyReport $legacyReport): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+        abort_unless($this->currentUser()->isSuperAdmin(), 403, 'Super admin access required.');
+        abort_unless($legacyReport->assignment_id === $assignment->id, 403);
+
+        Storage::disk('public')->delete($legacyReport->file_path);
+        $legacyReport->delete();
+
+        return back()->with('success', 'Legacy report removed.');
     }
 }

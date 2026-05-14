@@ -160,6 +160,15 @@ export interface AssignmentBastData {
     bast_photos: AssignmentBastPhoto[];
 }
 
+export interface AssignmentLegacyReport {
+    id: number;
+    assignment_id: number;
+    report_type: string;
+    original_filename: string;
+    download_url: string;
+    created_at: string | null;
+}
+
 export interface Assignment {
     id: number;
     site_id: number;
@@ -177,6 +186,7 @@ export interface Assignment {
     pln_data: AssignmentPlnData | null;
     construction_data: AssignmentConstructionData | null;
     bast_data: AssignmentBastData | null;
+    legacy_reports: AssignmentLegacyReport[];
 }
 
 export interface PaginationLink {

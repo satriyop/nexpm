@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -9,6 +9,7 @@ import {
     ClipboardList,
     Download,
     ExternalLink,
+    FileArchive,
     FileText,
     ImageIcon,
     LockKeyhole,
@@ -17,6 +18,8 @@ import {
     RefreshCw,
     RotateCw,
     Send,
+    Trash2,
+    Upload,
     X,
 } from 'lucide-vue-next';
 import { computed, onUnmounted, ref } from 'vue';
@@ -24,6 +27,7 @@ import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/As
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import InputError from '@/components/InputError.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
+import type { AssignmentLegacyReport } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -92,10 +96,14 @@ defineOptions({
     }),
 });
 
+const page = usePage();
+const isSuperAdmin = computed(() => (page.props.auth as any)?.user?.role === 'super_admin');
+
 const survey = computed(() => props.assignment.survey_data);
 const pln = computed(() => props.assignment.pln_data);
 const construction = computed(() => props.assignment.construction_data);
 const bast = computed(() => props.assignment.bast_data);
+const legacyReports = computed(() => props.assignment.legacy_reports ?? []);
 
 const isConstruction = computed(
     () => props.assignment.activity_type === 'CONSTRUCTION',
@@ -518,6 +526,46 @@ onUnmounted(() => {
     removeNavGuard();
     window.removeEventListener('beforeunload', handleBeforeUnload);
 });
+
+// --- Legacy Reports (superadmin only) ---
+const legacyReportFileRef = ref<HTMLInputElement | null>(null);
+const legacyReportForm = useForm({
+    report_type: 'SSR' as 'SSR' | 'BAST' | 'CONSTRUCTION',
+    file: null as File | null,
+});
+
+function submitLegacyReport(): void {
+    if (!legacyReportFileRef.value?.files?.[0]) {
+        return;
+    }
+    legacyReportForm.file = legacyReportFileRef.value.files[0];
+    legacyReportForm.post(
+        AdminAssignmentActions.storeLegacyReport(props.assignment.id).url,
+        {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                legacyReportForm.reset();
+                if (legacyReportFileRef.value) {
+                    legacyReportFileRef.value.value = '';
+                }
+            },
+        },
+    );
+}
+
+function deleteLegacyReport(report: AssignmentLegacyReport): void {
+    if (!confirm(`Remove "${report.original_filename}"?`)) {
+        return;
+    }
+    router.delete(
+        AdminAssignmentActions.destroyLegacyReport({
+            assignment: props.assignment.id,
+            legacy_report: report.id,
+        }).url,
+        { preserveScroll: true },
+    );
+}
 </script>
 
 <template>
@@ -2455,6 +2503,82 @@ onUnmounted(() => {
                         </form>
                     </CardContent>
                 </Card>
+            </div>
+        </div>
+
+        <!-- Legacy Reports (superadmin only) -->
+        <div
+            v-if="isSuperAdmin"
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div
+                class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+            >
+                <FileArchive class="size-4 text-muted-foreground" />
+                <h2 class="text-sm font-semibold">Legacy Reports</h2>
+                <span class="ml-auto text-xs text-muted-foreground">Superadmin only</span>
+            </div>
+
+            <!-- Existing reports list -->
+            <div v-if="legacyReports.length > 0" class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
+                <div
+                    v-for="report in legacyReports"
+                    :key="report.id"
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm"
+                >
+                    <FileText class="size-4 shrink-0 text-muted-foreground" />
+                    <div class="min-w-0 flex-1">
+                        <span class="truncate font-medium">{{ report.original_filename }}</span>
+                        <span class="ml-2 text-xs text-muted-foreground">{{ report.report_type }}</span>
+                    </div>
+                    <a
+                        :href="report.download_url"
+                        target="_blank"
+                        class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                        <Download class="size-3" />Download
+                    </a>
+                    <button
+                        class="ml-1 text-muted-foreground hover:text-destructive"
+                        @click="deleteLegacyReport(report)"
+                    >
+                        <Trash2 class="size-4" />
+                    </button>
+                </div>
+            </div>
+            <div v-else class="px-4 py-3 text-sm text-muted-foreground">
+                No legacy reports uploaded yet.
+            </div>
+
+            <!-- Upload form -->
+            <div class="border-t border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+                <form class="flex flex-wrap items-end gap-3" @submit.prevent="submitLegacyReport">
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium text-muted-foreground">Report Type</label>
+                        <select
+                            v-model="legacyReportForm.report_type"
+                            class="flex h-8 rounded-md border border-input bg-background px-2 text-sm"
+                        >
+                            <option value="SSR">SSR</option>
+                            <option value="BAST">BAST</option>
+                            <option value="CONSTRUCTION">Construction</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 space-y-1">
+                        <label class="text-xs font-medium text-muted-foreground">File (PDF, XLSX, Image)</label>
+                        <input
+                            ref="legacyReportFileRef"
+                            type="file"
+                            accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"
+                            class="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm file:border-0 file:bg-transparent file:text-xs file:font-medium"
+                        />
+                    </div>
+                    <Button type="submit" size="sm" :disabled="legacyReportForm.processing">
+                        <Upload class="mr-1 size-3.5" />
+                        {{ legacyReportForm.processing ? 'Uploading…' : 'Upload' }}
+                    </Button>
+                </form>
+                <InputError :message="legacyReportForm.errors.file" class="mt-1" />
             </div>
         </div>
 
