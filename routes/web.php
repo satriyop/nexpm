@@ -39,6 +39,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
     Route::get('projects', [Admin\ProjectController::class, 'index'])->name('projects.index');
     Route::post('projects', [Admin\ProjectController::class, 'store'])->name('projects.store');
     Route::get('projects/{project}', [Admin\ProjectController::class, 'show'])->name('projects.show');
+    Route::delete('projects/{project}', [Admin\ProjectController::class, 'destroy'])->name('projects.destroy');
 
     Route::get('subcontractors', [Admin\SubcontractorController::class, 'index'])->name('subcontractors.index');
     Route::post('subcontractors', [Admin\SubcontractorController::class, 'store'])->name('subcontractors.store');

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
     ArrowLeft,
@@ -8,6 +8,7 @@ import {
     Download,
     Eye,
     Pencil,
+    Trash2,
     Upload,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -235,6 +236,22 @@ function submitAssignmentImport() {
 
 const formatBudget = (val: string | null) =>
     val ? `IDR ${Number(val).toLocaleString('id-ID')}` : '—';
+
+const page = usePage();
+const isSuperAdmin = computed(
+    () => (page.props.auth as any)?.user?.role === 'super_admin',
+);
+
+const deleteConfirmOpen = ref(false);
+const deleteForm = useForm({});
+
+function confirmDelete(): void {
+    deleteForm.delete(ProjectActions.destroy(props.project).url, {
+        onSuccess: () => {
+            deleteConfirmOpen.value = false;
+        },
+    });
+}
 </script>
 
 <template>
@@ -252,19 +269,63 @@ const formatBudget = (val: string | null) =>
                     {{ project.name }}
                 </h1>
             </div>
-            <a
-                :href="
-                    AssignmentActions.index({
-                        query: { project_id: project.id },
-                    }).url
-                "
-            >
-                <Button variant="outline" size="sm">
-                    <ClipboardList class="mr-1.5 h-4 w-4" />
-                    View Assignments
+            <div class="flex items-center gap-2">
+                <a
+                    :href="
+                        AssignmentActions.index({
+                            query: { project_id: project.id },
+                        }).url
+                    "
+                >
+                    <Button variant="outline" size="sm">
+                        <ClipboardList class="mr-1.5 h-4 w-4" />
+                        View Assignments
+                    </Button>
+                </a>
+                <Button
+                    v-if="isSuperAdmin"
+                    variant="destructive"
+                    size="sm"
+                    @click="deleteConfirmOpen = true"
+                >
+                    <Trash2 class="mr-1.5 h-4 w-4" />
+                    Delete Project
                 </Button>
-            </a>
+            </div>
         </div>
+
+        <!-- Delete confirmation dialog -->
+        <Dialog v-model:open="deleteConfirmOpen">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Delete Project</DialogTitle>
+                    <DialogDescription>
+                        This will permanently delete
+                        <strong>{{ project.name }}</strong> along with all its
+                        sites, assignments, activity data, uploaded files, and
+                        reports. This action cannot be undone.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button
+                        variant="outline"
+                        @click="deleteConfirmOpen = false"
+                        >Cancel</Button
+                    >
+                    <Button
+                        variant="destructive"
+                        :disabled="deleteForm.processing"
+                        @click="confirmDelete"
+                    >
+                        {{
+                            deleteForm.processing
+                                ? 'Deleting…'
+                                : 'Yes, delete everything'
+                        }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
         <!-- Import result alert -->
         <Alert

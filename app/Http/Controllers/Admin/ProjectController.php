@@ -8,6 +8,8 @@ use App\Models\MainContractor;
 use App\Models\Project;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -68,5 +70,112 @@ class ProjectController extends Controller
             'sites' => $project->sites()->with('siteType')->latest('id')->paginate(25),
             'import' => session('import'),
         ]);
+    }
+
+    public function destroy(Project $project): RedirectResponse
+    {
+        abort_unless($this->currentUser()->isSuperAdmin(), 403);
+
+        $projectName = $project->name;
+
+        $this->deleteProjectFiles($project);
+
+        // Delete orphaned reports before the cascade removes the pivot rows.
+        $assignmentIds = DB::table('assignments')
+            ->whereIn('site_id', DB::table('sites')->where('project_id', $project->id)->pluck('id'))
+            ->pluck('id');
+
+        if ($assignmentIds->isNotEmpty()) {
+            $reportIds = DB::table('report_assignments')
+                ->whereIn('assignment_id', $assignmentIds)
+                ->pluck('report_id');
+
+            if ($reportIds->isNotEmpty()) {
+                DB::table('reports')->whereIn('id', $reportIds)->delete();
+            }
+        }
+
+        $project->delete();
+
+        return redirect()->route('admin.projects.index')
+            ->with('success', "Project \"{$projectName}\" and all related data have been deleted.");
+    }
+
+    private function deleteProjectFiles(Project $project): void
+    {
+        $siteIds = DB::table('sites')->where('project_id', $project->id)->pluck('id');
+
+        if ($siteIds->isEmpty()) {
+            return;
+        }
+
+        $assignmentIds = DB::table('assignments')->whereIn('site_id', $siteIds)->pluck('id');
+
+        $paths = collect();
+
+        // Site photos
+        $paths->push(...DB::table('site_photos')->whereIn('site_id', $siteIds)->pluck('path'));
+
+        if ($assignmentIds->isNotEmpty()) {
+            // Survey data file/photo columns
+            $surveyRows = DB::table('assignment_survey_data')
+                ->whereIn('assignment_id', $assignmentIds)
+                ->get(['photo_overall_site', 'photo_parking_evcs', 'photo_access_route', 'photo_pln_network', 'photo_satellite_gmaps', 'file_mockup_3d', 'file_site_plan', 'file_ba_survey']);
+
+            foreach ($surveyRows as $row) {
+                foreach ((array) $row as $val) {
+                    if ($val) {
+                        $paths->push($val);
+                    }
+                }
+            }
+
+            // PLN data file columns
+            $plnRows = DB::table('assignment_pln_data')
+                ->whereIn('assignment_id', $assignmentIds)
+                ->get(['file_slo', 'file_nidi', 'file_reg', 'file_pk', 'foto_kwh']);
+
+            foreach ($plnRows as $row) {
+                foreach ((array) $row as $val) {
+                    if ($val) {
+                        $paths->push($val);
+                    }
+                }
+            }
+
+            // Construction: single foto_machine_sn column + construction photos
+            $consDataIds = DB::table('assignment_construction_data')
+                ->whereIn('assignment_id', $assignmentIds)
+                ->get(['id', 'foto_machine_sn']);
+
+            foreach ($consDataIds as $row) {
+                if ($row->foto_machine_sn) {
+                    $paths->push($row->foto_machine_sn);
+                }
+            }
+
+            $consDataIdList = $consDataIds->pluck('id');
+            if ($consDataIdList->isNotEmpty()) {
+                $paths->push(...DB::table('assignment_construction_photos')->whereIn('assignment_construction_data_id', $consDataIdList)->pluck('path'));
+            }
+
+            // BAST photos
+            $bastDataIds = DB::table('assignment_bast_data')
+                ->whereIn('assignment_id', $assignmentIds)
+                ->pluck('id');
+
+            if ($bastDataIds->isNotEmpty()) {
+                $paths->push(...DB::table('assignment_bast_photos')->whereIn('assignment_bast_data_id', $bastDataIds)->pluck('photo_path'));
+            }
+
+            // Legacy report files
+            $paths->push(...DB::table('assignment_legacy_reports')->whereIn('assignment_id', $assignmentIds)->pluck('file_path'));
+        }
+
+        $filesToDelete = $paths->filter()->unique()->values()->all();
+
+        if ($filesToDelete !== []) {
+            Storage::disk('public')->delete($filesToDelete);
+        }
     }
 }
