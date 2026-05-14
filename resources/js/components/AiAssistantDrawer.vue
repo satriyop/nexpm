@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
-import { AlertCircle, Bot, Loader2, Send, Sparkles } from 'lucide-vue-next';
+import { AlertCircle, Bot, Loader2, RotateCcw, Send, Sparkles } from 'lucide-vue-next';
 import { computed, nextTick, ref } from 'vue';
 
 import { store as storeAiMessage } from '@/actions/App/Http/Controllers/Admin/AiAssistantController';
@@ -32,12 +32,26 @@ const messagesEl = ref<HTMLElement | null>(null);
 const isSuperAdmin = computed(() => page.props.auth.user.role === 'super_admin');
 
 const quickPrompts = [
-    'Find blocked assignments',
-    'Summarize dashboard progress',
-    'Check report readiness',
+    'Apa risiko proyek hari ini?',
+    'Assignment mana yang telat atau stuck?',
+    'Project mana yang progress-nya paling lambat?',
+    'Subcon mana yang paling banyak blocker?',
+    'Apa yang siap dibuat laporan?',
+    'Apa prioritas tindakan saya hari ini?',
 ];
 
 const csrfToken = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
+const toolLabels: Record<string, string> = {
+    check_report_readiness: 'Kesiapan laporan',
+    find_blocked_assignments: 'Assignment telat',
+    general_help: 'Bantuan',
+    list_users: 'Daftar user',
+    summarize_priority_actions: 'Prioritas tindakan',
+    summarize_project_risks: 'Risiko proyek',
+    summarize_subcontractor_blockers: 'Blocker subcon',
+    summarize_dashboard: 'Ringkasan dashboard',
+};
 
 const scrollToBottom = async () => {
     await nextTick();
@@ -98,6 +112,13 @@ const ask = async (prompt?: string) => {
         await scrollToBottom();
     }
 };
+
+const resetConversation = () => {
+    conversationId.value = null;
+    messages.value = [];
+    input.value = '';
+    error.value = null;
+};
 </script>
 
 <template>
@@ -116,11 +137,25 @@ const ask = async (prompt?: string) => {
         </TooltipProvider>
 
         <SheetContent side="right" class="w-full gap-0 p-0 sm:max-w-[520px]">
-            <SheetHeader class="border-b px-5 py-4">
-                <SheetTitle class="flex items-center gap-2 text-base">
-                    <Bot class="size-4" />
-                    AI Assistant
-                </SheetTitle>
+            <SheetHeader class="border-b px-5 py-4 pr-12">
+                <div class="flex items-center justify-between gap-3">
+                    <SheetTitle class="flex items-center gap-2 text-base">
+                        <Bot class="size-4" />
+                        AI Assistant
+                    </SheetTitle>
+                    <Button
+                        v-if="messages.length > 0"
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        class="h-8"
+                        :disabled="processing"
+                        @click="resetConversation"
+                    >
+                        <RotateCcw class="size-4" />
+                        Pertanyaan baru
+                    </Button>
+                </div>
             </SheetHeader>
 
             <div ref="messagesEl" class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
@@ -151,7 +186,7 @@ const ask = async (prompt?: string) => {
                         "
                     >
                         <div v-if="message.tool_name" class="mb-1 text-xs font-medium text-muted-foreground">
-                            {{ message.tool_name.replaceAll('_', ' ') }}
+                            {{ toolLabels[message.tool_name] ?? message.tool_name.replaceAll('_', ' ') }}
                         </div>
                         {{ message.content }}
                     </div>
@@ -159,7 +194,7 @@ const ask = async (prompt?: string) => {
 
                 <div v-if="processing" class="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 class="size-4 animate-spin" />
-                    Thinking
+                    Memproses
                 </div>
 
                 <div v-if="error" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -174,7 +209,7 @@ const ask = async (prompt?: string) => {
                     rows="2"
                     class="min-h-11 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="processing"
-                    placeholder="Ask about assignments, reports, or progress"
+                    placeholder="Tanyakan risiko proyek, blocker, laporan, atau prioritas"
                     @keydown.enter.exact.prevent="ask()"
                 />
                 <Button type="submit" size="icon" :disabled="processing || input.trim() === ''" aria-label="Send message">
