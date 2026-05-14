@@ -23,17 +23,22 @@ class SummarizeSubcontractorBlockersTool implements Tool
 
     public function description(): string
     {
-        return 'Analyze which subcontractors have the most blocked assignments. Use when the user asks about subcontractor performance, which subcon has the most blockers, or subcontractor-level issues.';
+        return 'Analyze subcontractor performance and blockers. Use when the user asks about subcontractor blockers, performance, or when they ask about a specific subcontractor by name — including how many sites they handle, what sites they manage, or their full assignment list.';
     }
 
     public function schema(JsonSchema $schema): array
     {
-        return [];
+        return [
+            'subcontractor_name' => $schema->string()
+                ->description('Optional: filter results to a specific subcontractor by name to see all their sites and full assignment list, not just blocked ones.')
+                ->nullable(),
+        ];
     }
 
     public function handle(Request $request): string
     {
-        $payload = $this->service->summarizeSubcontractorBlockers($this->context);
+        $subcontractorName = isset($request['subcontractor_name']) ? (string) $request['subcontractor_name'] : null;
+        $payload = $this->service->summarizeSubcontractorBlockers($this->context, $subcontractorName);
         $this->bag->toolName = $this->name();
         $this->bag->toolPayload = $payload;
 

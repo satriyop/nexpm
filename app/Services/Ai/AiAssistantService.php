@@ -350,8 +350,12 @@ class AiAssistantService
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    public function summarizeSubcontractorBlockers(array $context = []): array
+    public function summarizeSubcontractorBlockers(array $context = [], ?string $subcontractorName = null): array
     {
+        if ($subcontractorName !== null) {
+            return $this->subcontractorProfile($context, $subcontractorName);
+        }
+
         $assignments = $this->riskCandidateAssignments($context);
 
         $subcontractorIds = $assignments
@@ -419,6 +423,46 @@ class AiAssistantService
             'total_subcontractors_with_blockers' => $subcontractors->count(),
             'total_blocked_assignments' => $assignments->count(),
             'subcontractors' => $subcontractors->all(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function subcontractorProfile(array $context, string $subcontractorName): array
+    {
+        $assignments = Assignment::query()
+            ->with(['site.project', 'subcontractor'])
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
+            ->whereHas('subcontractor', fn ($q) => $q->where('name', 'LIKE', "%{$subcontractorName}%"))
+            ->latest('updated_at')
+            ->get();
+
+        if ($assignments->isEmpty()) {
+            return [
+                'subcontractor' => $subcontractorName,
+                'error' => "No assignments found for subcontractor matching '{$subcontractorName}'.",
+            ];
+        }
+
+        $first = $assignments->first();
+
+        return [
+            'subcontractor' => $first->subcontractor?->name,
+            'total_assignments' => $assignments->count(),
+            'status_counts' => $this->countAssignmentsBy($assignments, 'status'),
+            'activity_counts' => $this->countAssignmentsBy($assignments, 'activity_type'),
+            'assignments' => $assignments->map(fn (Assignment $a): array => [
+                'id' => $a->id,
+                'site_code' => $a->site?->site_code,
+                'site_name' => $a->site?->location_name,
+                'project' => $a->site?->project?->name,
+                'activity_type' => $a->activity_type->value,
+                'status' => $a->status->value,
+                'age_days' => (int) $a->updated_at->diffInDays(now()),
+                'url' => route('admin.assignments.show', $a),
+            ])->values()->all(),
         ];
     }
 
