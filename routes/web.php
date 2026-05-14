@@ -22,6 +22,10 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::post('ai/messages', [Admin\AiAssistantController::class, 'store'])
+        ->middleware(['role:super_admin', 'throttle:20,1'])
+        ->name('ai.messages.store');
+
     Route::get('main-contractors', [Admin\MainContractorController::class, 'index'])->name('main-contractors.index');
     Route::post('main-contractors', [Admin\MainContractorController::class, 'store'])->name('main-contractors.store');
     Route::post('main-contractors/{main_contractor}', [Admin\MainContractorController::class, 'update'])->name('main-contractors.update');

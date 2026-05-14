@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AiAssistantDrawer from '@/components/AiAssistantDrawer.vue';
 import AppInertiaNotificationBell from '@/components/AppInertiaNotificationBell.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -24,6 +25,9 @@ withDefaults(
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </template>
         </div>
-        <AppInertiaNotificationBell />
+        <div class="flex items-center gap-1">
+            <AiAssistantDrawer />
+            <AppInertiaNotificationBell />
+        </div>
     </header>
 </template>
