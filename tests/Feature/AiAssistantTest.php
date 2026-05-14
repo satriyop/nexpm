@@ -23,16 +23,35 @@ test('only super admins can ask the assistant', function () {
 });
 
 test('super admins can ask the assistant and messages are stored', function () {
-    config(['services.deepseek.key' => 'test-key']);
+    config(['ai.providers.deepseek.key' => 'test-key']);
 
     Http::fake([
-        'api.deepseek.com/*' => Http::response([
-            'model' => 'deepseek-chat',
-            'choices' => [
-                ['message' => ['content' => 'There is 1 blocked assignment that needs attention.']],
-            ],
-            'usage' => ['total_tokens' => 42],
-        ]),
+        'api.deepseek.com/*' => Http::sequence()
+            ->push([
+                'model' => 'deepseek-chat',
+                'choices' => [[
+                    'finish_reason' => 'tool_calls',
+                    'message' => [
+                        'content' => null,
+                        'tool_calls' => [[
+                            'id' => 'call_123',
+                            'function' => [
+                                'name' => 'find_blocked_assignments',
+                                'arguments' => '{}',
+                            ],
+                        ]],
+                    ],
+                ]],
+                'usage' => ['prompt_tokens' => 100, 'completion_tokens' => 0],
+            ])
+            ->push([
+                'model' => 'deepseek-chat',
+                'choices' => [[
+                    'finish_reason' => 'stop',
+                    'message' => ['content' => 'There is 1 blocked assignment that needs attention.'],
+                ]],
+                'usage' => ['prompt_tokens' => 150, 'completion_tokens' => 42],
+            ]),
     ]);
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -52,12 +71,12 @@ test('super admins can ask the assistant and messages are stored', function () {
     expect(AiConversation::query()->count())->toBe(1)
         ->and(AiMessage::query()->count())->toBe(2);
 
-    Http::assertSent(fn ($request): bool => $request->url() === 'https://api.deepseek.com/chat/completions'
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'api.deepseek.com')
         && $request['model'] === 'deepseek-chat');
 });
 
 test('assistant falls back to local summaries when deepseek is not configured', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -76,7 +95,7 @@ test('assistant falls back to local summaries when deepseek is not configured', 
 });
 
 test('assistant can route user questions to user summaries', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -97,7 +116,7 @@ test('assistant can route user questions to user summaries', function () {
 });
 
 test('assistant does not default unrelated questions to blocked assignments', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -112,7 +131,7 @@ test('assistant does not default unrelated questions to blocked assignments', fu
 });
 
 test('assistant routes project manager risk questions to project risk analytics', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -133,7 +152,7 @@ test('assistant routes project manager risk questions to project risk analytics'
 });
 
 test('assistant routes subcontractor blocker questions to subcon blocker analytics', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -154,7 +173,7 @@ test('assistant routes subcontractor blocker questions to subcon blocker analyti
 });
 
 test('assistant routes pm priority questions to priority actions', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -179,7 +198,7 @@ test('assistant routes pm priority questions to priority actions', function () {
 });
 
 test('assistant returns project health briefing with risks reports and workflow gaps', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -206,7 +225,7 @@ test('assistant returns project health briefing with risks reports and workflow 
 });
 
 test('assistant scopes project context summaries to the selected project', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -241,7 +260,7 @@ test('assistant scopes project context summaries to the selected project', funct
 });
 
 test('assistant summarizes assignment context with workflow gaps and next action', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
@@ -265,7 +284,7 @@ test('assistant summarizes assignment context with workflow gaps and next action
 });
 
 test('assistant detects workflow gaps across core workflows', function () {
-    config(['services.deepseek.key' => null]);
+    config(['ai.providers.deepseek.key' => null]);
     Http::fake();
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);

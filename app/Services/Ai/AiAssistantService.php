@@ -9,53 +9,15 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Throwable;
 
 class AiAssistantService
 {
-    public function __construct(private readonly DeepSeekClient $client) {}
-
     /**
-     * @param  array<string, mixed>  $context
-     * @return array{answer: string, tool_name: string, tool_payload: array<string, mixed>, usage: array<string, mixed>}
-     */
-    public function answer(User $user, string $message, array $context = []): array
-    {
-        abort_unless($user->isSuperAdmin(), 403);
-
-        $toolName = $this->selectTool($message, $context);
-        $language = $this->detectLanguage($message);
-        $toolPayload = $this->runTool($toolName, $context);
-        $prompt = $this->buildUserPrompt($message, $toolName, $context);
-
-        try {
-            $completion = $this->client->complete($this->systemPrompt(), $prompt, $toolPayload);
-            $answer = $completion['content'] !== ''
-                ? $completion['content']
-                : $this->fallbackAnswer($toolName, $toolPayload, language: $language);
-
-            return [
-                'answer' => $answer,
-                'tool_name' => $toolName,
-                'tool_payload' => $toolPayload,
-                'usage' => $completion['usage'],
-            ];
-        } catch (Throwable $exception) {
-            return [
-                'answer' => $this->fallbackAnswer($toolName, $toolPayload, true, $language),
-                'tool_name' => $toolName,
-                'tool_payload' => array_merge($toolPayload, [
-                    'ai_provider_error' => $exception->getMessage(),
-                ]),
-                'usage' => [],
-            ];
-        }
-    }
-
-    /**
+     * Select a tool based on keyword matching (used for local fallback).
+     *
      * @param  array<string, mixed>  $context
      */
-    private function selectTool(string $message, array $context): string
+    public function selectTool(string $message, array $context): string
     {
         $normalized = Str::lower($message);
 
@@ -102,45 +64,13 @@ class AiAssistantService
         return 'general_help';
     }
 
-    private function detectLanguage(string $message): string
-    {
-        $normalized = Str::lower($message);
-
-        if (Str::contains($normalized, [
-            'apa',
-            'siapa',
-            'saja',
-            'yang',
-            'temukan',
-            'daftar',
-            'pengguna',
-            'telat',
-            'terlambat',
-            'ringkas',
-            'rangkum',
-            'progres',
-            'laporan',
-            'siap',
-            'bisa',
-            'kamu',
-            'bantu',
-            'sudah',
-            'belum',
-        ])) {
-            return 'id';
-        }
-
-        return 'en';
-    }
-
     /**
-     * @return array<string, mixed>
-     */
-    /**
+     * Run a tool by name and return its payload (used for local fallback).
+     *
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function runTool(string $toolName, array $context): array
+    public function runTool(string $toolName, array $context): array
     {
         return match ($toolName) {
             'list_users' => $this->listUsers(),
@@ -158,13 +88,79 @@ class AiAssistantService
     }
 
     /**
-     * @return array<string, mixed>
+     * Generate a local fallback answer when the AI provider is unavailable.
+     *
+     * @param  array<string, mixed>  $toolPayload
      */
+    public function fallbackAnswer(string $toolName, array $toolPayload, string $language = 'en'): string
+    {
+        if ($language === 'id') {
+            return $this->fallbackAnswerInIndonesian($toolName, $toolPayload);
+        }
+
+        $prefix = 'AI provider is not configured or reachable, so this is a local NexPM summary. ';
+
+        return $prefix.match ($toolName) {
+            'list_users' => sprintf(
+                'Users found: %d. Role split: %s.',
+                (int) $toolPayload['total_users_returned'],
+                $this->formatCounts($toolPayload['role_counts'] ?? [])
+            ),
+            'general_help' => 'I can help with project risks, late assignments, subcontractor blockers, report readiness, and PM priority actions.',
+            'contextual_page_summary' => sprintf(
+                'Context summary: %d workflow gaps found for this page.',
+                count($toolPayload['gaps'] ?? [])
+            ),
+            'detect_workflow_gaps' => sprintf(
+                'Workflow gap scan: %d gaps found. Gap split: %s.',
+                (int) $toolPayload['total_gaps'],
+                $this->formatCounts($toolPayload['gap_type_counts'] ?? [])
+            ),
+            'project_health_briefing' => sprintf(
+                'Project health briefing: %d risky assignments, %d report-ready assignments, and %d workflow gaps need attention.',
+                (int) data_get($toolPayload, 'project_risks.total_risky_assignments', 0),
+                (int) data_get($toolPayload, 'report_readiness.ready_assignment_count', 0),
+                (int) data_get($toolPayload, 'workflow_gaps.total_gaps', 0),
+            ),
+            'summarize_priority_actions' => sprintf(
+                'Priority actions: %d items need attention. Blocker actions: %d. Report-ready items: %d.',
+                (int) $toolPayload['total_priority_actions'],
+                (int) $toolPayload['risk_action_count'],
+                (int) $toolPayload['report_ready_count'],
+            ),
+            'summarize_project_risks' => sprintf(
+                'Project risk summary: %d projects have risk across %d assignments.',
+                (int) $toolPayload['total_projects_with_risk'],
+                (int) $toolPayload['total_risky_assignments'],
+            ),
+            'summarize_subcontractor_blockers' => sprintf(
+                'Subcontractor blockers: %d subcontractors have blockers across %d assignments.',
+                (int) $toolPayload['total_subcontractors_with_blockers'],
+                (int) $toolPayload['total_blocked_assignments'],
+            ),
+            'check_report_readiness' => sprintf(
+                'Report readiness: %d assignments are currently in report-ready statuses. Top activity split: %s.',
+                (int) $toolPayload['ready_assignment_count'],
+                $this->formatCounts($toolPayload['activity_counts'] ?? [])
+            ),
+            'summarize_dashboard' => sprintf(
+                'Dashboard summary: %d assignments found. Status split: %s.',
+                (int) $toolPayload['total_assignments'],
+                $this->formatCounts($toolPayload['status_counts'] ?? [])
+            ),
+            default => sprintf(
+                'Blocked assignment scan: %d risky assignments found. Status split: %s.',
+                (int) $toolPayload['total_risky_assignments'],
+                $this->formatCounts($toolPayload['status_counts'] ?? [])
+            ),
+        };
+    }
+
     /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function findBlockedAssignments(array $context = []): array
+    public function findBlockedAssignments(array $context = []): array
     {
         $slowThreshold = now()->subDays(7);
         $assignments = Assignment::query()
@@ -227,13 +223,10 @@ class AiAssistantService
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function summarizeDashboard(array $context = []): array
+    public function summarizeDashboard(array $context = []): array
     {
         $statusCounts = Assignment::query()
             ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
@@ -283,13 +276,10 @@ class AiAssistantService
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function checkReportReadiness(array $context = []): array
+    public function checkReportReadiness(array $context = []): array
     {
         $readyStatuses = AssignmentStatus::verifiableStatuses();
         $assignments = Assignment::query()
@@ -321,13 +311,10 @@ class AiAssistantService
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function summarizeProjectRisks(array $context = []): array
+    public function summarizeProjectRisks(array $context = []): array
     {
         $assignments = $this->riskCandidateAssignments($context);
 
@@ -360,13 +347,10 @@ class AiAssistantService
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function summarizeSubcontractorBlockers(array $context = []): array
+    public function summarizeSubcontractorBlockers(array $context = []): array
     {
         $assignments = $this->riskCandidateAssignments($context);
 
@@ -399,13 +383,10 @@ class AiAssistantService
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function summarizePriorityActions(array $context = []): array
+    public function summarizePriorityActions(array $context = []): array
     {
         $riskAssignments = $this->riskCandidateAssignments($context)
             ->sortByDesc(fn (Assignment $assignment): int => $this->assignmentRiskScore($assignment))
@@ -465,7 +446,7 @@ class AiAssistantService
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function projectHealthBriefing(array $context = []): array
+    public function projectHealthBriefing(array $context = []): array
     {
         return [
             'generated_at' => now()->toIso8601String(),
@@ -482,7 +463,7 @@ class AiAssistantService
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function contextualPageSummary(array $context): array
+    public function contextualPageSummary(array $context): array
     {
         if ($assignmentId = $this->contextAssignmentId($context)) {
             $assignment = Assignment::query()
@@ -537,7 +518,7 @@ class AiAssistantService
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function detectWorkflowGaps(array $context = []): array
+    public function detectWorkflowGaps(array $context = []): array
     {
         $assignments = Assignment::query()
             ->with(['site.project', 'subcontractor', 'surveyData', 'plnData', 'constructionData', 'bastData.bastPhotos'])
@@ -561,7 +542,7 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function listUsers(): array
+    public function listUsers(): array
     {
         $users = User::query()
             ->with(['mainContractor:id,name', 'subcontractor:id,name'])
@@ -590,7 +571,7 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function generalHelp(): array
+    public function generalHelp(): array
     {
         return [
             'generated_at' => now()->toIso8601String(),
@@ -618,7 +599,7 @@ class AiAssistantService
      * @param  array<string, mixed>  $context
      * @return Collection<int, Assignment>
      */
-    private function riskCandidateAssignments(array $context = []): Collection
+    public function riskCandidateAssignments(array $context = []): Collection
     {
         $slowThreshold = now()->subDays(7);
 
@@ -668,7 +649,7 @@ class AiAssistantService
         return (int) $assignments->sum(fn (Assignment $assignment): int => $this->assignmentRiskScore($assignment));
     }
 
-    private function assignmentRiskScore(Assignment $assignment): int
+    public function assignmentRiskScore(Assignment $assignment): int
     {
         $score = 10 + min(30, (int) $assignment->updated_at->diffInDays(now()));
 
@@ -691,7 +672,7 @@ class AiAssistantService
         return $score;
     }
 
-    private function recommendedAction(Assignment $assignment): string
+    public function recommendedAction(Assignment $assignment): string
     {
         if ($assignment->status === AssignmentStatus::Revision) {
             return 'Follow up revisi dengan PIC terkait dan pastikan komentar revisi ditutup.';
@@ -716,7 +697,7 @@ class AiAssistantService
      * @param  Collection<int, Assignment>  $assignments
      * @return Collection<int, array<string, mixed>>
      */
-    private function workflowGapsForAssignments(Collection $assignments): Collection
+    public function workflowGapsForAssignments(Collection $assignments): Collection
     {
         return $assignments
             ->flatMap(fn (Assignment $assignment): array => $this->assignmentWorkflowGaps($assignment))
@@ -726,7 +707,7 @@ class AiAssistantService
     /**
      * @return list<array<string, mixed>>
      */
-    private function assignmentWorkflowGaps(Assignment $assignment): array
+    public function assignmentWorkflowGaps(Assignment $assignment): array
     {
         $gaps = [];
 
@@ -806,7 +787,7 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function assignmentSummary(Assignment $assignment): array
+    public function assignmentSummary(Assignment $assignment): array
     {
         return [
             'id' => $assignment->id,
@@ -859,7 +840,7 @@ class AiAssistantService
      * @param  Collection<int, Assignment>  $assignments
      * @return array<string, int>
      */
-    private function countAssignmentsBy(Collection $assignments, string $key): array
+    public function countAssignmentsBy(Collection $assignments, string $key): array
     {
         return $assignments
             ->countBy(fn (Assignment $assignment): string => match ($key) {
@@ -875,7 +856,7 @@ class AiAssistantService
      * @param  mixed  $query
      * @param  array<string, mixed>  $context
      */
-    private function applyAssignmentContext($query, array $context): void
+    public function applyAssignmentContext($query, array $context): void
     {
         if ($assignmentId = $this->contextAssignmentId($context)) {
             $query->where('assignments.id', $assignmentId);
@@ -897,7 +878,7 @@ class AiAssistantService
     /**
      * @param  array<string, mixed>  $context
      */
-    private function hasRecordContext(array $context): bool
+    public function hasRecordContext(array $context): bool
     {
         return $this->contextAssignmentId($context) !== null
             || $this->contextSiteId($context) !== null
@@ -907,7 +888,7 @@ class AiAssistantService
     /**
      * @param  array<string, mixed>  $context
      */
-    private function contextAssignmentId(array $context): ?int
+    public function contextAssignmentId(array $context): ?int
     {
         if ($id = $this->contextInteger($context, 'assignment_id')) {
             return $id;
@@ -919,7 +900,7 @@ class AiAssistantService
     /**
      * @param  array<string, mixed>  $context
      */
-    private function contextSiteId(array $context): ?int
+    public function contextSiteId(array $context): ?int
     {
         if ($id = $this->contextInteger($context, 'site_id')) {
             return $id;
@@ -931,7 +912,7 @@ class AiAssistantService
     /**
      * @param  array<string, mixed>  $context
      */
-    private function contextProjectId(array $context): ?int
+    public function contextProjectId(array $context): ?int
     {
         if ($id = $this->contextInteger($context, 'project_id')) {
             return $id;
@@ -958,7 +939,7 @@ class AiAssistantService
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
-    private function normalizedContext(array $context): array
+    public function normalizedContext(array $context): array
     {
         return [
             'type' => $context['type'] ?? 'page',
@@ -971,107 +952,12 @@ class AiAssistantService
         ];
     }
 
-    private function systemPrompt(): string
-    {
-        return <<<'PROMPT'
-You are NexPM's read-only project management assistant for super admins.
-Use only the supplied application data. Do not claim that you changed records, sent messages, generated reports, or updated workflow state.
-Answer concisely with concrete project risks, blockers, counts, and recommended next actions. If the data is insufficient, say what is missing.
-Reply in the same language as the user's question.
-PROMPT;
-    }
-
-    /**
-     * @param  array<string, mixed>  $context
-     */
-    private function buildUserPrompt(string $message, string $toolName, array $context): string
-    {
-        return 'User question: '.$message.PHP_EOL
-            .'Selected read-only tool: '.$toolName.PHP_EOL
-            .'UI context: '.json_encode($context, JSON_UNESCAPED_SLASHES);
-    }
-
     /**
      * @param  array<string, mixed>  $toolPayload
      */
-    private function fallbackAnswer(
-        string $toolName,
-        array $toolPayload,
-        bool $providerUnavailable = false,
-        string $language = 'en',
-    ): string {
-        if ($language === 'id') {
-            return $this->fallbackAnswerInIndonesian($toolName, $toolPayload, $providerUnavailable);
-        }
-
-        $prefix = $providerUnavailable
-            ? 'AI provider is not configured or reachable, so this is a local NexPM summary. '
-            : '';
-
-        return $prefix.match ($toolName) {
-            'list_users' => sprintf(
-                'Users found: %d. Role split: %s.',
-                (int) $toolPayload['total_users_returned'],
-                $this->formatCounts($toolPayload['role_counts'] ?? [])
-            ),
-            'general_help' => 'I can help with project risks, late assignments, subcontractor blockers, report readiness, and PM priority actions.',
-            'contextual_page_summary' => sprintf(
-                'Context summary: %d workflow gaps found for this page.',
-                count($toolPayload['gaps'] ?? [])
-            ),
-            'detect_workflow_gaps' => sprintf(
-                'Workflow gap scan: %d gaps found. Gap split: %s.',
-                (int) $toolPayload['total_gaps'],
-                $this->formatCounts($toolPayload['gap_type_counts'] ?? [])
-            ),
-            'project_health_briefing' => sprintf(
-                'Project health briefing: %d risky assignments, %d report-ready assignments, and %d workflow gaps need attention.',
-                (int) data_get($toolPayload, 'project_risks.total_risky_assignments', 0),
-                (int) data_get($toolPayload, 'report_readiness.ready_assignment_count', 0),
-                (int) data_get($toolPayload, 'workflow_gaps.total_gaps', 0),
-            ),
-            'summarize_priority_actions' => sprintf(
-                'Priority actions: %d items need attention. Blocker actions: %d. Report-ready items: %d.',
-                (int) $toolPayload['total_priority_actions'],
-                (int) $toolPayload['risk_action_count'],
-                (int) $toolPayload['report_ready_count'],
-            ),
-            'summarize_project_risks' => sprintf(
-                'Project risk summary: %d projects have risk across %d assignments.',
-                (int) $toolPayload['total_projects_with_risk'],
-                (int) $toolPayload['total_risky_assignments'],
-            ),
-            'summarize_subcontractor_blockers' => sprintf(
-                'Subcontractor blockers: %d subcontractors have blockers across %d assignments.',
-                (int) $toolPayload['total_subcontractors_with_blockers'],
-                (int) $toolPayload['total_blocked_assignments'],
-            ),
-            'check_report_readiness' => sprintf(
-                'Report readiness: %d assignments are currently in report-ready statuses. Top activity split: %s.',
-                (int) $toolPayload['ready_assignment_count'],
-                $this->formatCounts($toolPayload['activity_counts'] ?? [])
-            ),
-            'summarize_dashboard' => sprintf(
-                'Dashboard summary: %d assignments found. Status split: %s.',
-                (int) $toolPayload['total_assignments'],
-                $this->formatCounts($toolPayload['status_counts'] ?? [])
-            ),
-            default => sprintf(
-                'Blocked assignment scan: %d risky assignments found. Status split: %s.',
-                (int) $toolPayload['total_risky_assignments'],
-                $this->formatCounts($toolPayload['status_counts'] ?? [])
-            ),
-        };
-    }
-
-    /**
-     * @param  array<string, mixed>  $toolPayload
-     */
-    private function fallbackAnswerInIndonesian(string $toolName, array $toolPayload, bool $providerUnavailable): string
+    private function fallbackAnswerInIndonesian(string $toolName, array $toolPayload): string
     {
-        $prefix = $providerUnavailable
-            ? 'AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. '
-            : '';
+        $prefix = 'AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. ';
 
         return $prefix.match ($toolName) {
             'list_users' => sprintf(
