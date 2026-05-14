@@ -53,6 +53,7 @@ function submit() {
     if (!fileRef.value?.files?.[0]) {
         return;
     }
+
     uploadForm.file = fileRef.value.files[0];
     uploadForm.post(Actions.preview().url, { forceFormData: true });
 }
@@ -69,17 +70,21 @@ const filteredRows = computed(() => {
     if (!props.previewRows) {
         return [];
     }
+
     if (showAll.value) {
         return props.previewRows;
     }
+
     return props.previewRows.filter((r) => r.status === 'error');
 });
 
 // Group filtered rows by "project / site" key for collapsible display.
 const groupedRows = computed(() => {
     const groups: Record<string, { label: string; rows: PreviewRow[] }> = {};
+
     for (const row of filteredRows.value) {
         const key = `${row.project_name}__${row.site_code}`;
+
         if (!groups[key]) {
             groups[key] = {
                 label: row.site_code ? `${row.project_name} › ${row.site_code}` : row.project_name,
@@ -87,8 +92,10 @@ const groupedRows = computed(() => {
             };
             expandedSites.value.add(key);
         }
+
         groups[key].rows.push(row);
     }
+
     return groups;
 });
 
@@ -134,6 +141,7 @@ function activityLabel(type: string) {
         PLN_CONNECTION: 'PLN',
         BAST: 'BAST',
     };
+
     return map[type] ?? type;
 }
 </script>

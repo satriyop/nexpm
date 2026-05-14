@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Assignment } from '@/types';
+import type { Assignment, AssignmentConstructionData } from '@/types';
 
 const props = defineProps<{
     assignment: Assignment;
@@ -16,7 +16,7 @@ const props = defineProps<{
     submitUrl?: string;
     storePhotoUrl?: string;
     deletePhotoUrlFn?: (photoId: number) => string;
-    siblingConstruction?: import('@/types').AssignmentConstructionData | null;
+    siblingConstruction?: AssignmentConstructionData | null;
 }>();
 
 const siteTypeName = computed(

@@ -24,10 +24,11 @@ import {
 } from 'lucide-vue-next';
 import { computed, onUnmounted, ref } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
+import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import InputError from '@/components/InputError.vue';
+import PhotoUpload from '@/components/PhotoUpload.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
-import type { AssignmentLegacyReport } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,10 +55,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
-import PhotoUpload from '@/components/PhotoUpload.vue';
 import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
+import type { AssignmentLegacyReport } from '@/types';
 import type { Assignment, AssignmentConstructionData } from '@/types';
 
 interface SubcontractorOption {
@@ -352,7 +352,10 @@ const constructionUploadingPhoto = ref(false);
 const constructionUploadKey = ref(0);
 
 function onAdminConstructionPhotoSelected(file: File | null): void {
-    if (!file) return;
+    if (!file) {
+        return;
+    }
+
     const uploadForm = useForm({ photo: file });
     constructionUploadingPhoto.value = true;
     uploadForm.post(AdminAssignmentActions.storeConstructionPhoto(props.assignment).url, {
@@ -538,6 +541,7 @@ function submitLegacyReport(): void {
     if (!legacyReportFileRef.value?.files?.[0]) {
         return;
     }
+
     legacyReportForm.file = legacyReportFileRef.value.files[0];
     legacyReportForm.post(
         AdminAssignmentActions.storeLegacyReport(props.assignment.id).url,
@@ -546,6 +550,7 @@ function submitLegacyReport(): void {
             preserveScroll: true,
             onSuccess: () => {
                 legacyReportForm.reset();
+
                 if (legacyReportFileRef.value) {
                     legacyReportFileRef.value.value = '';
                 }
@@ -558,6 +563,7 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
     if (!confirm(`Remove "${report.original_filename}"?`)) {
         return;
     }
+
     router.delete(
         AdminAssignmentActions.destroyLegacyReport({
             assignment: props.assignment.id,

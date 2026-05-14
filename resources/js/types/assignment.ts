@@ -153,9 +153,22 @@ export interface AssignmentBastData {
     id: number;
     assignment_id: number;
     updated_at: string | null;
+    plant_name: string | null;
+    plant_address: string | null;
+    plant_coordinate: string | null;
+    gmaps_link: string | null;
+    charger_type: string | null;
+    sn_unit: string | null;
+    id_pln: string | null;
     sim_provider: string | null;
+    installation_vendor: string | null;
+    pic_vendor_contact: string | null;
+    installation_date: string | null;
     nomor_simcard: string | null;
     commissioning_date: string | null;
+    customer: string | null;
+    go_live_date_pln_pass: string | null;
+    go_live_date_pln: string | null;
     measurements: Record<string, string | null> | null;
     bast_photos: AssignmentBastPhoto[];
 }

@@ -34,6 +34,7 @@ async function onFileChange(e: Event) {
 
     if (file.type.startsWith('image/')) {
         compressing.value = true;
+
         try {
             const compressed = await compressToUnder1MB(file);
             compressedSize.value = formatSize(compressed.size);
@@ -43,25 +44,31 @@ async function onFileChange(e: Event) {
             error.value = 'Could not process the image. Please try another.';
         } finally {
             compressing.value = false;
+
             if (inputRef.value) {
                 inputRef.value.value = '';
             }
         }
+
         return;
     }
 
     // Non-image files (PDF, DWG, etc.) — validate size and pass through as-is
     const limitKb = props.maxSizeKb ?? 20480;
+
     if (file.size > limitKb * 1024) {
         const label =
             limitKb >= 1024
                 ? `${(limitKb / 1024).toFixed(0)} MB`
                 : `${limitKb} KB`;
         error.value = `File too large. Maximum allowed size is ${label}.`;
+
         if (inputRef.value) {
             inputRef.value.value = '';
         }
+
         emit('update:modelValue', null);
+
         return;
     }
 
@@ -81,6 +88,7 @@ async function compressToUnder1MB(file: File): Promise<File> {
     for (const maxWidth of [1920, 1280, 960]) {
         for (const quality of [0.82, 0.7, 0.6, 0.5]) {
             const blob = await drawAndEncode(img, maxWidth, quality);
+
             if (blob.size <= ONE_MB) {
                 return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
                     type: 'image/jpeg',
@@ -90,6 +98,7 @@ async function compressToUnder1MB(file: File): Promise<File> {
     }
 
     const blob = await drawAndEncode(img, 640, 0.4);
+
     return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
         type: 'image/jpeg',
     });
