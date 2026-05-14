@@ -63,10 +63,16 @@ class SiteController extends Controller
             'latest_remark' => ['nullable', 'string'],
             'invoice_submission_date' => ['nullable', 'date'],
             'dp_35_date' => ['nullable', 'date'],
+            'dp_35_inv_number' => ['nullable', 'string', 'max:255'],
+            'dp_35_dpp_amount' => ['nullable', 'numeric', 'min:0'],
             'invoice_60_submission_date' => ['nullable', 'date'],
             'payment_60_date' => ['nullable', 'date'],
+            'invoice_60_inv_number' => ['nullable', 'string', 'max:255'],
+            'invoice_60_dpp_amount' => ['nullable', 'numeric', 'min:0'],
             'invoice_5_submission_date' => ['nullable', 'date'],
             'payment_5_date' => ['nullable', 'date'],
+            'invoice_5_inv_number' => ['nullable', 'string', 'max:255'],
+            'invoice_5_dpp_amount' => ['nullable', 'numeric', 'min:0'],
             'invoice_url' => ['nullable', 'string', 'max:500'],
         ]);
 

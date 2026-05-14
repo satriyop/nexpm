@@ -68,10 +68,16 @@ interface Site {
     latest_remark: string | null;
     invoice_submission_date: string | null;
     dp_35_date: string | null;
+    dp_35_inv_number: string | null;
+    dp_35_dpp_amount: string | null;
     invoice_60_submission_date: string | null;
     payment_60_date: string | null;
+    invoice_60_inv_number: string | null;
+    invoice_60_dpp_amount: string | null;
     invoice_5_submission_date: string | null;
     payment_5_date: string | null;
+    invoice_5_inv_number: string | null;
+    invoice_5_dpp_amount: string | null;
     invoice_url: string | null;
     project: Project;
 }
@@ -112,10 +118,16 @@ onMounted(() => {
 const financialFields = [
     'invoice_submission_date',
     'dp_35_date',
+    'dp_35_inv_number',
+    'dp_35_dpp_amount',
     'invoice_60_submission_date',
     'payment_60_date',
+    'invoice_60_inv_number',
+    'invoice_60_dpp_amount',
     'invoice_5_submission_date',
     'payment_5_date',
+    'invoice_5_inv_number',
+    'invoice_5_dpp_amount',
     'invoice_url',
 ] as const;
 const hasFinancialErrors = computed(() =>
@@ -150,10 +162,16 @@ const form = useForm({
     latest_remark: props.site.latest_remark ?? '',
     invoice_submission_date: props.site.invoice_submission_date ?? '',
     dp_35_date: props.site.dp_35_date ?? '',
+    dp_35_inv_number: props.site.dp_35_inv_number ?? '',
+    dp_35_dpp_amount: props.site.dp_35_dpp_amount ?? '',
     invoice_60_submission_date: props.site.invoice_60_submission_date ?? '',
     payment_60_date: props.site.payment_60_date ?? '',
+    invoice_60_inv_number: props.site.invoice_60_inv_number ?? '',
+    invoice_60_dpp_amount: props.site.invoice_60_dpp_amount ?? '',
     invoice_5_submission_date: props.site.invoice_5_submission_date ?? '',
     payment_5_date: props.site.payment_5_date ?? '',
+    invoice_5_inv_number: props.site.invoice_5_inv_number ?? '',
+    invoice_5_dpp_amount: props.site.invoice_5_dpp_amount ?? '',
     invoice_url: props.site.invoice_url ?? '',
 });
 
@@ -632,84 +650,164 @@ function removeAssignment(assignment: Assignment): void {
             novalidate
         >
             <Card>
-                <CardHeader class="pb-2"
-                    ><h2 class="text-base font-semibold">
+                <CardHeader class="pb-2">
+                    <h2 class="text-base font-semibold">
                         Invoice &amp; Payment Tracking
-                    </h2></CardHeader
-                >
-                <CardContent class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div class="grid gap-1.5">
-                        <Label for="invoice_submission_date"
-                            >Invoice Submission Date / DP</Label
-                        >
-                        <Input
-                            id="invoice_submission_date"
-                            v-model="form.invoice_submission_date"
-                            type="date"
-                        />
-                        <InputError
-                            :message="form.errors.invoice_submission_date"
-                        />
+                    </h2>
+                </CardHeader>
+                <CardContent class="space-y-6">
+                    <!-- 35% tier -->
+                    <div>
+                        <p class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                            35% (Down Payment)
+                        </p>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <div class="grid gap-1.5">
+                                <Label for="invoice_submission_date">35% Submission Date</Label>
+                                <Input
+                                    id="invoice_submission_date"
+                                    v-model="form.invoice_submission_date"
+                                    type="date"
+                                />
+                                <InputError :message="form.errors.invoice_submission_date" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="dp_35_date">35% DP Date</Label>
+                                <Input
+                                    id="dp_35_date"
+                                    v-model="form.dp_35_date"
+                                    type="date"
+                                />
+                                <InputError :message="form.errors.dp_35_date" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="dp_35_inv_number">35% Inv Number</Label>
+                                <Input
+                                    id="dp_35_inv_number"
+                                    v-model="form.dp_35_inv_number"
+                                    placeholder="Invoice number"
+                                />
+                                <InputError :message="form.errors.dp_35_inv_number" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="dp_35_dpp_amount">35% DPP Amount</Label>
+                                <Input
+                                    id="dp_35_dpp_amount"
+                                    v-model="form.dp_35_dpp_amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0"
+                                />
+                                <InputError :message="form.errors.dp_35_dpp_amount" />
+                            </div>
+                        </div>
                     </div>
-                    <div class="grid gap-1.5">
-                        <Label for="dp_35_date">35% DP Date</Label>
-                        <Input
-                            id="dp_35_date"
-                            v-model="form.dp_35_date"
-                            type="date"
-                        />
-                        <InputError :message="form.errors.dp_35_date" />
+
+                    <!-- 60% tier -->
+                    <div>
+                        <p class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                            60%
+                        </p>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <div class="grid gap-1.5">
+                                <Label for="invoice_60_submission_date">60% Submission Date</Label>
+                                <Input
+                                    id="invoice_60_submission_date"
+                                    v-model="form.invoice_60_submission_date"
+                                    type="date"
+                                />
+                                <InputError :message="form.errors.invoice_60_submission_date" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="payment_60_date">60% Payment Date</Label>
+                                <Input
+                                    id="payment_60_date"
+                                    v-model="form.payment_60_date"
+                                    type="date"
+                                />
+                                <InputError :message="form.errors.payment_60_date" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="invoice_60_inv_number">60% Inv Number</Label>
+                                <Input
+                                    id="invoice_60_inv_number"
+                                    v-model="form.invoice_60_inv_number"
+                                    placeholder="Invoice number"
+                                />
+                                <InputError :message="form.errors.invoice_60_inv_number" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="invoice_60_dpp_amount">60% DPP Amount</Label>
+                                <Input
+                                    id="invoice_60_dpp_amount"
+                                    v-model="form.invoice_60_dpp_amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0"
+                                />
+                                <InputError :message="form.errors.invoice_60_dpp_amount" />
+                            </div>
+                        </div>
                     </div>
-                    <div class="grid gap-1.5">
-                        <Label for="invoice_60_submission_date"
-                            >Invoice 60% Submission Date</Label
-                        >
-                        <Input
-                            id="invoice_60_submission_date"
-                            v-model="form.invoice_60_submission_date"
-                            type="date"
-                        />
-                        <InputError
-                            :message="form.errors.invoice_60_submission_date"
-                        />
+
+                    <!-- 5% tier -->
+                    <div>
+                        <p class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                            5% (Retention)
+                        </p>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <div class="grid gap-1.5">
+                                <Label for="invoice_5_submission_date">5% Submission Date</Label>
+                                <Input
+                                    id="invoice_5_submission_date"
+                                    v-model="form.invoice_5_submission_date"
+                                    type="date"
+                                />
+                                <InputError :message="form.errors.invoice_5_submission_date" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="payment_5_date">5% Payment Date</Label>
+                                <Input
+                                    id="payment_5_date"
+                                    v-model="form.payment_5_date"
+                                    type="date"
+                                />
+                                <InputError :message="form.errors.payment_5_date" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="invoice_5_inv_number">5% Inv Number</Label>
+                                <Input
+                                    id="invoice_5_inv_number"
+                                    v-model="form.invoice_5_inv_number"
+                                    placeholder="Invoice number"
+                                />
+                                <InputError :message="form.errors.invoice_5_inv_number" />
+                            </div>
+                            <div class="grid gap-1.5">
+                                <Label for="invoice_5_dpp_amount">5% DPP Amount</Label>
+                                <Input
+                                    id="invoice_5_dpp_amount"
+                                    v-model="form.invoice_5_dpp_amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0"
+                                />
+                                <InputError :message="form.errors.invoice_5_dpp_amount" />
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Invoice URL -->
                     <div class="grid gap-1.5">
-                        <Label for="payment_60_date">60% Payment Date</Label>
-                        <Input
-                            id="payment_60_date"
-                            v-model="form.payment_60_date"
-                            type="date"
-                        />
-                        <InputError :message="form.errors.payment_60_date" />
-                    </div>
-                    <div class="grid gap-1.5">
-                        <Label for="invoice_5_submission_date"
-                            >Invoice 5% Submission Date</Label
-                        >
-                        <Input
-                            id="invoice_5_submission_date"
-                            v-model="form.invoice_5_submission_date"
-                            type="date"
-                        />
-                        <InputError
-                            :message="form.errors.invoice_5_submission_date"
-                        />
-                    </div>
-                    <div class="grid gap-1.5">
-                        <Label for="payment_5_date">5% Payment Date</Label>
-                        <Input
-                            id="payment_5_date"
-                            v-model="form.payment_5_date"
-                            type="date"
-                        />
-                        <InputError :message="form.errors.payment_5_date" />
-                    </div>
-                    <div class="col-span-full grid gap-1.5">
                         <Label for="invoice_url">Invoice URL</Label>
                         <Input
                             id="invoice_url"
                             v-model="form.invoice_url"
                             type="url"
+                            placeholder="https://"
                         />
                         <InputError :message="form.errors.invoice_url" />
                     </div>

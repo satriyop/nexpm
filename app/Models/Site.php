@@ -40,10 +40,16 @@ class Site extends Model
         'latest_remark',
         'invoice_submission_date',
         'dp_35_date',
+        'dp_35_inv_number',
+        'dp_35_dpp_amount',
         'invoice_60_submission_date',
         'payment_60_date',
+        'invoice_60_inv_number',
+        'invoice_60_dpp_amount',
         'invoice_5_submission_date',
         'payment_5_date',
+        'invoice_5_inv_number',
+        'invoice_5_dpp_amount',
         'invoice_url',
     ];
 
