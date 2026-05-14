@@ -32,10 +32,10 @@ const messagesEl = ref<HTMLElement | null>(null);
 const isSuperAdmin = computed(() => page.props.auth.user.role === 'super_admin');
 
 const quickPrompts = [
-    'Apa risiko proyek hari ini?',
+    'Briefing proyek hari ini',
+    'Apa risiko terbesar saat ini?',
     'Assignment mana yang telat atau stuck?',
-    'Project mana yang progress-nya paling lambat?',
-    'Subcon mana yang paling banyak blocker?',
+    'Cek gap workflow',
     'Apa yang siap dibuat laporan?',
     'Apa prioritas tindakan saya hari ini?',
 ];
@@ -47,6 +47,9 @@ const toolLabels: Record<string, string> = {
     find_blocked_assignments: 'Assignment telat',
     general_help: 'Bantuan',
     list_users: 'Daftar user',
+    contextual_page_summary: 'Ringkasan halaman',
+    detect_workflow_gaps: 'Gap workflow',
+    project_health_briefing: 'Briefing proyek',
     summarize_priority_actions: 'Prioritas tindakan',
     summarize_project_risks: 'Risiko proyek',
     summarize_subcontractor_blockers: 'Blocker subcon',
@@ -59,6 +62,41 @@ const scrollToBottom = async () => {
     if (messagesEl.value) {
         messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
     }
+};
+
+const numericId = (value: unknown): number | undefined => (typeof value === 'number' ? value : undefined);
+
+const currentContext = () => {
+    const props = page.props as Record<string, unknown>;
+    const assignment = props.assignment as Record<string, unknown> | undefined;
+    const site = (props.site ?? assignment?.site) as Record<string, unknown> | undefined;
+    const project = (props.project ?? site?.project) as Record<string, unknown> | undefined;
+    const url = page.url;
+
+    let type = 'page';
+
+    if (numericId(assignment?.id)) {
+        type = 'assignment';
+    } else if (numericId(site?.id)) {
+        type = 'site';
+    } else if (numericId(project?.id)) {
+        type = 'project';
+    } else if (url.includes('/reports')) {
+        type = 'reports';
+    } else if (url.includes('/dashboard')) {
+        type = 'dashboard';
+    }
+
+    return {
+        type,
+        id: numericId(assignment?.id) ?? numericId(site?.id) ?? numericId(project?.id),
+        assignment_id: numericId(assignment?.id),
+        site_id: numericId(site?.id),
+        project_id: numericId(project?.id),
+        label: String(assignment?.site_code ?? site?.site_code ?? project?.name ?? url),
+        url,
+        component: page.component,
+    };
 };
 
 const ask = async (prompt?: string) => {
@@ -88,8 +126,7 @@ const ask = async (prompt?: string) => {
                 message,
                 conversation_id: conversationId.value,
                 context: {
-                    type: 'page',
-                    label: page.url,
+                    ...currentContext(),
                 },
             }),
         });

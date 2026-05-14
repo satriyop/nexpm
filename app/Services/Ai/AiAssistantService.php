@@ -23,9 +23,9 @@ class AiAssistantService
     {
         abort_unless($user->isSuperAdmin(), 403);
 
-        $toolName = $this->selectTool($message);
+        $toolName = $this->selectTool($message, $context);
         $language = $this->detectLanguage($message);
-        $toolPayload = $this->runTool($toolName);
+        $toolPayload = $this->runTool($toolName, $context);
         $prompt = $this->buildUserPrompt($message, $toolName, $context);
 
         try {
@@ -52,7 +52,10 @@ class AiAssistantService
         }
     }
 
-    private function selectTool(string $message): string
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function selectTool(string $message, array $context): string
     {
         $normalized = Str::lower($message);
 
@@ -60,7 +63,19 @@ class AiAssistantService
             return 'list_users';
         }
 
-        if (Str::contains($normalized, ['risiko proyek', 'project risk', 'project mana', 'proyek mana', 'paling lambat', 'lambat', 'project lambat', 'proyek lambat'])) {
+        if (Str::contains($normalized, ['briefing', 'brief', 'kabar proyek', 'kondisi proyek', 'health', 'health briefing'])) {
+            return 'project_health_briefing';
+        }
+
+        if (Str::contains($normalized, ['gap', 'workflow gap', 'gap workflow', 'inkonsisten', 'inconsistent', 'missing field', 'data kurang', 'belum lengkap', 'tidak lengkap'])) {
+            return 'detect_workflow_gaps';
+        }
+
+        if ($this->hasRecordContext($context) && Str::contains($normalized, ['halaman ini', 'record ini', 'assignment ini', 'site ini', 'project ini', 'proyek ini', 'apa masalah', 'masalahnya', 'statusnya', 'apa status'])) {
+            return 'contextual_page_summary';
+        }
+
+        if (Str::contains($normalized, ['risiko proyek', 'risiko terbesar', 'project risk', 'project mana', 'proyek mana', 'paling lambat', 'lambat', 'project lambat', 'proyek lambat'])) {
             return 'summarize_project_risks';
         }
 
@@ -121,28 +136,40 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function runTool(string $toolName): array
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function runTool(string $toolName, array $context): array
     {
         return match ($toolName) {
             'list_users' => $this->listUsers(),
-            'summarize_priority_actions' => $this->summarizePriorityActions(),
-            'summarize_project_risks' => $this->summarizeProjectRisks(),
-            'summarize_subcontractor_blockers' => $this->summarizeSubcontractorBlockers(),
-            'check_report_readiness' => $this->checkReportReadiness(),
-            'summarize_dashboard' => $this->summarizeDashboard(),
+            'contextual_page_summary' => $this->contextualPageSummary($context),
+            'detect_workflow_gaps' => $this->detectWorkflowGaps($context),
+            'project_health_briefing' => $this->projectHealthBriefing($context),
+            'summarize_priority_actions' => $this->summarizePriorityActions($context),
+            'summarize_project_risks' => $this->summarizeProjectRisks($context),
+            'summarize_subcontractor_blockers' => $this->summarizeSubcontractorBlockers($context),
+            'check_report_readiness' => $this->checkReportReadiness($context),
+            'summarize_dashboard' => $this->summarizeDashboard($context),
             'general_help' => $this->generalHelp(),
-            default => $this->findBlockedAssignments(),
+            default => $this->findBlockedAssignments($context),
         };
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function findBlockedAssignments(): array
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function findBlockedAssignments(array $context = []): array
     {
         $slowThreshold = now()->subDays(7);
         $assignments = Assignment::query()
             ->with(['site.project', 'subcontractor', 'constructionData'])
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
             ->whereNotIn('status', [
                 AssignmentStatus::Drop,
                 AssignmentStatus::Verified,
@@ -202,9 +229,14 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function summarizeDashboard(): array
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function summarizeDashboard(array $context = []): array
     {
         $statusCounts = Assignment::query()
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
             ->select('status', DB::raw('COUNT(*) as total'))
             ->groupBy('status')
             ->orderBy('status')
@@ -213,6 +245,7 @@ class AiAssistantService
             ->all();
 
         $activityMatrix = Assignment::query()
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
             ->select('activity_type', 'status', DB::raw('COUNT(*) as total'))
             ->groupBy('activity_type', 'status')
             ->get()
@@ -225,6 +258,9 @@ class AiAssistantService
         $projectCounts = DB::table('assignments')
             ->join('sites', 'sites.id', '=', 'assignments.site_id')
             ->join('projects', 'projects.id', '=', 'sites.project_id')
+            ->when($this->contextAssignmentId($context), fn ($query, int $id) => $query->where('assignments.id', $id))
+            ->when($this->contextSiteId($context), fn ($query, int $id) => $query->where('sites.id', $id))
+            ->when($this->contextProjectId($context), fn ($query, int $id) => $query->where('projects.id', $id))
             ->select('projects.id', 'projects.name', DB::raw('COUNT(assignments.id) as assignments_count'))
             ->groupBy('projects.id', 'projects.name')
             ->orderByDesc('assignments_count')
@@ -249,11 +285,16 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function checkReportReadiness(): array
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function checkReportReadiness(array $context = []): array
     {
         $readyStatuses = AssignmentStatus::verifiableStatuses();
         $assignments = Assignment::query()
             ->with(['site.project', 'subcontractor'])
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
             ->whereIn('status', $readyStatuses)
             ->latest('updated_at')
             ->limit(30)
@@ -282,9 +323,13 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function summarizeProjectRisks(): array
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function summarizeProjectRisks(array $context = []): array
     {
-        $assignments = $this->riskCandidateAssignments();
+        $assignments = $this->riskCandidateAssignments($context);
 
         $projects = $assignments
             ->groupBy(fn (Assignment $assignment): string => (string) ($assignment->site?->project?->id ?? 0))
@@ -317,9 +362,13 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function summarizeSubcontractorBlockers(): array
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function summarizeSubcontractorBlockers(array $context = []): array
     {
-        $assignments = $this->riskCandidateAssignments();
+        $assignments = $this->riskCandidateAssignments($context);
 
         $subcontractors = $assignments
             ->groupBy(fn (Assignment $assignment): string => (string) ($assignment->subcontractor?->id ?? 0))
@@ -352,15 +401,20 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    private function summarizePriorityActions(): array
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function summarizePriorityActions(array $context = []): array
     {
-        $riskAssignments = $this->riskCandidateAssignments()
+        $riskAssignments = $this->riskCandidateAssignments($context)
             ->sortByDesc(fn (Assignment $assignment): int => $this->assignmentRiskScore($assignment))
             ->take(8)
             ->values();
 
         $reportReady = Assignment::query()
             ->with(['site.project', 'subcontractor'])
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
             ->whereIn('status', AssignmentStatus::verifiableStatuses())
             ->latest('updated_at')
             ->limit(5)
@@ -408,6 +462,103 @@ class AiAssistantService
     }
 
     /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function projectHealthBriefing(array $context = []): array
+    {
+        return [
+            'generated_at' => now()->toIso8601String(),
+            'context' => $this->normalizedContext($context),
+            'project_risks' => $this->summarizeProjectRisks($context),
+            'subcontractor_blockers' => $this->summarizeSubcontractorBlockers($context),
+            'report_readiness' => $this->checkReportReadiness($context),
+            'priority_actions' => $this->summarizePriorityActions($context),
+            'workflow_gaps' => $this->detectWorkflowGaps($context),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function contextualPageSummary(array $context): array
+    {
+        if ($assignmentId = $this->contextAssignmentId($context)) {
+            $assignment = Assignment::query()
+                ->with([
+                    'site.project',
+                    'subcontractor',
+                    'surveyData',
+                    'plnData',
+                    'constructionData',
+                    'bastData.bastPhotos',
+                ])
+                ->find($assignmentId);
+
+            return [
+                'generated_at' => now()->toIso8601String(),
+                'context' => $this->normalizedContext($context),
+                'assignment' => $assignment ? $this->assignmentSummary($assignment) : null,
+                'gaps' => $assignment ? $this->assignmentWorkflowGaps($assignment) : [],
+                'next_action' => $assignment ? $this->recommendedAction($assignment) : 'Assignment tidak ditemukan.',
+            ];
+        }
+
+        if ($siteId = $this->contextSiteId($context)) {
+            $assignments = Assignment::query()
+                ->with(['site.project', 'subcontractor', 'surveyData', 'plnData', 'constructionData', 'bastData.bastPhotos'])
+                ->where('site_id', $siteId)
+                ->get();
+
+            return [
+                'generated_at' => now()->toIso8601String(),
+                'context' => $this->normalizedContext($context),
+                'assignment_count' => $assignments->count(),
+                'status_counts' => $this->countAssignmentsBy($assignments, 'status'),
+                'activity_counts' => $this->countAssignmentsBy($assignments, 'activity_type'),
+                'gaps' => $this->workflowGapsForAssignments($assignments)->take(20)->values()->all(),
+                'priority_actions' => $assignments
+                    ->sortByDesc(fn (Assignment $assignment): int => $this->assignmentRiskScore($assignment))
+                    ->take(5)
+                    ->map(fn (Assignment $assignment): array => [
+                        'assignment' => $this->assignmentSummary($assignment),
+                        'recommended_action' => $this->recommendedAction($assignment),
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
+        return $this->projectHealthBriefing($context);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function detectWorkflowGaps(array $context = []): array
+    {
+        $assignments = Assignment::query()
+            ->with(['site.project', 'subcontractor', 'surveyData', 'plnData', 'constructionData', 'bastData.bastPhotos'])
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
+            ->whereNotIn('status', [AssignmentStatus::Drop, AssignmentStatus::Reported])
+            ->latest('updated_at')
+            ->limit(300)
+            ->get();
+
+        $gaps = $this->workflowGapsForAssignments($assignments);
+
+        return [
+            'generated_at' => now()->toIso8601String(),
+            'context' => $this->normalizedContext($context),
+            'total_gaps' => $gaps->count(),
+            'gap_type_counts' => $gaps->countBy('type')->sortKeys()->all(),
+            'items' => $gaps->take(50)->values()->all(),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function listUsers(): array
@@ -444,6 +595,9 @@ class AiAssistantService
         return [
             'generated_at' => now()->toIso8601String(),
             'supported_tools' => [
+                'project_health_briefing',
+                'detect_workflow_gaps',
+                'contextual_page_summary',
                 'find_blocked_assignments',
                 'summarize_project_risks',
                 'summarize_subcontractor_blockers',
@@ -452,23 +606,25 @@ class AiAssistantService
                 'check_report_readiness',
             ],
             'examples' => [
-                'Apa risiko proyek hari ini?',
-                'Project mana yang progress-nya paling lambat?',
-                'Subcon mana yang paling banyak blocker?',
+                'Briefing proyek hari ini',
+                'Cek gap workflow',
+                'Assignment ini apa masalahnya?',
                 'Apa prioritas tindakan saya hari ini?',
             ],
         ];
     }
 
     /**
+     * @param  array<string, mixed>  $context
      * @return Collection<int, Assignment>
      */
-    private function riskCandidateAssignments(): Collection
+    private function riskCandidateAssignments(array $context = []): Collection
     {
         $slowThreshold = now()->subDays(7);
 
         return Assignment::query()
             ->with(['site.project', 'subcontractor', 'constructionData'])
+            ->tap(fn ($query) => $this->applyAssignmentContext($query, $context))
             ->whereNotIn('status', [
                 AssignmentStatus::Drop,
                 AssignmentStatus::Verified,
@@ -556,6 +712,116 @@ class AiAssistantService
         return 'Cek update terbaru dan minta PIC memberikan progress.';
     }
 
+    /**
+     * @param  Collection<int, Assignment>  $assignments
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function workflowGapsForAssignments(Collection $assignments): Collection
+    {
+        return $assignments
+            ->flatMap(fn (Assignment $assignment): array => $this->assignmentWorkflowGaps($assignment))
+            ->values();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function assignmentWorkflowGaps(Assignment $assignment): array
+    {
+        $gaps = [];
+
+        if (
+            $assignment->activity_type === ActivityType::Survey
+            && ($assignment->surveyData?->isComplete() ?? false)
+            && $assignment->status !== AssignmentStatus::Document
+            && ! in_array($assignment->status, AssignmentStatus::adminLocked(), true)
+        ) {
+            $gaps[] = $this->gapItem($assignment, 'survey_complete_status_mismatch', 'Survey lengkap tetapi status belum DOCUMENT.', 'Sinkronkan status survey menjadi DOCUMENT atau cek observer status.');
+        }
+
+        if ($assignment->activity_type === ActivityType::Construction && $assignment->isLocked()) {
+            $gaps[] = $this->gapItem($assignment, 'construction_missing_wo', 'Construction terkunci karena WO number belum diisi.', 'Lengkapi WO number dari admin agar subcon bisa lanjut.');
+        }
+
+        if ($assignment->activity_type === ActivityType::Bast) {
+            $missing = $this->missingBastFields($assignment);
+
+            if ($missing !== []) {
+                $gaps[] = $this->gapItem($assignment, 'bast_missing_data', 'BAST belum lengkap: '.implode(', ', $missing).'.', 'Lengkapi data dan foto BAST sebelum submit/verifikasi.');
+            }
+        }
+
+        if ($assignment->status === AssignmentStatus::Verified) {
+            $gaps[] = $this->gapItem($assignment, 'verified_not_reported', 'Assignment sudah VERIFIED tetapi belum masuk report.', 'Masukkan assignment ke proses generate report.');
+        }
+
+        if (
+            in_array($assignment->status, [AssignmentStatus::Pending, AssignmentStatus::Revision], true)
+            && $assignment->updated_at->lte(now()->subDays(7))
+        ) {
+            $gaps[] = $this->gapItem($assignment, 'stale_pending_revision', 'Assignment pending/revision lebih dari 7 hari.', 'Follow up PIC/subcon dan update progress terbaru.');
+        }
+
+        if ($assignment->activity_type === ActivityType::Survey && blank($assignment->site?->power_kva)) {
+            $gaps[] = $this->gapItem($assignment, 'site_missing_power', 'Data power_kva site kosong.', 'Lengkapi daya site agar dokumen survey/report tidak tertahan.');
+        }
+
+        return $gaps;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function gapItem(Assignment $assignment, string $type, string $reason, string $recommendedAction): array
+    {
+        return [
+            'type' => $type,
+            'reason' => $reason,
+            'recommended_action' => $recommendedAction,
+            'assignment' => $this->assignmentSummary($assignment),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function missingBastFields(Assignment $assignment): array
+    {
+        $bast = $assignment->bastData;
+        $missing = [];
+
+        foreach (['sim_provider', 'nomor_simcard', 'commissioning_date'] as $field) {
+            if (blank($bast?->{$field})) {
+                $missing[] = $field;
+            }
+        }
+
+        if (($bast?->bastPhotos?->count() ?? 0) === 0) {
+            $missing[] = 'bast_photos';
+        }
+
+        return $missing;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function assignmentSummary(Assignment $assignment): array
+    {
+        return [
+            'id' => $assignment->id,
+            'project' => $assignment->site?->project?->name,
+            'site_id' => $assignment->site_id,
+            'site_code' => $assignment->site?->site_code,
+            'site_name' => $assignment->site?->location_name,
+            'subcontractor' => $assignment->subcontractor?->name,
+            'activity_type' => $assignment->activity_type->value,
+            'status' => $assignment->status->value,
+            'age_days' => (int) $assignment->updated_at->diffInDays(now()),
+            'url' => route('admin.assignments.show', $assignment),
+        ];
+    }
+
     private function assignmentRiskReason(Assignment $assignment): string
     {
         if ($assignment->status === AssignmentStatus::Revision) {
@@ -605,6 +871,106 @@ class AiAssistantService
             ->all();
     }
 
+    /**
+     * @param  mixed  $query
+     * @param  array<string, mixed>  $context
+     */
+    private function applyAssignmentContext($query, array $context): void
+    {
+        if ($assignmentId = $this->contextAssignmentId($context)) {
+            $query->where('assignments.id', $assignmentId);
+
+            return;
+        }
+
+        if ($siteId = $this->contextSiteId($context)) {
+            $query->where('site_id', $siteId);
+
+            return;
+        }
+
+        if ($projectId = $this->contextProjectId($context)) {
+            $query->whereHas('site', fn ($query) => $query->where('project_id', $projectId));
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function hasRecordContext(array $context): bool
+    {
+        return $this->contextAssignmentId($context) !== null
+            || $this->contextSiteId($context) !== null
+            || $this->contextProjectId($context) !== null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function contextAssignmentId(array $context): ?int
+    {
+        if ($id = $this->contextInteger($context, 'assignment_id')) {
+            return $id;
+        }
+
+        return ($context['type'] ?? null) === 'assignment' ? $this->contextInteger($context, 'id') : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function contextSiteId(array $context): ?int
+    {
+        if ($id = $this->contextInteger($context, 'site_id')) {
+            return $id;
+        }
+
+        return ($context['type'] ?? null) === 'site' ? $this->contextInteger($context, 'id') : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function contextProjectId(array $context): ?int
+    {
+        if ($id = $this->contextInteger($context, 'project_id')) {
+            return $id;
+        }
+
+        return ($context['type'] ?? null) === 'project' ? $this->contextInteger($context, 'id') : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function contextInteger(array $context, string $key): ?int
+    {
+        $value = $context[$key] ?? null;
+
+        if (is_numeric($value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function normalizedContext(array $context): array
+    {
+        return [
+            'type' => $context['type'] ?? 'page',
+            'id' => $context['id'] ?? null,
+            'project_id' => $this->contextProjectId($context),
+            'site_id' => $this->contextSiteId($context),
+            'assignment_id' => $this->contextAssignmentId($context),
+            'label' => $context['label'] ?? null,
+            'url' => $context['url'] ?? null,
+        ];
+    }
+
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
@@ -649,6 +1015,21 @@ PROMPT;
                 $this->formatCounts($toolPayload['role_counts'] ?? [])
             ),
             'general_help' => 'I can help with project risks, late assignments, subcontractor blockers, report readiness, and PM priority actions.',
+            'contextual_page_summary' => sprintf(
+                'Context summary: %d workflow gaps found for this page.',
+                count($toolPayload['gaps'] ?? [])
+            ),
+            'detect_workflow_gaps' => sprintf(
+                'Workflow gap scan: %d gaps found. Gap split: %s.',
+                (int) $toolPayload['total_gaps'],
+                $this->formatCounts($toolPayload['gap_type_counts'] ?? [])
+            ),
+            'project_health_briefing' => sprintf(
+                'Project health briefing: %d risky assignments, %d report-ready assignments, and %d workflow gaps need attention.',
+                (int) data_get($toolPayload, 'project_risks.total_risky_assignments', 0),
+                (int) data_get($toolPayload, 'report_readiness.ready_assignment_count', 0),
+                (int) data_get($toolPayload, 'workflow_gaps.total_gaps', 0),
+            ),
             'summarize_priority_actions' => sprintf(
                 'Priority actions: %d items need attention. Blocker actions: %d. Report-ready items: %d.',
                 (int) $toolPayload['total_priority_actions'],
@@ -699,6 +1080,21 @@ PROMPT;
                 $this->formatCounts($toolPayload['role_counts'] ?? [], 'id')
             ),
             'general_help' => 'Saya bisa membantu melihat risiko proyek, assignment telat, blocker subcon, kesiapan laporan, dan prioritas tindakan PM hari ini.',
+            'contextual_page_summary' => sprintf(
+                'Ringkasan konteks: ditemukan %d gap workflow untuk halaman ini.',
+                count($toolPayload['gaps'] ?? [])
+            ),
+            'detect_workflow_gaps' => sprintf(
+                'Pemeriksaan gap workflow: ditemukan %d gap. Pembagian gap: %s.',
+                (int) $toolPayload['total_gaps'],
+                $this->formatCounts($toolPayload['gap_type_counts'] ?? [], 'id')
+            ),
+            'project_health_briefing' => sprintf(
+                'Briefing proyek: ada %d assignment berisiko, %d assignment siap laporan, dan %d gap workflow yang perlu perhatian.',
+                (int) data_get($toolPayload, 'project_risks.total_risky_assignments', 0),
+                (int) data_get($toolPayload, 'report_readiness.ready_assignment_count', 0),
+                (int) data_get($toolPayload, 'workflow_gaps.total_gaps', 0),
+            ),
             'summarize_priority_actions' => sprintf(
                 'Prioritas tindakan: ada %d item yang perlu perhatian. Tindakan blocker: %d. Assignment siap laporan: %d.',
                 (int) $toolPayload['total_priority_actions'],

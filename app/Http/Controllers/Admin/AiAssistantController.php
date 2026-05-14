@@ -22,6 +22,11 @@ class AiAssistantController extends Controller
             'context.type' => ['nullable', 'string', 'max:50'],
             'context.id' => ['nullable'],
             'context.label' => ['nullable', 'string', 'max:255'],
+            'context.url' => ['nullable', 'string', 'max:255'],
+            'context.component' => ['nullable', 'string', 'max:255'],
+            'context.project_id' => ['nullable', 'integer'],
+            'context.site_id' => ['nullable', 'integer'],
+            'context.assignment_id' => ['nullable', 'integer'],
         ]);
 
         $conversation = AiConversation::query()

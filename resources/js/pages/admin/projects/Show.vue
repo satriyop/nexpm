@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
     ArrowLeft,

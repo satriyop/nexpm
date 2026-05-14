@@ -6,6 +6,11 @@ use App\Enums\Role;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\Assignment;
+use App\Models\AssignmentBastData;
+use App\Models\AssignmentConstructionData;
+use App\Models\AssignmentSurveyData;
+use App\Models\Project;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
@@ -169,6 +174,127 @@ test('assistant routes pm priority questions to priority actions', function () {
         ->assertJsonPath('message.tool_name', 'summarize_priority_actions')
         ->assertJsonPath('message.tool_payload.risk_action_count', 1)
         ->assertJsonPath('message.tool_payload.report_ready_count', 1);
+
+    Http::assertNothingSent();
+});
+
+test('assistant returns project health briefing with risks reports and workflow gaps', function () {
+    config(['services.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    Assignment::factory()->create([
+        'activity_type' => ActivityType::Construction,
+        'status' => AssignmentStatus::Pending,
+        'updated_at' => now()->subDays(8),
+    ]);
+    Assignment::factory()->create([
+        'activity_type' => ActivityType::Survey,
+        'status' => AssignmentStatus::Document,
+    ]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Briefing proyek hari ini'])
+        ->assertOk()
+        ->assertJsonPath('message.tool_name', 'project_health_briefing')
+        ->assertJsonPath('message.tool_payload.project_risks.total_risky_assignments', 1)
+        ->assertJsonPath('message.tool_payload.report_readiness.ready_assignment_count', 1);
+
+    expect($response->json('message.tool_payload.workflow_gaps.total_gaps'))->toBeGreaterThanOrEqual(1);
+
+    Http::assertNothingSent();
+});
+
+test('assistant scopes project context summaries to the selected project', function () {
+    config(['services.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create();
+    $otherProject = Project::factory()->create();
+    $site = Site::factory()->create(['project_id' => $project->id]);
+    $otherSite = Site::factory()->create(['project_id' => $otherProject->id]);
+
+    Assignment::factory()->create([
+        'site_id' => $site->id,
+        'activity_type' => ActivityType::Survey,
+        'status' => AssignmentStatus::Revision,
+        'updated_at' => now()->subDays(8),
+    ]);
+    Assignment::factory()->create([
+        'site_id' => $otherSite->id,
+        'activity_type' => ActivityType::Survey,
+        'status' => AssignmentStatus::Revision,
+        'updated_at' => now()->subDays(8),
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'Project ini apa masalahnya?',
+            'context' => ['type' => 'project', 'id' => $project->id, 'project_id' => $project->id],
+        ])
+        ->assertOk()
+        ->assertJsonPath('message.tool_name', 'contextual_page_summary')
+        ->assertJsonPath('message.tool_payload.project_risks.total_risky_assignments', 1);
+
+    Http::assertNothingSent();
+});
+
+test('assistant summarizes assignment context with workflow gaps and next action', function () {
+    config(['services.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $assignment = Assignment::factory()->construction()->create(['status' => AssignmentStatus::Pending]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $assignment->id,
+        'cons_wo_number' => null,
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'Assignment ini apa masalahnya?',
+            'context' => ['type' => 'assignment', 'id' => $assignment->id, 'assignment_id' => $assignment->id],
+        ])
+        ->assertOk()
+        ->assertJsonPath('message.tool_name', 'contextual_page_summary')
+        ->assertJsonPath('message.tool_payload.assignment.id', $assignment->id)
+        ->assertJsonPath('message.tool_payload.gaps.0.type', 'construction_missing_wo');
+
+    Http::assertNothingSent();
+});
+
+test('assistant detects workflow gaps across core workflows', function () {
+    config(['services.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+
+    $survey = Assignment::factory()->survey()->create(['status' => AssignmentStatus::Pending]);
+    $surveyData = AssignmentSurveyData::factory()->complete()->make(['assignment_id' => $survey->id]);
+    AssignmentSurveyData::withoutEvents(fn () => $surveyData->save());
+    $survey->status = AssignmentStatus::Pending;
+    $survey->saveQuietly();
+
+    $construction = Assignment::factory()->construction()->create(['status' => AssignmentStatus::Pending]);
+    AssignmentConstructionData::factory()->create(['assignment_id' => $construction->id, 'cons_wo_number' => null]);
+
+    $bast = Assignment::factory()->bast()->create(['status' => AssignmentStatus::Pending]);
+    AssignmentBastData::factory()->create(['assignment_id' => $bast->id]);
+
+    Assignment::factory()->create([
+        'activity_type' => ActivityType::Survey,
+        'status' => AssignmentStatus::Verified,
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Cek gap workflow'])
+        ->assertOk()
+        ->assertJsonPath('message.tool_name', 'detect_workflow_gaps')
+        ->assertJsonPath('message.tool_payload.gap_type_counts.survey_complete_status_mismatch', 1)
+        ->assertJsonPath('message.tool_payload.gap_type_counts.construction_missing_wo', 1)
+        ->assertJsonPath('message.tool_payload.gap_type_counts.bast_missing_data', 1)
+        ->assertJsonPath('message.tool_payload.gap_type_counts.verified_not_reported', 1);
 
     Http::assertNothingSent();
 });
