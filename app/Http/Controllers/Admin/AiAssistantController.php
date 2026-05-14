@@ -6,14 +6,16 @@ use App\Ai\Agents\NexpmAssistantAgent;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
 use App\Services\Ai\AiAssistantService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Laravel\Ai\Streaming\Events\TextDelta;
+use Laravel\Ai\Streaming\Events\ToolResult;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class AiAssistantController extends Controller
 {
-    public function store(Request $request, AiAssistantService $service): JsonResponse
+    public function store(Request $request, AiAssistantService $service): StreamedResponse
     {
         abort_unless($request->user()?->isSuperAdmin(), 403);
 
@@ -50,91 +52,121 @@ class AiAssistantController extends Controller
             'content' => $validated['message'],
         ]);
 
-        $result = $this->runAgent($service, $validated['message'], $context, $conversation->id);
+        $message = $validated['message'];
 
-        $message = $conversation->messages()->create([
-            'role' => 'assistant',
-            'content' => $result['answer'],
-            'tool_name' => $result['tool_name'],
-            'tool_payload' => $result['tool_payload'],
-            'usage' => $result['usage'],
-        ]);
-
-        $conversation->touch();
-
-        return response()->json([
-            'conversation_id' => $conversation->id,
-            'message' => [
-                'id' => $message->id,
-                'role' => $message->role,
-                'content' => $message->content,
-                'tool_name' => $message->tool_name,
-                'tool_payload' => $message->tool_payload,
-                'created_at' => $message->created_at?->toIso8601String(),
+        return response()->stream(
+            function () use ($service, $message, $context, $conversation): void {
+                $this->streamResponse($service, $message, $context, $conversation);
+            },
+            200,
+            [
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+                'X-Accel-Buffering' => 'no',
             ],
-        ]);
+        );
     }
 
-    /**
-     * Run the agent, falling back to local keyword routing when the AI provider is unavailable.
-     *
-     * @param  array<string, mixed>  $context
-     * @return array{answer: string, tool_name: string, tool_payload: array<string, mixed>, usage: array<string, mixed>}
-     */
-    private function runAgent(AiAssistantService $service, string $message, array $context, int $conversationId): array
+    private function streamResponse(AiAssistantService $service, string $message, array $context, AiConversation $conversation): void
     {
         $apiKey = config('ai.providers.deepseek.key');
 
         if (empty($apiKey)) {
-            return $this->fallback($service, $message, $context, new \RuntimeException('DeepSeek API key is not configured.'));
+            $this->streamFallback($service, $message, $context, $conversation, new \RuntimeException('DeepSeek API key is not configured.'));
+
+            return;
         }
 
-        $agent = new NexpmAssistantAgent($service, $context, $conversationId);
+        $agent = new NexpmAssistantAgent($service, $context, $conversation->id);
 
         try {
-            $response = $agent->prompt($message);
-            $bag = $agent->getResultBag();
+            $stream = $agent->stream($message);
+            $content = '';
+            $toolName = null;
+            $toolPayload = [];
 
-            $toolName = $bag->toolName ?? 'general_help';
-            $toolPayload = $bag->toolPayload;
-
-            if ($toolPayload === []) {
-                $toolPayload = $service->runTool($toolName, $context);
+            foreach ($stream as $event) {
+                if ($event instanceof ToolResult) {
+                    $bag = $agent->getResultBag();
+                    $toolName = $bag->toolName;
+                    $toolPayload = $bag->toolPayload;
+                    $this->emit('tool_data', [
+                        'tool_name' => $toolName ?? 'general_help',
+                        'tool_payload' => $toolPayload,
+                    ]);
+                } elseif ($event instanceof TextDelta) {
+                    $content .= $event->delta;
+                    $this->emit('text', ['delta' => $event->delta]);
+                }
             }
 
-            return [
-                'answer' => $response->text,
+            if ($toolName === null) {
+                $bag = $agent->getResultBag();
+                $toolName = $bag->toolName ?? 'general_help';
+                $toolPayload = $bag->toolPayload !== [] ? $bag->toolPayload : $service->runTool($toolName, $context);
+            }
+
+            $aiMessage = $conversation->messages()->create([
+                'role' => 'assistant',
+                'content' => $content,
                 'tool_name' => $toolName,
                 'tool_payload' => $toolPayload,
-                'usage' => [
-                    'prompt_tokens' => $response->usage->promptTokens,
-                    'completion_tokens' => $response->usage->completionTokens,
-                ],
-            ];
+                'usage' => [],
+            ]);
+
+            $conversation->touch();
+
+            $this->emit('done', [
+                'conversation_id' => $conversation->id,
+                'message_id' => $aiMessage->id,
+            ]);
         } catch (Throwable $exception) {
-            return $this->fallback($service, $message, $context, $exception);
+            // If partial text was already streamed, appending fallback would corrupt the message.
+            // Emit an error so the frontend can display it cleanly instead.
+            if ($content !== '') {
+                $this->emit('error', ['message' => 'AI assistant encountered an error. Please try again.']);
+
+                return;
+            }
+
+            $this->streamFallback($service, $message, $context, $conversation, $exception);
         }
     }
 
-    /**
-     * @param  array<string, mixed>  $context
-     * @return array{answer: string, tool_name: string, tool_payload: array<string, mixed>, usage: array<string, mixed>}
-     */
-    private function fallback(AiAssistantService $service, string $message, array $context, Throwable $exception): array
+    private function streamFallback(AiAssistantService $service, string $message, array $context, AiConversation $conversation, Throwable $exception): void
     {
         $toolName = $service->selectTool($message, $context);
         $toolPayload = $service->runTool($toolName, $context);
         $language = $this->detectLanguage($message);
         $answer = $service->fallbackAnswer($toolName, $toolPayload, $language);
 
-        return [
-            'answer' => $answer,
+        $toolPayload['ai_provider_error'] = $exception->getMessage();
+
+        $this->emit('tool_data', ['tool_name' => $toolName, 'tool_payload' => $toolPayload]);
+        $this->emit('text', ['delta' => $answer]);
+
+        $aiMessage = $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => $answer,
             'tool_name' => $toolName,
-            'tool_payload' => array_merge($toolPayload, [
-                'ai_provider_error' => $exception->getMessage(),
-            ]),
+            'tool_payload' => $toolPayload,
             'usage' => [],
-        ];
+        ]);
+
+        $conversation->touch();
+
+        $this->emit('done', [
+            'conversation_id' => $conversation->id,
+            'message_id' => $aiMessage->id,
+        ]);
+    }
+
+    private function emit(string $event, array $data): void
+    {
+        echo "event: {$event}\n";
+        echo 'data: '.json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n\n";
+        ob_flush();
+        flush();
     }
 
     private function detectLanguage(string $message): string

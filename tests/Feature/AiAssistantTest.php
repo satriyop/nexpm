@@ -1,5 +1,6 @@
 <?php
 
+use App\Ai\Agents\NexpmAssistantAgent;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Enums\Role;
@@ -14,6 +15,41 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * Parse SSE event stream into a keyed array of event data.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function parseSseEvents(string $content): array
+{
+    $events = [];
+
+    foreach (explode("\n\n", trim($content)) as $block) {
+        $block = trim($block);
+
+        if ($block === '') {
+            continue;
+        }
+
+        $eventName = '';
+        $eventData = '';
+
+        foreach (explode("\n", $block) as $line) {
+            if (str_starts_with($line, 'event: ')) {
+                $eventName = substr($line, 7);
+            } elseif (str_starts_with($line, 'data: ')) {
+                $eventData = substr($line, 6);
+            }
+        }
+
+        if ($eventName !== '' && $eventData !== '') {
+            $events[$eventName] = json_decode($eventData, true);
+        }
+    }
+
+    return $events;
+}
+
 test('only super admins can ask the assistant', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
 
@@ -25,34 +61,7 @@ test('only super admins can ask the assistant', function () {
 test('super admins can ask the assistant and messages are stored', function () {
     config(['ai.providers.deepseek.key' => 'test-key']);
 
-    Http::fake([
-        'api.deepseek.com/*' => Http::sequence()
-            ->push([
-                'model' => 'deepseek-chat',
-                'choices' => [[
-                    'finish_reason' => 'tool_calls',
-                    'message' => [
-                        'content' => null,
-                        'tool_calls' => [[
-                            'id' => 'call_123',
-                            'function' => [
-                                'name' => 'find_blocked_assignments',
-                                'arguments' => '{}',
-                            ],
-                        ]],
-                    ],
-                ]],
-                'usage' => ['prompt_tokens' => 100, 'completion_tokens' => 0],
-            ])
-            ->push([
-                'model' => 'deepseek-chat',
-                'choices' => [[
-                    'finish_reason' => 'stop',
-                    'message' => ['content' => 'There is 1 blocked assignment that needs attention.'],
-                ]],
-                'usage' => ['prompt_tokens' => 150, 'completion_tokens' => 42],
-            ]),
-    ]);
+    NexpmAssistantAgent::fake(['There is 1 blocked assignment that needs attention.']);
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
     Assignment::factory()->create([
@@ -61,18 +70,21 @@ test('super admins can ask the assistant and messages are stored', function () {
         'updated_at' => now()->subDays(8),
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'Find blocked assignments'])
         ->assertOk()
-        ->assertJsonPath('message.role', 'assistant')
-        ->assertJsonPath('message.content', 'There is 1 blocked assignment that needs attention.')
-        ->assertJsonPath('message.tool_name', 'find_blocked_assignments');
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events)->toHaveKey('done')
+        ->and($events['done']['conversation_id'])->toBeInt()
+        ->and($events['done']['message_id'])->toBeInt();
 
     expect(AiConversation::query()->count())->toBe(1)
         ->and(AiMessage::query()->count())->toBe(2);
 
-    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'api.deepseek.com')
-        && $request['model'] === 'deepseek-chat');
+    NexpmAssistantAgent::assertPrompted('Find blocked assignments');
 });
 
 test('assistant falls back to local summaries when deepseek is not configured', function () {
@@ -85,11 +97,16 @@ test('assistant falls back to local summaries when deepseek is not configured', 
         'status' => AssignmentStatus::Document,
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'Check report readiness'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'check_report_readiness')
-        ->assertJsonFragment(['content' => 'AI provider is not configured or reachable, so this is a local NexPM summary. Report readiness: 1 assignments are currently in report-ready statuses. Top activity split: SURVEY: 1.']);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('check_report_readiness')
+        ->and($events['text']['delta'])->toBe('AI provider is not configured or reachable, so this is a local NexPM summary. Report readiness: 1 assignments are currently in report-ready statuses. Top activity split: SURVEY: 1.')
+        ->and($events['done'])->toHaveKey('conversation_id');
 
     Http::assertNothingSent();
 });
@@ -102,15 +119,19 @@ test('assistant can route user questions to user summaries', function () {
     User::factory()->create(['role' => Role::Admin]);
     User::factory()->create(['role' => Role::Subcontractor]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'siapa saja user'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'list_users')
-        ->assertJsonPath('message.content', 'AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. Ditemukan 3 user. Pembagian role: admin: 1, subcontractor: 1, super_admin: 1.')
-        ->assertJsonPath('message.tool_payload.total_users_returned', 3)
-        ->assertJsonPath('message.tool_payload.role_counts.admin', 1)
-        ->assertJsonPath('message.tool_payload.role_counts.subcontractor', 1)
-        ->assertJsonPath('message.tool_payload.role_counts.super_admin', 1);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('list_users')
+        ->and($events['text']['delta'])->toBe('AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. Ditemukan 3 user. Pembagian role: admin: 1, subcontractor: 1, super_admin: 1.')
+        ->and($events['tool_data']['tool_payload']['total_users_returned'])->toBe(3)
+        ->and($events['tool_data']['tool_payload']['role_counts']['admin'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['role_counts']['subcontractor'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['role_counts']['super_admin'])->toBe(1);
 
     Http::assertNothingSent();
 });
@@ -121,11 +142,15 @@ test('assistant does not default unrelated questions to blocked assignments', fu
 
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'apa yang bisa kamu bantu'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'general_help')
-        ->assertJsonPath('message.content', 'AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. Saya bisa membantu melihat risiko proyek, assignment telat, blocker subcon, kesiapan laporan, dan prioritas tindakan PM hari ini.');
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('general_help')
+        ->and($events['text']['delta'])->toBe('AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. Saya bisa membantu melihat risiko proyek, assignment telat, blocker subcon, kesiapan laporan, dan prioritas tindakan PM hari ini.');
 
     Http::assertNothingSent();
 });
@@ -141,12 +166,16 @@ test('assistant routes project manager risk questions to project risk analytics'
         'updated_at' => now()->subDays(10),
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'Apa risiko proyek hari ini?'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'summarize_project_risks')
-        ->assertJsonPath('message.tool_payload.total_projects_with_risk', 1)
-        ->assertJsonPath('message.tool_payload.total_risky_assignments', 1);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('summarize_project_risks')
+        ->and($events['tool_data']['tool_payload']['total_projects_with_risk'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['total_risky_assignments'])->toBe(1);
 
     Http::assertNothingSent();
 });
@@ -162,12 +191,16 @@ test('assistant routes subcontractor blocker questions to subcon blocker analyti
         'updated_at' => now()->subDays(8),
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'Subcon mana yang paling banyak blocker?'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'summarize_subcontractor_blockers')
-        ->assertJsonPath('message.tool_payload.total_subcontractors_with_blockers', 1)
-        ->assertJsonPath('message.tool_payload.total_blocked_assignments', 1);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('summarize_subcontractor_blockers')
+        ->and($events['tool_data']['tool_payload']['total_subcontractors_with_blockers'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['total_blocked_assignments'])->toBe(1);
 
     Http::assertNothingSent();
 });
@@ -187,12 +220,16 @@ test('assistant routes pm priority questions to priority actions', function () {
         'status' => AssignmentStatus::Document,
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'Apa prioritas tindakan saya hari ini?'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'summarize_priority_actions')
-        ->assertJsonPath('message.tool_payload.risk_action_count', 1)
-        ->assertJsonPath('message.tool_payload.report_ready_count', 1);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('summarize_priority_actions')
+        ->and($events['tool_data']['tool_payload']['risk_action_count'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['report_ready_count'])->toBe(1);
 
     Http::assertNothingSent();
 });
@@ -215,11 +252,14 @@ test('assistant returns project health briefing with risks reports and workflow 
     $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'Briefing proyek hari ini'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'project_health_briefing')
-        ->assertJsonPath('message.tool_payload.project_risks.total_risky_assignments', 1)
-        ->assertJsonPath('message.tool_payload.report_readiness.ready_assignment_count', 1);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
 
-    expect($response->json('message.tool_payload.workflow_gaps.total_gaps'))->toBeGreaterThanOrEqual(1);
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('project_health_briefing')
+        ->and($events['tool_data']['tool_payload']['project_risks']['total_risky_assignments'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['report_readiness']['ready_assignment_count'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['workflow_gaps']['total_gaps'])->toBeGreaterThanOrEqual(1);
 
     Http::assertNothingSent();
 });
@@ -247,14 +287,18 @@ test('assistant scopes project context summaries to the selected project', funct
         'updated_at' => now()->subDays(8),
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), [
             'message' => 'Project ini apa masalahnya?',
             'context' => ['type' => 'project', 'id' => $project->id, 'project_id' => $project->id],
         ])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'contextual_page_summary')
-        ->assertJsonPath('message.tool_payload.project_risks.total_risky_assignments', 1);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('contextual_page_summary')
+        ->and($events['tool_data']['tool_payload']['project_risks']['total_risky_assignments'])->toBe(1);
 
     Http::assertNothingSent();
 });
@@ -270,15 +314,19 @@ test('assistant summarizes assignment context with workflow gaps and next action
         'cons_wo_number' => null,
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), [
             'message' => 'Assignment ini apa masalahnya?',
             'context' => ['type' => 'assignment', 'id' => $assignment->id, 'assignment_id' => $assignment->id],
         ])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'contextual_page_summary')
-        ->assertJsonPath('message.tool_payload.assignment.id', $assignment->id)
-        ->assertJsonPath('message.tool_payload.gaps.0.type', 'construction_missing_wo');
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('contextual_page_summary')
+        ->and($events['tool_data']['tool_payload']['assignment']['id'])->toBe($assignment->id)
+        ->and($events['tool_data']['tool_payload']['gaps'][0]['type'])->toBe('construction_missing_wo');
 
     Http::assertNothingSent();
 });
@@ -306,14 +354,18 @@ test('assistant detects workflow gaps across core workflows', function () {
         'status' => AssignmentStatus::Verified,
     ]);
 
-    $this->actingAs($superAdmin)
+    $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.ai.messages.store'), ['message' => 'Cek gap workflow'])
         ->assertOk()
-        ->assertJsonPath('message.tool_name', 'detect_workflow_gaps')
-        ->assertJsonPath('message.tool_payload.gap_type_counts.survey_complete_status_mismatch', 1)
-        ->assertJsonPath('message.tool_payload.gap_type_counts.construction_missing_wo', 1)
-        ->assertJsonPath('message.tool_payload.gap_type_counts.bast_missing_data', 1)
-        ->assertJsonPath('message.tool_payload.gap_type_counts.verified_not_reported', 1);
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('detect_workflow_gaps')
+        ->and($events['tool_data']['tool_payload']['gap_type_counts']['survey_complete_status_mismatch'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['gap_type_counts']['construction_missing_wo'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['gap_type_counts']['bast_missing_data'])->toBe(1)
+        ->and($events['tool_data']['tool_payload']['gap_type_counts']['verified_not_reported'])->toBe(1);
 
     Http::assertNothingSent();
 });

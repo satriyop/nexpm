@@ -15,15 +15,11 @@ type ChatMessage = {
     tool_name?: string | null;
 };
 
-type AiResponse = {
-    conversation_id: number;
-    message: ChatMessage;
-};
-
 const page = usePage();
 const open = ref(false);
 const input = ref('');
 const processing = ref(false);
+const streaming = ref(false);
 const error = ref<string | null>(null);
 const conversationId = ref<number | null>(null);
 const messages = ref<ChatMessage[]>([]);
@@ -102,7 +98,7 @@ const currentContext = () => {
 const ask = async (prompt?: string) => {
     const message = (prompt ?? input.value).trim();
 
-    if (!message || processing.value) {
+    if (!message || processing.value || streaming.value) {
         return;
     }
 
@@ -117,7 +113,6 @@ const ask = async (prompt?: string) => {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
-                Accept: 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
                 'X-Requested-With': 'XMLHttpRequest',
@@ -125,27 +120,77 @@ const ask = async (prompt?: string) => {
             body: JSON.stringify({
                 message,
                 conversation_id: conversationId.value,
-                context: {
-                    ...currentContext(),
-                },
+                context: { ...currentContext() },
             }),
         });
 
-        const payload = (await response.json()) as Partial<AiResponse> & { message?: ChatMessage | string };
-
-        if (!response.ok) {
+        if (!response.ok || !response.body) {
+            const payload = await response.json().catch(() => ({}));
             throw new Error(typeof payload.message === 'string' ? payload.message : 'AI assistant request failed.');
         }
 
-        conversationId.value = payload.conversation_id ?? conversationId.value;
+        // Push placeholder that gets filled as tokens arrive
+        const placeholder: ChatMessage = { role: 'assistant', content: '', tool_name: null };
+        messages.value.push(placeholder);
+        const msgIndex = messages.value.length - 1;
 
-        if (payload.message && typeof payload.message !== 'string') {
-            messages.value.push(payload.message);
+        streaming.value = true;
+        processing.value = false;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+                break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // SSE events are separated by double newlines
+            const blocks = buffer.split('\n\n');
+            buffer = blocks.pop() ?? '';
+
+            for (const block of blocks) {
+                let eventName = '';
+                let eventData = '';
+
+                for (const line of block.split('\n')) {
+                    if (line.startsWith('event: ')) {
+                        eventName = line.slice(7).trim();
+                    } else if (line.startsWith('data: ')) {
+                        // SSE spec: multiple data lines must be concatenated with \n
+                        eventData = eventData ? eventData + '\n' + line.slice(6) : line.slice(6);
+                    }
+                }
+
+                if (!eventName || !eventData) {
+                    continue;
+                }
+
+                const data = JSON.parse(eventData) as Record<string, unknown>;
+
+                if (eventName === 'tool_data') {
+                    messages.value[msgIndex].tool_name = data.tool_name as string | null;
+                } else if (eventName === 'text') {
+                    messages.value[msgIndex].content += data.delta as string;
+                    await scrollToBottom();
+                } else if (eventName === 'done') {
+                    conversationId.value = (data.conversation_id as number) ?? conversationId.value;
+                    messages.value[msgIndex].id = data.message_id as number;
+                } else if (eventName === 'error') {
+                    throw new Error((data.message as string) ?? 'AI assistant request failed.');
+                }
+            }
         }
     } catch (requestError) {
         error.value = requestError instanceof Error ? requestError.message : 'AI assistant request failed.';
     } finally {
         processing.value = false;
+        streaming.value = false;
         await scrollToBottom();
     }
 };
@@ -186,7 +231,7 @@ const resetConversation = () => {
                         variant="ghost"
                         size="sm"
                         class="h-8"
-                        :disabled="processing"
+                        :disabled="processing || streaming"
                         @click="resetConversation"
                     >
                         <RotateCcw class="size-4" />
@@ -225,7 +270,11 @@ const resetConversation = () => {
                         <div v-if="message.tool_name" class="mb-1 text-xs font-medium text-muted-foreground">
                             {{ toolLabels[message.tool_name] ?? message.tool_name.replaceAll('_', ' ') }}
                         </div>
-                        {{ message.content }}
+                        {{ message.content
+                        }}<span
+                            v-if="streaming && index === messages.length - 1"
+                            class="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-current align-middle"
+                        />
                     </div>
                 </div>
 
@@ -245,12 +294,12 @@ const resetConversation = () => {
                     v-model="input"
                     rows="2"
                     class="min-h-11 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="processing"
+                    :disabled="processing || streaming"
                     placeholder="Tanyakan risiko proyek, blocker, laporan, atau prioritas"
                     @keydown.enter.exact.prevent="ask()"
                 />
-                <Button type="submit" size="icon" :disabled="processing || input.trim() === ''" aria-label="Send message">
-                    <Loader2 v-if="processing" class="size-4 animate-spin" />
+                <Button type="submit" size="icon" :disabled="processing || streaming || input.trim() === ''" aria-label="Send message">
+                    <Loader2 v-if="processing || streaming" class="size-4 animate-spin" />
                     <Send v-else class="size-4" />
                 </Button>
             </form>
