@@ -116,6 +116,7 @@ onMounted(() => {
 });
 
 const financialFields = [
+    'approved_budget',
     'invoice_submission_date',
     'dp_35_date',
     'dp_35_inv_number',
@@ -160,6 +161,7 @@ const form = useForm({
     nidi_slo_bpujl_url: props.site.nidi_slo_bpujl_url ?? '',
     sik_url: props.site.sik_url ?? '',
     latest_remark: props.site.latest_remark ?? '',
+    approved_budget: props.site.approved_budget ?? '',
     invoice_submission_date: props.site.invoice_submission_date ?? '',
     dp_35_date: props.site.dp_35_date ?? '',
     dp_35_inv_number: props.site.dp_35_inv_number ?? '',
@@ -652,6 +654,26 @@ function removeAssignment(assignment: Assignment): void {
             @submit.prevent="submit"
             novalidate
         >
+            <Card>
+                <CardHeader class="pb-2">
+                    <h2 class="text-base font-semibold">Budget</h2>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid gap-1.5 max-w-xs">
+                        <Label for="approved_budget">Approved Budget (Rp)</Label>
+                        <Input
+                            id="approved_budget"
+                            v-model="form.approved_budget"
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="0"
+                        />
+                        <InputError :message="form.errors.approved_budget" />
+                    </div>
+                </CardContent>
+            </Card>
+
             <Card>
                 <CardHeader class="pb-2">
                     <h2 class="text-base font-semibold">

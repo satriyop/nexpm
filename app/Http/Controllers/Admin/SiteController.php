@@ -74,6 +74,7 @@ class SiteController extends Controller
             'invoice_5_inv_number' => ['nullable', 'string', 'max:255'],
             'invoice_5_dpp_amount' => ['nullable', 'numeric', 'min:0'],
             'invoice_url' => ['nullable', 'string', 'max:500'],
+            'approved_budget' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $powerKvaChanged = ($validated['power_kva'] ?? null) !== $site->power_kva;

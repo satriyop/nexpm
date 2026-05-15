@@ -51,6 +51,7 @@ class Site extends Model
         'invoice_5_inv_number',
         'invoice_5_dpp_amount',
         'invoice_url',
+        'approved_budget',
     ];
 
     /**
@@ -64,6 +65,7 @@ class Site extends Model
             'cable_length_to_panel' => 'decimal:2',
             'cable_length_panel_to_charger' => 'decimal:2',
             'charging_station_count' => 'integer',
+            'approved_budget' => 'integer',
             'invoice_submission_date' => 'date',
             'dp_35_date' => 'date',
             'invoice_60_submission_date' => 'date',
