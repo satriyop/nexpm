@@ -9,6 +9,18 @@ import {
     Trash2,
 } from 'lucide-vue-next';
 import { computed, watch } from 'vue';
+
+function relativeTime(dateStr: string | null | undefined): string {
+    if (!dateStr) return 'No activity yet';
+    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    if (diff < 60) return rtf.format(-Math.round(diff), 'second');
+    if (diff < 3600) return rtf.format(-Math.round(diff / 60), 'minute');
+    if (diff < 86400) return rtf.format(-Math.round(diff / 3600), 'hour');
+    if (diff < 2592000) return rtf.format(-Math.round(diff / 86400), 'day');
+    if (diff < 31536000) return rtf.format(-Math.round(diff / 2592000), 'month');
+    return rtf.format(-Math.round(diff / 31536000), 'year');
+}
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import InputError from '@/components/InputError.vue';
@@ -422,17 +434,18 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="surveyAssignment" class="pt-0">
-                    <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link
-                            :href="
-                                AdminAssignmentActions.show(surveyAssignment.id)
-                                    .url
-                            "
-                        >
-                            View Details →
-                        </Link>
-                    </Button>
+                <CardFooter v-if="surveyAssignment" class="border-t pt-0">
+                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                        <span class="text-xs text-muted-foreground">
+                            Updated {{ relativeTime(surveyAssignment.survey_data?.updated_at ?? surveyAssignment.updated_at) }}
+                        </span>
+                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
+                            <Link :href="AdminAssignmentActions.show(surveyAssignment.id).url">
+                                <ExternalLink class="size-3" />
+                                Details
+                            </Link>
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
 
@@ -683,18 +696,18 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="constructionAssignment" class="pt-0">
-                    <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link
-                            :href="
-                                AdminAssignmentActions.show(
-                                    constructionAssignment.id,
-                                ).url
-                            "
-                        >
-                            View Details →
-                        </Link>
-                    </Button>
+                <CardFooter v-if="constructionAssignment" class="border-t pt-0">
+                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                        <span class="text-xs text-muted-foreground">
+                            Updated {{ relativeTime(constructionAssignment.construction_data?.updated_at ?? constructionAssignment.updated_at) }}
+                        </span>
+                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
+                            <Link :href="AdminAssignmentActions.show(constructionAssignment.id).url">
+                                <ExternalLink class="size-3" />
+                                Details
+                            </Link>
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
 
@@ -841,17 +854,18 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="plnAssignment" class="pt-0">
-                    <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link
-                            :href="
-                                AdminAssignmentActions.show(plnAssignment.id)
-                                    .url
-                            "
-                        >
-                            View Details →
-                        </Link>
-                    </Button>
+                <CardFooter v-if="plnAssignment" class="border-t pt-0">
+                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                        <span class="text-xs text-muted-foreground">
+                            Updated {{ relativeTime(plnAssignment.pln_data?.updated_at ?? plnAssignment.updated_at) }}
+                        </span>
+                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
+                            <Link :href="AdminAssignmentActions.show(plnAssignment.id).url">
+                                <ExternalLink class="size-3" />
+                                Details
+                            </Link>
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
 
@@ -998,17 +1012,18 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="bastAssignment" class="pt-0">
-                    <Button as-child variant="ghost" size="sm" class="text-xs">
-                        <Link
-                            :href="
-                                AdminAssignmentActions.show(bastAssignment.id)
-                                    .url
-                            "
-                        >
-                            View Details →
-                        </Link>
-                    </Button>
+                <CardFooter v-if="bastAssignment" class="border-t pt-0">
+                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                        <span class="text-xs text-muted-foreground">
+                            Updated {{ relativeTime(bastAssignment.bast_data?.updated_at ?? bastAssignment.updated_at) }}
+                        </span>
+                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
+                            <Link :href="AdminAssignmentActions.show(bastAssignment.id).url">
+                                <ExternalLink class="size-3" />
+                                Details
+                            </Link>
+                        </Button>
+                    </div>
                 </CardFooter>
             </Card>
         </div>
