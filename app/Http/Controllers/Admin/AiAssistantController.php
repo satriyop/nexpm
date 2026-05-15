@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Ai\Agents\NexpmAssistantAgent;
+use App\Ai\Agents\NexpmFullModeAgent;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
 use App\Services\Ai\AiAssistantService;
+use App\Services\Ai\DbSchemaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Laravel\Ai\Streaming\Events\TextDelta;
@@ -22,6 +24,7 @@ class AiAssistantController extends Controller
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:2000'],
             'conversation_id' => ['nullable', 'integer', 'exists:ai_conversations,id'],
+            'mode' => ['nullable', 'string', 'in:standard,full'],
             'context' => ['nullable', 'array'],
             'context.type' => ['nullable', 'string', 'max:50'],
             'context.id' => ['nullable'],
@@ -34,6 +37,7 @@ class AiAssistantController extends Controller
         ]);
 
         $context = $validated['context'] ?? [];
+        $mode = $validated['mode'] ?? $request->user()->getAiPreferences()['mode'];
 
         $conversation = AiConversation::query()
             ->where('user_id', $request->user()->id)
@@ -55,8 +59,8 @@ class AiAssistantController extends Controller
         $message = $validated['message'];
 
         return response()->stream(
-            function () use ($service, $message, $context, $conversation): void {
-                $this->streamResponse($service, $message, $context, $conversation);
+            function () use ($service, $message, $context, $conversation, $mode, $request): void {
+                $this->streamResponse($service, $message, $context, $conversation, $mode, $request->user()->main_contractor_id, $request->user()->getAiPreferences());
             },
             200,
             [
@@ -67,7 +71,8 @@ class AiAssistantController extends Controller
         );
     }
 
-    private function streamResponse(AiAssistantService $service, string $message, array $context, AiConversation $conversation): void
+    /** @param array{mode: string, max_rows: int} $preferences */
+    private function streamResponse(AiAssistantService $service, string $message, array $context, AiConversation $conversation, string $mode = 'standard', ?int $mainContractorId = null, array $preferences = []): void
     {
         $apiKey = config('ai.providers.deepseek.key');
 
@@ -77,7 +82,11 @@ class AiAssistantController extends Controller
             return;
         }
 
-        $agent = new NexpmAssistantAgent($service, $context, $conversation->id);
+        if ($mode === 'full' && $mainContractorId !== null) {
+            $agent = new NexpmFullModeAgent(app(DbSchemaService::class), $preferences, $mainContractorId, $conversation->id);
+        } else {
+            $agent = new NexpmAssistantAgent($service, $context, $conversation->id);
+        }
 
         try {
             $stream = $agent->stream($message);

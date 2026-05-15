@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { usePage } from '@inertiajs/vue3';
-import { AlertCircle, Bot, Loader2, RotateCcw, Send, Sparkles } from 'lucide-vue-next';
+import { Link, usePage } from '@inertiajs/vue3';
+import { AlertCircle, Bot, Loader2, RotateCcw, Send, Settings, Sparkles } from 'lucide-vue-next';
 import { computed, nextTick, ref } from 'vue';
 
 import { store as storeAiMessage } from '@/actions/App/Http/Controllers/Admin/AiAssistantController';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { edit as editAiSettings } from '@/routes/ai-settings';
 
 type ChatMessage = {
     id?: number;
@@ -26,6 +28,10 @@ const messages = ref<ChatMessage[]>([]);
 const messagesEl = ref<HTMLElement | null>(null);
 
 const isSuperAdmin = computed(() => page.props.auth.user.role === 'super_admin');
+const aiMode = computed<string>(() => {
+    const prefs = (page.props.auth.user as Record<string, unknown>).ai_preferences as Record<string, unknown> | null;
+    return (prefs?.mode as string) ?? 'standard';
+});
 
 const quickPrompts = [
     'Briefing proyek hari ini',
@@ -120,6 +126,7 @@ const ask = async (prompt?: string) => {
             body: JSON.stringify({
                 message,
                 conversation_id: conversationId.value,
+                mode: aiMode.value,
                 context: { ...currentContext() },
             }),
         });
@@ -224,19 +231,37 @@ const resetConversation = () => {
                     <SheetTitle class="flex items-center gap-2 text-base">
                         <Bot class="size-4" />
                         AI Assistant
+                        <Badge
+                            :variant="aiMode === 'full' ? 'default' : 'secondary'"
+                            class="text-[10px] px-1.5 py-0 font-normal"
+                        >
+                            {{ aiMode === 'full' ? 'Full DB' : 'Standard' }}
+                        </Badge>
                     </SheetTitle>
-                    <Button
-                        v-if="messages.length > 0"
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        class="h-8"
-                        :disabled="processing || streaming"
-                        @click="resetConversation"
-                    >
-                        <RotateCcw class="size-4" />
-                        Pertanyaan baru
-                    </Button>
+                    <div class="flex items-center gap-1">
+                        <Button
+                            v-if="messages.length > 0"
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            class="h-8"
+                            :disabled="processing || streaming"
+                            @click="resetConversation"
+                        >
+                            <RotateCcw class="size-4" />
+                            Pertanyaan baru
+                        </Button>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="icon" class="size-8" as-child>
+                                    <Link :href="editAiSettings()">
+                                        <Settings class="size-3.5" />
+                                    </Link>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">AI settings</TooltipContent>
+                        </Tooltip>
+                    </div>
                 </div>
             </SheetHeader>
 
