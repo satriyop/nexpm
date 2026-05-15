@@ -4,18 +4,23 @@ import {
     Activity,
     Bot,
     CheckSquare,
+    ChevronDown,
     ChevronRight,
     ClipboardList,
     FolderKanban,
     HelpCircle,
     Layers,
     Lock,
-    MessageCircle,
-    RefreshCw,
+    Search,
     Users,
+    X,
 } from 'lucide-vue-next';
 import type { Component } from 'vue';
-import { computed, nextTick, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
 
 type UserRole = 'super_admin' | 'admin' | 'subcontractor';
@@ -43,13 +48,6 @@ interface FaqCategory {
     icon: Component;
     roles: FaqRole[];
     questions: FaqQuestion[];
-}
-
-interface ChatMessage {
-    id: string;
-    type: 'question' | 'answer';
-    questionText?: string;
-    question?: FaqQuestion;
 }
 
 interface StatusStep {
@@ -120,7 +118,6 @@ const bastStatusSteps: StatusStep[] = [
     { step: 'REPORTED', label: 'Masuk\nlaporan BAST', color: 'violet' },
 ];
 
-// Workflow step data for flowcharts
 const adminWorkflowSteps = [
     { step: 1, label: 'Buat\nProject' },
     { step: 2, label: 'Tambah\nSite' },
@@ -722,338 +719,400 @@ const allCategories: FaqCategory[] = [
     },
 ];
 
-const selectedCategoryId = ref<string | null>(null);
-const chatMessages = ref<ChatMessage[]>([]);
-const chatContainer = ref<HTMLElement | null>(null);
-const answeredQuestionIds = ref<Set<string>>(new Set());
+// ── Reactive state ───────────────────────────────────────────────────────────
 
-const categories = computed(() =>
+const searchQuery = ref('');
+const openQuestions = ref<Record<string, boolean>>({});
+
+const visibleCategories = computed(() =>
     allCategories.filter((cat) => cat.roles.includes('all') || cat.roles.includes(props.userRole as FaqRole)),
 );
 
-const selectedCategory = computed(() => categories.value.find((c) => c.id === selectedCategoryId.value) ?? categories.value[0] ?? null);
+const isSearching = computed(() => searchQuery.value.trim().length > 0);
 
-if (categories.value.length > 0) {
-    selectedCategoryId.value = categories.value[0].id;
-}
-
-function selectCategory(categoryId: string) {
-    selectedCategoryId.value = categoryId;
-}
-
-async function clickQuestion(question: FaqQuestion, category: FaqCategory) {
-    const msgId = `${category.id}-${question.id}-${Date.now()}`;
-    chatMessages.value.push({ id: `q-${msgId}`, type: 'question', questionText: question.question });
-    chatMessages.value.push({ id: `a-${msgId}`, type: 'answer', question });
-    answeredQuestionIds.value.add(question.id);
-    await nextTick();
-    if (chatContainer.value) {
-        chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+const searchResults = computed(() => {
+    const q = searchQuery.value.trim().toLowerCase();
+    if (!q) return [];
+    const results: Array<{ question: FaqQuestion; categoryLabel: string; categoryId: string }> = [];
+    for (const cat of visibleCategories.value) {
+        for (const question of cat.questions) {
+            if (question.question.toLowerCase().includes(q) || question.answer.toLowerCase().includes(q)) {
+                results.push({ question, categoryLabel: cat.label, categoryId: cat.id });
+            }
+        }
     }
-}
-
-function resetChat() {
-    chatMessages.value = [];
-    answeredQuestionIds.value = new Set();
-}
-
-const quickStartQuestions = computed(() => {
-    if (props.userRole === 'subcontractor') {
-        const struct = allCategories.find((c) => c.id === 'structure');
-        const wf = allCategories.find((c) => c.id === 'subcontractor-workflow');
-        const items: { question: FaqQuestion; category: FaqCategory }[] = [];
-        if (struct) items.push({ question: struct.questions[0], category: struct });
-        if (wf) items.push({ question: wf.questions[0], category: wf });
-        if (wf) items.push({ question: wf.questions[4], category: wf }); // BAST question
-        return items;
-    }
-    if (props.userRole === 'admin') {
-        const pm = allCategories.find((c) => c.id === 'project-management');
-        const ver = allCategories.find((c) => c.id === 'verification');
-        const items: { question: FaqQuestion; category: FaqCategory }[] = [];
-        if (pm) items.push({ question: pm.questions[0], category: pm });
-        if (ver) items.push({ question: ver.questions[0], category: ver });
-        return items;
-    }
-    // super admin
-    const struct = allCategories.find((c) => c.id === 'structure');
-    const status = allCategories.find((c) => c.id === 'status');
-    const ai = allCategories.find((c) => c.id === 'ai-assistant');
-    const items: { question: FaqQuestion; category: FaqCategory }[] = [];
-    if (struct) items.push({ question: struct.questions[1], category: struct }); // activity types
-    if (status) items.push({ question: status.questions[3], category: status }); // BAST status
-    if (ai) items.push({ question: ai.questions[0], category: ai });
-    return items;
+    return results;
 });
+
+function clearSearch() {
+    searchQuery.value = '';
+}
+
+function scrollToCategory(id: string) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
 </script>
 
 <template>
     <Head title="Pusat Bantuan" />
 
-    <div class="flex h-[calc(100vh-8.5rem)] gap-4 p-6 pt-2">
-        <!-- ── Left Panel: Categories + Questions ── -->
-        <div class="flex w-72 shrink-0 flex-col overflow-hidden rounded-xl border bg-card">
-            <!-- Category list -->
-            <div class="shrink-0 border-b p-3">
-                <p class="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Topik</p>
-                <nav class="space-y-0.5">
-                    <button
-                        v-for="cat in categories"
-                        :key="cat.id"
-                        class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors"
-                        :class="
-                            selectedCategory?.id === cat.id
-                                ? 'bg-primary text-primary-foreground font-medium'
-                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        "
-                        @click="selectCategory(cat.id)"
-                    >
-                        <component :is="cat.icon" class="h-4 w-4 shrink-0" />
-                        <span>{{ cat.label }}</span>
-                    </button>
-                </nav>
+    <div class="flex flex-col gap-4 p-3 sm:p-4 md:mx-auto md:max-w-4xl md:p-6">
+        <!-- ── Page header ── -->
+        <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <HelpCircle class="h-5 w-5 text-primary" />
             </div>
-
-            <!-- Question list -->
-            <div class="flex-1 overflow-y-auto p-3">
-                <p class="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Pertanyaan</p>
-                <div v-if="selectedCategory" class="space-y-0.5">
-                    <button
-                        v-for="question in selectedCategory.questions"
-                        :key="question.id"
-                        class="flex w-full items-start gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors"
-                        :class="
-                            answeredQuestionIds.has(question.id)
-                                ? 'bg-primary/10 text-foreground'
-                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        "
-                        @click="clickQuestion(question, selectedCategory)"
-                    >
-                        <MessageCircle
-                            class="mt-0.5 h-3.5 w-3.5 shrink-0"
-                            :class="answeredQuestionIds.has(question.id) ? 'text-primary' : ''"
-                        />
-                        <span class="leading-snug">{{ question.question }}</span>
-                    </button>
-                </div>
+            <div>
+                <h1 class="text-lg font-semibold tracking-tight sm:text-xl">Pusat Bantuan</h1>
+                <p class="text-sm text-muted-foreground">Temukan jawaban atas pertanyaan Anda tentang NexPM.</p>
             </div>
         </div>
 
-        <!-- ── Right Panel: Chat Area ── -->
-        <div class="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card">
-            <!-- Header -->
-            <div class="flex shrink-0 items-center justify-between border-b px-5 py-3.5">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                        <HelpCircle class="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-semibold">Pusat Bantuan NexPM</p>
-                        <p class="text-xs text-muted-foreground">Klik pertanyaan di panel kiri untuk membaca jawaban</p>
-                    </div>
-                </div>
-                <button
-                    v-if="chatMessages.length > 0"
-                    class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    @click="resetChat"
-                >
-                    <RefreshCw class="h-3.5 w-3.5" />
-                    Reset
-                </button>
-            </div>
+        <!-- ── Search bar ── -->
+        <div class="relative">
+            <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+                v-model="searchQuery"
+                placeholder="Cari pertanyaan..."
+                class="pl-9 pr-9"
+            />
+            <button
+                v-if="searchQuery"
+                class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                @click="clearSearch"
+            >
+                <X class="h-4 w-4" />
+            </button>
+        </div>
 
-            <!-- Chat body -->
-            <div ref="chatContainer" class="flex-1 overflow-y-auto p-5">
-                <!-- ── Welcome state ── -->
-                <div v-if="chatMessages.length === 0" class="flex h-full flex-col items-center justify-center px-4 text-center">
-                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                        <HelpCircle class="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 class="mb-1.5 text-base font-semibold">Selamat datang di Pusat Bantuan</h3>
-                    <p class="max-w-sm text-sm text-muted-foreground">
-                        Pilih topik di panel kiri, lalu klik pertanyaan yang ingin Anda ketahui.
-                    </p>
-                    <div class="mt-5 flex flex-wrap justify-center gap-2">
-                        <button
-                            v-for="item in quickStartQuestions"
-                            :key="item.question.id"
-                            class="rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            @click="clickQuestion(item.question, item.category)"
-                        >
-                            {{ item.question.question }}
-                        </button>
-                    </div>
-                </div>
+        <!-- ── Category jump pills ── -->
+        <div v-if="!isSearching" class="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+            <button
+                v-for="cat in visibleCategories"
+                :key="cat.id"
+                class="flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                @click="scrollToCategory(cat.id)"
+            >
+                <component :is="cat.icon" class="h-3.5 w-3.5" />
+                {{ cat.label }}
+            </button>
+        </div>
 
-                <!-- ── Chat messages ── -->
-                <div v-else class="space-y-5">
-                    <template v-for="msg in chatMessages" :key="msg.id">
-                        <!-- User question bubble -->
-                        <div v-if="msg.type === 'question'" class="flex justify-end">
-                            <div class="max-w-sm rounded-2xl rounded-tr-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-                                {{ msg.questionText }}
+        <!-- ── Search results ── -->
+        <div v-if="isSearching" class="flex flex-col gap-3">
+            <p class="text-sm text-muted-foreground">
+                <template v-if="searchResults.length > 0">
+                    {{ searchResults.length }} hasil ditemukan untuk
+                    <span class="font-medium text-foreground">"{{ searchQuery.trim() }}"</span>
+                </template>
+                <template v-else>
+                    Tidak ada hasil untuk
+                    <span class="font-medium text-foreground">"{{ searchQuery.trim() }}"</span>
+                </template>
+            </p>
+
+            <div v-if="searchResults.length > 0" class="overflow-hidden rounded-xl border bg-card">
+                <template v-for="(result, idx) in searchResults" :key="result.question.id">
+                    <Collapsible v-model:open="openQuestions[result.question.id]">
+                        <CollapsibleTrigger class="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium leading-snug text-foreground">{{ result.question.question }}</p>
+                                <Badge variant="outline" class="mt-1 text-[10px]">{{ result.categoryLabel }}</Badge>
                             </div>
-                        </div>
-
-                        <!-- Answer bubble -->
-                        <div v-else-if="msg.type === 'answer' && msg.question" class="flex justify-start">
-                            <div class="max-w-2xl space-y-3.5 rounded-2xl rounded-tl-sm bg-muted px-5 py-4 text-sm">
-                                <!-- Answer prose -->
-                                <p class="whitespace-pre-wrap leading-relaxed text-foreground">{{ msg.question.answer }}</p>
-
-                                <!-- ── Survey Status Diagram ── -->
-                                <div v-if="msg.question.diagram === 'status_survey'" class="overflow-x-auto rounded-lg border bg-background p-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Alur Status — Aktivitas Survey (otomatis)
-                                    </p>
-                                    <div class="flex min-w-max flex-wrap items-start gap-1.5">
-                                        <template v-for="(s, i) in surveyStatusSteps" :key="s.step">
-                                            <div class="flex flex-col items-center gap-1.5 w-[72px]">
-                                                <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
-                                            </div>
-                                            <div v-if="i < surveyStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-
-                                <!-- ── Construction Status Diagram ── -->
-                                <div v-else-if="msg.question.diagram === 'status_construction'" class="overflow-x-auto rounded-lg border bg-background p-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Alur Status — Aktivitas Konstruksi (otomatis, setelah WO diisi)
-                                    </p>
-                                    <div class="flex min-w-max items-start gap-1.5">
-                                        <template v-for="(s, i) in constructionStatusSteps" :key="s.step">
-                                            <div class="flex flex-col items-center gap-1.5 w-[72px]">
-                                                <span :class="statusColorMap[s.color]" class="whitespace-pre-line text-center">{{ s.step }}</span>
-                                                <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
-                                            </div>
-                                            <div v-if="i < constructionStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-
-                                <!-- ── PLN Status Diagram ── -->
-                                <div v-else-if="msg.question.diagram === 'status_pln'" class="overflow-x-auto rounded-lg border bg-background p-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Alur Status — Aktivitas PLN Connection (otomatis)
-                                    </p>
-                                    <div class="flex min-w-max items-start gap-1.5">
-                                        <template v-for="(s, i) in plnStatusSteps" :key="s.step">
-                                            <div class="flex flex-col items-center gap-1.5 w-[72px]">
-                                                <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
-                                            </div>
-                                            <div v-if="i < plnStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-
-                                <!-- ── BAST Status Diagram ── -->
-                                <div v-else-if="msg.question.diagram === 'status_bast'" class="rounded-lg border bg-background p-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Alur Status — Aktivitas BAST (manual Submit diperlukan)
-                                    </p>
-                                    <!-- Main flow -->
-                                    <div class="flex flex-wrap items-start gap-1.5">
-                                        <template v-for="(s, i) in bastStatusSteps" :key="s.step">
-                                            <div class="flex flex-col items-center gap-1.5 w-[72px]">
-                                                <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
-                                            </div>
-                                            <div v-if="i < bastStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                            </div>
-                                        </template>
-                                    </div>
-                                    <!-- REVISION branch -->
-                                    <div class="mt-3 flex items-center gap-2.5 border-t pt-3">
-                                        <span class="text-xs text-muted-foreground">Opsional:</span>
-                                        <span :class="statusColorMap['blue']">SUBMITTED</span>
-                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                        <span :class="statusColorMap['red']">REVISION</span>
-                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                        <span :class="statusColorMap['amber']">PENDING</span>
-                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                        <span class="text-xs italic text-muted-foreground">subkon submit ulang → SUBMITTED lagi</span>
-                                    </div>
-                                </div>
-
-                                <!-- ── Admin Workflow Diagram ── -->
-                                <div v-else-if="msg.question.diagram === 'workflow_admin'" class="overflow-x-auto rounded-lg border bg-background p-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Alur Lengkap Admin
-                                    </p>
-                                    <div class="flex min-w-max items-start gap-1.5">
-                                        <template v-for="(s, i) in adminWorkflowSteps" :key="s.step">
-                                            <div class="flex w-[68px] flex-col items-center gap-2">
-                                                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm">
-                                                    {{ s.step }}
+                            <ChevronDown
+                                class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                                :class="{ 'rotate-180': openQuestions[result.question.id] }"
+                            />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <div class="border-t px-4 pb-4 pt-3">
+                                <!-- Answer content rendered below -->
+                                <template v-if="openQuestions[result.question.id]">
+                                    <div class="space-y-3.5 text-sm">
+                                        <p class="whitespace-pre-wrap leading-relaxed text-foreground">{{ result.question.answer }}</p>
+                                        <!-- diagrams and steps injected via shared slot below -->
+                                        <template v-if="result.question.diagram === 'status_survey'">
+                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Survey (otomatis)</p>
+                                                <div class="flex min-w-max items-start gap-1.5">
+                                                    <template v-for="(s, i) in surveyStatusSteps" :key="s.step">
+                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                            <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
+                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                        </div>
+                                                        <div v-if="i < surveyStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        </div>
+                                                    </template>
                                                 </div>
-                                                <p class="whitespace-pre-line text-center text-[11px] leading-tight text-muted-foreground">
-                                                    {{ s.label }}
-                                                </p>
                                             </div>
-                                            <div v-if="i < adminWorkflowSteps.length - 1" class="mt-[18px] h-px w-4 shrink-0 bg-muted-foreground/30"></div>
                                         </template>
+                                        <template v-if="result.question.diagram === 'status_construction'">
+                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Konstruksi (otomatis, setelah WO diisi)</p>
+                                                <div class="flex min-w-max items-start gap-1.5">
+                                                    <template v-for="(s, i) in constructionStatusSteps" :key="s.step">
+                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                            <span :class="statusColorMap[s.color]" class="whitespace-pre-line text-center">{{ s.step }}</span>
+                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                        </div>
+                                                        <div v-if="i < constructionStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template v-if="result.question.diagram === 'status_pln'">
+                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — PLN Connection (otomatis)</p>
+                                                <div class="flex min-w-max items-start gap-1.5">
+                                                    <template v-for="(s, i) in plnStatusSteps" :key="s.step">
+                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                            <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
+                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                        </div>
+                                                        <div v-if="i < plnStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template v-if="result.question.diagram === 'status_bast'">
+                                            <div class="rounded-lg border bg-muted/30 p-3">
+                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — BAST (manual Submit diperlukan)</p>
+                                                <div class="flex flex-wrap items-start gap-1.5">
+                                                    <template v-for="(s, i) in bastStatusSteps" :key="s.step">
+                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                            <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
+                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                        </div>
+                                                        <div v-if="i < bastStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                                <div class="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+                                                    <span class="text-xs text-muted-foreground">Opsional:</span>
+                                                    <span :class="statusColorMap['blue']">SUBMITTED</span>
+                                                    <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    <span :class="statusColorMap['red']">REVISION</span>
+                                                    <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    <span :class="statusColorMap['amber']">PENDING</span>
+                                                    <span class="text-xs italic text-muted-foreground">→ subkon submit ulang</span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template v-if="result.question.diagram === 'workflow_admin'">
+                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Lengkap Admin</p>
+                                                <div class="flex min-w-max items-start gap-1.5">
+                                                    <template v-for="(s, i) in adminWorkflowSteps" :key="s.step">
+                                                        <div class="flex w-[68px] flex-col items-center gap-2">
+                                                            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm">{{ s.step }}</div>
+                                                            <p class="whitespace-pre-line text-center text-[11px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                        </div>
+                                                        <div v-if="i < adminWorkflowSteps.length - 1" class="mt-[18px] h-px w-4 shrink-0 bg-muted-foreground/30"></div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <ol v-if="result.question.steps" class="space-y-2.5">
+                                            <li v-for="(step, idx) in result.question.steps" :key="idx" class="flex gap-3">
+                                                <span v-if="step.icon" class="mt-0.5 shrink-0 text-base leading-none">{{ step.icon }}</span>
+                                                <span v-else class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">{{ idx + 1 }}</span>
+                                                <div class="min-w-0 flex-1">
+                                                    <span class="text-foreground">{{ step.text }}</span>
+                                                    <p v-if="step.note" class="mt-0.5 text-xs italic text-muted-foreground">{{ step.note }}</p>
+                                                </div>
+                                            </li>
+                                        </ol>
+                                        <div v-if="result.question.warning" class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3.5 py-3">
+                                            <span class="shrink-0 text-base">⚠️</span>
+                                            <p class="text-sm text-destructive">{{ result.question.warning }}</p>
+                                        </div>
+                                        <div v-if="result.question.tips?.length" class="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-800 dark:bg-blue-950/20">
+                                            <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400"><span>💡</span> Tips</p>
+                                            <ul class="space-y-1">
+                                                <li v-for="(tip, tidx) in result.question.tips" :key="tidx" class="flex items-start gap-1.5 text-xs text-blue-700 dark:text-blue-300">
+                                                    <span class="mt-0.5 shrink-0">•</span>
+                                                    <span>{{ tip }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </CollapsibleContent>
+                    </Collapsible>
+                    <Separator v-if="idx < searchResults.length - 1" />
+                </template>
+            </div>
+        </div>
+
+        <!-- ── Category accordion cards ── -->
+        <template v-if="!isSearching">
+            <div
+                v-for="cat in visibleCategories"
+                :id="cat.id"
+                :key="cat.id"
+                class="overflow-hidden rounded-xl border bg-card"
+            >
+                <!-- Category header -->
+                <div class="flex items-center gap-2.5 border-b bg-muted/30 px-4 py-3">
+                    <component :is="cat.icon" class="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <h2 class="text-sm font-semibold text-foreground">{{ cat.label }}</h2>
+                    <span class="ml-auto text-xs text-muted-foreground">{{ cat.questions.length }} pertanyaan</span>
+                </div>
+
+                <!-- Questions -->
+                <div>
+                    <template v-for="(question, qIdx) in cat.questions" :key="question.id">
+                        <Collapsible v-model:open="openQuestions[question.id]">
+                            <CollapsibleTrigger class="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50">
+                                <span class="text-sm font-medium leading-snug text-foreground">{{ question.question }}</span>
+                                <ChevronDown
+                                    class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+                                    :class="{ 'rotate-180': openQuestions[question.id] }"
+                                />
+                            </CollapsibleTrigger>
+
+                            <CollapsibleContent>
+                                <div class="border-t px-4 pb-5 pt-3">
+                                    <div class="space-y-3.5 text-sm">
+                                        <!-- Answer prose -->
+                                        <p class="whitespace-pre-wrap leading-relaxed text-foreground">{{ question.answer }}</p>
+
+                                        <!-- ── Survey Status Diagram ── -->
+                                        <div v-if="question.diagram === 'status_survey'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Survey (otomatis)</p>
+                                            <div class="flex min-w-max items-start gap-1.5">
+                                                <template v-for="(s, i) in surveyStatusSteps" :key="s.step">
+                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                        <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
+                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                    </div>
+                                                    <div v-if="i < surveyStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <!-- ── Construction Status Diagram ── -->
+                                        <div v-else-if="question.diagram === 'status_construction'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Konstruksi (otomatis, setelah WO diisi)</p>
+                                            <div class="flex min-w-max items-start gap-1.5">
+                                                <template v-for="(s, i) in constructionStatusSteps" :key="s.step">
+                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                        <span :class="statusColorMap[s.color]" class="whitespace-pre-line text-center">{{ s.step }}</span>
+                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                    </div>
+                                                    <div v-if="i < constructionStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <!-- ── PLN Status Diagram ── -->
+                                        <div v-else-if="question.diagram === 'status_pln'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — PLN Connection (otomatis)</p>
+                                            <div class="flex min-w-max items-start gap-1.5">
+                                                <template v-for="(s, i) in plnStatusSteps" :key="s.step">
+                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                        <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
+                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                    </div>
+                                                    <div v-if="i < plnStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <!-- ── BAST Status Diagram ── -->
+                                        <div v-else-if="question.diagram === 'status_bast'" class="rounded-lg border bg-muted/30 p-3">
+                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — BAST (manual Submit diperlukan)</p>
+                                            <div class="flex flex-wrap items-start gap-1.5">
+                                                <template v-for="(s, i) in bastStatusSteps" :key="s.step">
+                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
+                                                        <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
+                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                    </div>
+                                                    <div v-if="i < bastStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
+                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div class="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+                                                <span class="text-xs text-muted-foreground">Opsional:</span>
+                                                <span :class="statusColorMap['blue']">SUBMITTED</span>
+                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                <span :class="statusColorMap['red']">REVISION</span>
+                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                <span :class="statusColorMap['amber']">PENDING</span>
+                                                <span class="text-xs italic text-muted-foreground">→ subkon submit ulang</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- ── Admin Workflow Diagram ── -->
+                                        <div v-else-if="question.diagram === 'workflow_admin'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
+                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Lengkap Admin</p>
+                                            <div class="flex min-w-max items-start gap-1.5">
+                                                <template v-for="(s, i) in adminWorkflowSteps" :key="s.step">
+                                                    <div class="flex w-[68px] flex-col items-center gap-2">
+                                                        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm">{{ s.step }}</div>
+                                                        <p class="whitespace-pre-line text-center text-[11px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                                    </div>
+                                                    <div v-if="i < adminWorkflowSteps.length - 1" class="mt-[18px] h-px w-4 shrink-0 bg-muted-foreground/30"></div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <!-- ── Steps / numbered list ── -->
+                                        <ol v-if="question.steps" class="space-y-2.5">
+                                            <li v-for="(step, idx) in question.steps" :key="idx" class="flex gap-3">
+                                                <span v-if="step.icon" class="mt-0.5 shrink-0 text-base leading-none">{{ step.icon }}</span>
+                                                <span v-else class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">{{ idx + 1 }}</span>
+                                                <div class="min-w-0 flex-1">
+                                                    <span class="text-foreground">{{ step.text }}</span>
+                                                    <p v-if="step.note" class="mt-0.5 text-xs italic text-muted-foreground">{{ step.note }}</p>
+                                                </div>
+                                            </li>
+                                        </ol>
+
+                                        <!-- ── Warning box ── -->
+                                        <div v-if="question.warning" class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3.5 py-3">
+                                            <span class="shrink-0 text-base">⚠️</span>
+                                            <p class="text-sm text-destructive">{{ question.warning }}</p>
+                                        </div>
+
+                                        <!-- ── Tips box ── -->
+                                        <div v-if="question.tips?.length" class="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-800 dark:bg-blue-950/20">
+                                            <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
+                                                <span>💡</span> Tips
+                                            </p>
+                                            <ul class="space-y-1">
+                                                <li v-for="(tip, tidx) in question.tips" :key="tidx" class="flex items-start gap-1.5 text-xs text-blue-700 dark:text-blue-300">
+                                                    <span class="mt-0.5 shrink-0">•</span>
+                                                    <span>{{ tip }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
+                            </CollapsibleContent>
+                        </Collapsible>
 
-                                <!-- ── Steps / numbered list ── -->
-                                <ol v-if="msg.question.steps" class="space-y-2.5">
-                                    <li v-for="(step, idx) in msg.question.steps" :key="idx" class="flex gap-3">
-                                        <span v-if="step.icon" class="mt-0.5 shrink-0 text-base leading-none">{{ step.icon }}</span>
-                                        <span
-                                            v-else
-                                            class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary"
-                                        >
-                                            {{ idx + 1 }}
-                                        </span>
-                                        <div class="min-w-0 flex-1">
-                                            <span class="text-foreground">{{ step.text }}</span>
-                                            <p v-if="step.note" class="mt-0.5 text-xs italic text-muted-foreground">
-                                                {{ step.note }}
-                                            </p>
-                                        </div>
-                                    </li>
-                                </ol>
-
-                                <!-- ── Warning box ── -->
-                                <div v-if="msg.question.warning" class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3.5 py-3">
-                                    <span class="shrink-0 text-base">⚠️</span>
-                                    <p class="text-sm text-destructive">{{ msg.question.warning }}</p>
-                                </div>
-
-                                <!-- ── Tips box ── -->
-                                <div
-                                    v-if="msg.question.tips?.length"
-                                    class="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-800 dark:bg-blue-950/20"
-                                >
-                                    <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
-                                        <span>💡</span> Tips
-                                    </p>
-                                    <ul class="space-y-1">
-                                        <li
-                                            v-for="(tip, idx) in msg.question.tips"
-                                            :key="idx"
-                                            class="flex items-start gap-1.5 text-xs text-blue-700 dark:text-blue-300"
-                                        >
-                                            <span class="mt-0.5 shrink-0">•</span>
-                                            <span>{{ tip }}</span>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
+                        <Separator v-if="qIdx < cat.questions.length - 1" />
                     </template>
                 </div>
             </div>
-        </div>
+        </template>
     </div>
 </template>
