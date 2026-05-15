@@ -437,7 +437,7 @@ const locationParts = computed(() =>
                 <Link
                     v-if="surveyAssignment"
                     :href="AdminAssignmentActions.show(surveyAssignment.id).url"
-                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                    class="mt-auto -mb-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
                 >
                     <span class="text-xs text-primary/70">
                         Updated {{ relativeTime(surveyAssignment.survey_data?.updated_at ?? surveyAssignment.updated_at) }}
@@ -699,7 +699,7 @@ const locationParts = computed(() =>
                 <Link
                     v-if="constructionAssignment"
                     :href="AdminAssignmentActions.show(constructionAssignment.id).url"
-                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                    class="mt-auto -mb-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
                 >
                     <span class="text-xs text-primary/70">
                         Updated {{ relativeTime(constructionAssignment.construction_data?.updated_at ?? constructionAssignment.updated_at) }}
@@ -857,7 +857,7 @@ const locationParts = computed(() =>
                 <Link
                     v-if="plnAssignment"
                     :href="AdminAssignmentActions.show(plnAssignment.id).url"
-                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                    class="mt-auto -mb-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
                 >
                     <span class="text-xs text-primary/70">
                         Updated {{ relativeTime(plnAssignment.pln_data?.updated_at ?? plnAssignment.updated_at) }}
@@ -1015,7 +1015,7 @@ const locationParts = computed(() =>
                 <Link
                     v-if="bastAssignment"
                     :href="AdminAssignmentActions.show(bastAssignment.id).url"
-                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                    class="mt-auto -mb-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
                 >
                     <span class="text-xs text-primary/70">
                         Updated {{ relativeTime(bastAssignment.bast_data?.updated_at ?? bastAssignment.updated_at) }}
