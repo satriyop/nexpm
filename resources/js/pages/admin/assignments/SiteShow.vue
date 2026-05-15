@@ -3,6 +3,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowLeft,
+    ArrowRight,
     ExternalLink,
     LockKeyhole,
     MapPin,
@@ -31,7 +32,6 @@ import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
-    CardFooter,
     CardHeader,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -434,19 +434,19 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="surveyAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
-                        <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(surveyAssignment.survey_data?.updated_at ?? surveyAssignment.updated_at) }}
-                        </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(surveyAssignment.id).url">
-                                <ExternalLink class="size-3" />
-                                Details
-                            </Link>
-                        </Button>
-                    </div>
-                </CardFooter>
+                <Link
+                    v-if="surveyAssignment"
+                    :href="AdminAssignmentActions.show(surveyAssignment.id).url"
+                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                >
+                    <span class="text-xs text-primary/70">
+                        Updated {{ relativeTime(surveyAssignment.survey_data?.updated_at ?? surveyAssignment.updated_at) }}
+                    </span>
+                    <span class="flex items-center gap-1.5 text-xs font-semibold">
+                        Details
+                        <ArrowRight class="size-3.5" />
+                    </span>
+                </Link>
             </Card>
 
             <!-- CONSTRUCTION card -->
@@ -696,19 +696,19 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="constructionAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
-                        <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(constructionAssignment.construction_data?.updated_at ?? constructionAssignment.updated_at) }}
-                        </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(constructionAssignment.id).url">
-                                <ExternalLink class="size-3" />
-                                Details
-                            </Link>
-                        </Button>
-                    </div>
-                </CardFooter>
+                <Link
+                    v-if="constructionAssignment"
+                    :href="AdminAssignmentActions.show(constructionAssignment.id).url"
+                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                >
+                    <span class="text-xs text-primary/70">
+                        Updated {{ relativeTime(constructionAssignment.construction_data?.updated_at ?? constructionAssignment.updated_at) }}
+                    </span>
+                    <span class="flex items-center gap-1.5 text-xs font-semibold">
+                        Details
+                        <ArrowRight class="size-3.5" />
+                    </span>
+                </Link>
             </Card>
 
             <!-- PLN CONNECTION card -->
@@ -854,19 +854,19 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="plnAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
-                        <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(plnAssignment.pln_data?.updated_at ?? plnAssignment.updated_at) }}
-                        </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(plnAssignment.id).url">
-                                <ExternalLink class="size-3" />
-                                Details
-                            </Link>
-                        </Button>
-                    </div>
-                </CardFooter>
+                <Link
+                    v-if="plnAssignment"
+                    :href="AdminAssignmentActions.show(plnAssignment.id).url"
+                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                >
+                    <span class="text-xs text-primary/70">
+                        Updated {{ relativeTime(plnAssignment.pln_data?.updated_at ?? plnAssignment.updated_at) }}
+                    </span>
+                    <span class="flex items-center gap-1.5 text-xs font-semibold">
+                        Details
+                        <ArrowRight class="size-3.5" />
+                    </span>
+                </Link>
             </Card>
 
             <!-- BAST card -->
@@ -1012,19 +1012,19 @@ const locationParts = computed(() =>
                         />
                     </div>
                 </CardContent>
-                <CardFooter v-if="bastAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
-                        <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(bastAssignment.bast_data?.updated_at ?? bastAssignment.updated_at) }}
-                        </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(bastAssignment.id).url">
-                                <ExternalLink class="size-3" />
-                                Details
-                            </Link>
-                        </Button>
-                    </div>
-                </CardFooter>
+                <Link
+                    v-if="bastAssignment"
+                    :href="AdminAssignmentActions.show(bastAssignment.id).url"
+                    class="-mb-6 -mt-6 flex items-center justify-between rounded-b-xl border-t border-primary/20 bg-primary/10 px-5 py-3 text-primary transition-colors hover:bg-primary/15 active:bg-primary/20"
+                >
+                    <span class="text-xs text-primary/70">
+                        Updated {{ relativeTime(bastAssignment.bast_data?.updated_at ?? bastAssignment.updated_at) }}
+                    </span>
+                    <span class="flex items-center gap-1.5 text-xs font-semibold">
+                        Details
+                        <ArrowRight class="size-3.5" />
+                    </span>
+                </Link>
             </Card>
         </div>
     </div>
