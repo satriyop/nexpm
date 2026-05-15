@@ -123,7 +123,7 @@ const photoFields = computed<SurveyUploadField[]>(() => [
         label: 'Foto Satelit GMaps',
         isImage: true,
     },
-    { key: 'file_mockup_3d', label: 'Mock Up 3D', isImage: false },
+    { key: 'file_mockup_3d', label: 'Mock Up 3D', isImage: true },
     { key: 'file_site_plan', label: 'Site Plan', isImage: true },
     { key: 'file_ba_survey', label: 'BA Survey', isImage: true },
 ]);

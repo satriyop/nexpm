@@ -1179,7 +1179,7 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                                 <div class="grid gap-3 sm:grid-cols-2">
                                     <div
                                         v-for="[key, label, accept] in [
-                                            ['file_mockup_3d', '3D Mockup', '.pdf,.jpg,.jpeg,.png,.dwg'],
+                                            ['file_mockup_3d', '3D Mockup', 'image/*'],
                                             ['file_site_plan', 'Site Plan', 'image/*'],
                                             ['file_ba_survey', 'BA Survey', 'image/*'],
                                         ] as const"

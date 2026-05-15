@@ -339,7 +339,7 @@ class AssignmentController extends Controller
             'photo_access_route' => ['nullable', 'file', 'image', 'max:10240'],
             'photo_pln_network' => ['nullable', 'file', 'image', 'max:10240'],
             'photo_satellite_gmaps' => ['nullable', 'file', 'image', 'max:10240'],
-            'file_mockup_3d' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,dwg', 'max:20480'],
+            'file_mockup_3d' => ['nullable', 'file', 'image', 'max:20480'],
             'file_site_plan' => ['nullable', 'file', 'image', 'max:20480'],
             'file_ba_survey' => ['nullable', 'file', 'image', 'max:10240'],
             'ss_report_submission_date' => ['nullable', 'date'],

@@ -108,7 +108,7 @@ class SurveyFields
             // ── Documents ─────────────────────────────────────────────────────
             [
                 'key' => 'file_mockup_3d', 'label' => 'Mock Up 3D',
-                'type' => 'file', 'required' => false, 'max' => 20480,
+                'type' => 'image', 'required' => false, 'max' => 20480,
                 'section' => 'documents', 'reportable' => true, 'report_order' => 300,
                 'reports' => ['ssr'],
             ],
