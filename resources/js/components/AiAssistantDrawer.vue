@@ -15,6 +15,11 @@ type ChatMessage = {
     role: 'user' | 'assistant';
     content: string;
     tool_name?: string | null;
+    tool_payload?: {
+        sources?: string[];
+        follow_up_suggestions?: string[];
+        record_links?: { label: string; url: string }[];
+    };
 };
 
 const page = usePage();
@@ -30,6 +35,7 @@ const messagesEl = ref<HTMLElement | null>(null);
 const isSuperAdmin = computed(() => page.props.auth.user.role === 'super_admin');
 const aiMode = computed<string>(() => {
     const prefs = (page.props.auth.user as Record<string, unknown>).ai_preferences as Record<string, unknown> | null;
+
     return (prefs?.mode as string) ?? 'standard';
 });
 
@@ -49,6 +55,9 @@ const toolLabels: Record<string, string> = {
     find_blocked_assignments: 'Assignment telat',
     general_help: 'Bantuan',
     list_users: 'Daftar user',
+    query_database: 'Query database',
+    resolve_entity_context: 'Pencarian konteks',
+    workflow_knowledge: 'Pengetahuan workflow',
     contextual_page_summary: 'Ringkasan halaman',
     detect_workflow_gaps: 'Gap workflow',
     project_health_briefing: 'Briefing proyek',
@@ -133,6 +142,7 @@ const ask = async (prompt?: string) => {
 
         if (!response.ok || !response.body) {
             const payload = await response.json().catch(() => ({}));
+
             throw new Error(typeof payload.message === 'string' ? payload.message : 'AI assistant request failed.');
         }
 
@@ -182,6 +192,7 @@ const ask = async (prompt?: string) => {
 
                 if (eventName === 'tool_data') {
                     messages.value[msgIndex].tool_name = data.tool_name as string | null;
+                    messages.value[msgIndex].tool_payload = data.tool_payload as ChatMessage['tool_payload'];
                 } else if (eventName === 'text') {
                     messages.value[msgIndex].content += data.delta as string;
                     await scrollToBottom();
@@ -300,6 +311,47 @@ const resetConversation = () => {
                             v-if="streaming && index === messages.length - 1"
                             class="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-current align-middle"
                         />
+                        <div
+                            v-if="message.role === 'assistant' && message.tool_payload?.sources?.length"
+                            class="mt-2 flex flex-wrap gap-1"
+                        >
+                            <Badge
+                                v-for="source in message.tool_payload.sources"
+                                :key="source"
+                                variant="secondary"
+                                class="h-5 rounded px-1.5 text-[10px] font-normal"
+                            >
+                                {{ source }}
+                            </Badge>
+                        </div>
+                        <div
+                            v-if="message.role === 'assistant' && message.tool_payload?.record_links?.length"
+                            class="mt-2 flex flex-wrap gap-1"
+                        >
+                            <Link
+                                v-for="link in message.tool_payload.record_links"
+                                :key="link.url"
+                                :href="link.url"
+                                class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground transition hover:bg-accent"
+                            >
+                                {{ link.label }}
+                            </Link>
+                        </div>
+                        <div
+                            v-if="message.role === 'assistant' && message.tool_payload?.follow_up_suggestions?.length"
+                            class="mt-2 flex flex-wrap gap-1"
+                        >
+                            <button
+                                v-for="suggestion in message.tool_payload.follow_up_suggestions"
+                                :key="suggestion"
+                                type="button"
+                                class="rounded border border-border bg-background px-2 py-1 text-left text-xs text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                                :disabled="processing || streaming"
+                                @click="ask(suggestion)"
+                            >
+                                {{ suggestion }}
+                            </button>
+                        </div>
                     </div>
                 </div>
 

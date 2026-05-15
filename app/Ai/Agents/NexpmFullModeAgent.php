@@ -2,9 +2,23 @@
 
 namespace App\Ai\Agents;
 
+use App\Ai\Tools\CheckReportReadinessTool;
+use App\Ai\Tools\ContextualPageSummaryTool;
+use App\Ai\Tools\DetectWorkflowGapsTool;
+use App\Ai\Tools\FindBlockedAssignmentsTool;
+use App\Ai\Tools\GeneralHelpTool;
+use App\Ai\Tools\ListUsersTool;
+use App\Ai\Tools\ProjectHealthBriefingTool;
 use App\Ai\Tools\QueryDatabaseTool;
+use App\Ai\Tools\ResolveEntityContextTool;
+use App\Ai\Tools\SummarizeDashboardTool;
+use App\Ai\Tools\SummarizePriorityActionsTool;
+use App\Ai\Tools\SummarizeProjectRisksTool;
+use App\Ai\Tools\SummarizeSubcontractorBlockersTool;
 use App\Ai\Tools\ToolResultBag;
+use App\Ai\Tools\WorkflowKnowledgeTool;
 use App\Models\AiMessage;
+use App\Services\Ai\AiAssistantService;
 use App\Services\Ai\DbSchemaService;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\MaxTokens;
@@ -32,6 +46,8 @@ class NexpmFullModeAgent implements Agent, Conversational, HasTools
     /** @param array{mode: string, max_rows: int} $preferences */
     public function __construct(
         private readonly DbSchemaService $schemaService,
+        private readonly AiAssistantService $assistantService,
+        private readonly array $context,
         private readonly array $preferences,
         private readonly int $mainContractorId,
         private readonly ?int $conversationId = null,
@@ -56,6 +72,9 @@ RULES:
 5. After running a query, explain the results in natural language. Show key numbers prominently.
 6. If a query returns no results, say so clearly and suggest why.
 7. When asked about "subkontraktor", always query the `subcontractors` table — NOT the `users` table. The `users` table is for individual people accounts, not companies.
+8. Prefer the curated NexPM tools for workflow, project health, blockers, report readiness, priority actions, and entity lookup. Use raw SQL only when the curated tools cannot answer the user's specific question.
+9. For workflow/status/process questions, use `workflow_knowledge` before saying you do not have data.
+10. If a project/site/subcontractor name is ambiguous, ask a clarifying question and include the likely matches instead of inventing an answer.
 
 DATABASE SCHEMA AND DOMAIN MODEL:
 {$schema}
@@ -65,6 +84,19 @@ PROMPT;
     public function tools(): iterable
     {
         return [
+            new ProjectHealthBriefingTool($this->assistantService, $this->context, $this->bag),
+            new WorkflowKnowledgeTool($this->assistantService, $this->context, $this->bag),
+            new ResolveEntityContextTool($this->assistantService, $this->context, $this->bag),
+            new FindBlockedAssignmentsTool($this->assistantService, $this->context, $this->bag),
+            new SummarizeDashboardTool($this->assistantService, $this->context, $this->bag),
+            new CheckReportReadinessTool($this->assistantService, $this->context, $this->bag),
+            new SummarizeProjectRisksTool($this->assistantService, $this->context, $this->bag),
+            new SummarizeSubcontractorBlockersTool($this->assistantService, $this->context, $this->bag),
+            new SummarizePriorityActionsTool($this->assistantService, $this->context, $this->bag),
+            new ContextualPageSummaryTool($this->assistantService, $this->context, $this->bag),
+            new DetectWorkflowGapsTool($this->assistantService, $this->context, $this->bag),
+            new ListUsersTool($this->assistantService, $this->context, $this->bag),
+            new GeneralHelpTool($this->assistantService, $this->context, $this->bag),
             new QueryDatabaseTool($this->preferences, $this->bag),
         ];
     }

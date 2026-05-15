@@ -66,6 +66,7 @@ interface Site {
     nidi_slo_bpujl_url: string | null;
     sik_url: string | null;
     latest_remark: string | null;
+    approved_budget: string | null;
     invoice_submission_date: string | null;
     dp_35_date: string | null;
     dp_35_inv_number: string | null;
@@ -191,9 +192,9 @@ watch(
     () => form.approved_budget,
     (budget) => {
         const b = Number(budget) || 0;
-        form.dp_35_dpp_amount = b > 0 ? Math.round(b * 0.35) : '';
-        form.invoice_60_dpp_amount = b > 0 ? Math.round(b * 0.60) : '';
-        form.invoice_5_dpp_amount = b > 0 ? Math.round(b * 0.05) : '';
+        form.dp_35_dpp_amount = b > 0 ? String(Math.round(b * 0.35)) : '';
+        form.invoice_60_dpp_amount = b > 0 ? String(Math.round(b * 0.60)) : '';
+        form.invoice_5_dpp_amount = b > 0 ? String(Math.round(b * 0.05)) : '';
     },
 );
 
@@ -202,7 +203,9 @@ const copiedField = ref<string | null>(null);
 function copyToClipboard(value: string | number, field: string): void {
     navigator.clipboard.writeText(String(value)).then(() => {
         copiedField.value = field;
-        setTimeout(() => { copiedField.value = null; }, 1500);
+        setTimeout(() => {
+            copiedField.value = null;
+        }, 1500);
     });
 }
 

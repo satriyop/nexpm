@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Agents\NexpmAssistantAgent;
+use App\Ai\Agents\NexpmFullModeAgent;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Enums\Role;
@@ -12,7 +13,10 @@ use App\Models\AssignmentConstructionData;
 use App\Models\AssignmentSurveyData;
 use App\Models\Project;
 use App\Models\Site;
+use App\Models\Subcontractor;
 use App\Models\User;
+use App\Services\Ai\AiAssistantService;
+use App\Services\Ai\DbSchemaService;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -368,4 +372,56 @@ test('assistant detects workflow gaps across core workflows', function () {
         ->and($events['tool_data']['tool_payload']['gap_type_counts']['verified_not_reported'])->toBe(1);
 
     Http::assertNothingSent();
+});
+
+test('assistant answers workflow knowledge questions without database rows', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Apa arti status DOCUMENT?'])
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('workflow_knowledge')
+        ->and($events['text']['delta'])->toContain('DOCUMENT')
+        ->and($events['tool_data']['tool_payload']['sources'])->toContain('NexPM workflow rules')
+        ->and($events['tool_data']['tool_payload']['follow_up_suggestions'])->toContain('Cek gap workflow');
+
+    Http::assertNothingSent();
+});
+
+test('full mode agent includes curated pm tools before raw database querying', function () {
+    $agent = new NexpmFullModeAgent(
+        app(DbSchemaService::class),
+        app(AiAssistantService::class),
+        [],
+        ['mode' => 'full', 'max_rows' => 100],
+        1,
+    );
+
+    $toolNames = collect($agent->tools())->map(fn ($tool): string => $tool->name())->all();
+
+    expect($toolNames)->toContain('project_health_briefing')
+        ->and($toolNames)->toContain('workflow_knowledge')
+        ->and($toolNames)->toContain('resolve_entity_context')
+        ->and($toolNames)->toContain('query_database');
+});
+
+test('assistant can resolve ambiguous natural language project and subcon references', function () {
+    $service = app(AiAssistantService::class);
+
+    Project::factory()->create(['name' => 'Alpha Rollout Barat']);
+    Project::factory()->create(['name' => 'Alpha Rollout Timur']);
+    Subcontractor::factory()->create(['name' => 'Subcon Alpha']);
+
+    $payload = $service->resolveEntityContext('kenapa project Alpha lambat?');
+
+    expect($payload['needs_clarification'])->toBeTrue()
+        ->and($payload['match_count'])->toBeGreaterThanOrEqual(2)
+        ->and($payload['suggestions'])->not->toBeEmpty();
 });

@@ -83,7 +83,7 @@ class AiAssistantController extends Controller
         }
 
         if ($mode === 'full' && $mainContractorId !== null) {
-            $agent = new NexpmFullModeAgent(app(DbSchemaService::class), $preferences, $mainContractorId, $conversation->id);
+            $agent = new NexpmFullModeAgent(app(DbSchemaService::class), $service, $context, $preferences, $mainContractorId, $conversation->id);
         } else {
             $agent = new NexpmAssistantAgent($service, $context, $conversation->id);
         }
@@ -98,7 +98,7 @@ class AiAssistantController extends Controller
                 if ($event instanceof ToolResult) {
                     $bag = $agent->getResultBag();
                     $toolName = $bag->toolName;
-                    $toolPayload = $bag->toolPayload;
+                    $toolPayload = $service->decorateToolPayload($toolName ?? 'general_help', $bag->toolPayload, $context);
                     $this->emit('tool_data', [
                         'tool_name' => $toolName ?? 'general_help',
                         'tool_payload' => $toolPayload,
@@ -113,6 +113,7 @@ class AiAssistantController extends Controller
                 $bag = $agent->getResultBag();
                 $toolName = $bag->toolName ?? 'general_help';
                 $toolPayload = $bag->toolPayload !== [] ? $bag->toolPayload : $service->runTool($toolName, $context);
+                $toolPayload = $service->decorateToolPayload($toolName, $toolPayload, $context);
             }
 
             $aiMessage = $conversation->messages()->create([
@@ -146,6 +147,7 @@ class AiAssistantController extends Controller
     {
         $toolName = $service->selectTool($message, $context);
         $toolPayload = $service->runTool($toolName, $context);
+        $toolPayload = $service->decorateToolPayload($toolName, $toolPayload, $context);
         $language = $this->detectLanguage($message);
         $answer = $service->fallbackAnswer($toolName, $toolPayload, $language);
 

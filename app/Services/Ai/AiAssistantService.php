@@ -5,6 +5,9 @@ namespace App\Services\Ai;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Models\Assignment;
+use App\Models\Project;
+use App\Models\Site;
+use App\Models\Subcontractor;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +34,10 @@ class AiAssistantService
 
         if (Str::contains($normalized, ['gap', 'workflow gap', 'gap workflow', 'inkonsisten', 'inconsistent', 'missing field', 'data kurang', 'belum lengkap', 'tidak lengkap'])) {
             return 'detect_workflow_gaps';
+        }
+
+        if (Str::contains($normalized, ['arti', 'maksud', 'alur', 'workflow', 'flow', 'status', 'document', 'verified', 'reported', 'field wajib', 'wajib diisi', 'required field', 'siapa yang input', 'siapa input'])) {
+            return 'workflow_knowledge';
         }
 
         if ($this->hasRecordContext($context) && Str::contains($normalized, ['halaman ini', 'record ini', 'assignment ini', 'site ini', 'project ini', 'proyek ini', 'apa masalah', 'masalahnya', 'statusnya', 'apa status'])) {
@@ -77,6 +84,8 @@ class AiAssistantService
             'contextual_page_summary' => $this->contextualPageSummary($context),
             'detect_workflow_gaps' => $this->detectWorkflowGaps($context),
             'project_health_briefing' => $this->projectHealthBriefing($context),
+            'workflow_knowledge' => $this->workflowKnowledge(),
+            'resolve_entity_context' => $this->resolveEntityContext($context['query'] ?? '', $context),
             'summarize_priority_actions' => $this->summarizePriorityActions($context),
             'summarize_project_risks' => $this->summarizeProjectRisks($context),
             'summarize_subcontractor_blockers' => $this->summarizeSubcontractorBlockers($context),
@@ -107,6 +116,13 @@ class AiAssistantService
                 $this->formatCounts($toolPayload['role_counts'] ?? [])
             ),
             'general_help' => 'I can help with project risks, late assignments, subcontractor blockers, report readiness, and PM priority actions.',
+            'workflow_knowledge' => 'Workflow knowledge: survey completion moves eligible survey assignments to DOCUMENT, DOCUMENT assignments are ready for report preparation, VERIFIED means admin review is complete, and REPORTED means the assignment has been included in a generated report.',
+            'resolve_entity_context' => sprintf(
+                'Entity lookup: %d project matches, %d site matches, and %d subcontractor matches found.',
+                count($toolPayload['projects'] ?? []),
+                count($toolPayload['sites'] ?? []),
+                count($toolPayload['subcontractors'] ?? []),
+            ),
             'contextual_page_summary' => sprintf(
                 'Context summary: %d workflow gaps found for this page.',
                 count($toolPayload['gaps'] ?? [])
@@ -680,6 +696,142 @@ class AiAssistantService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function workflowKnowledge(): array
+    {
+        return [
+            'generated_at' => now()->toIso8601String(),
+            'sources' => ['NexPM workflow rules', 'Application implementation'],
+            'status_meanings' => [
+                'PENDING' => 'Assignment belum lengkap atau belum siap masuk review/dokumen.',
+                'REVISION' => 'Assignment dikembalikan untuk diperbaiki sebelum bisa lanjut.',
+                'DOCUMENT' => 'Data assignment sudah lengkap untuk tahap dokumen dan bisa dipertimbangkan dalam kesiapan laporan.',
+                'VERIFIED' => 'Admin sudah memverifikasi assignment, tetapi belum tentu sudah masuk report.',
+                'REPORTED' => 'Assignment sudah masuk report yang digenerate.',
+                'DROP' => 'Assignment tidak dilanjutkan dalam workflow aktif.',
+            ],
+            'required_data' => [
+                'survey' => [
+                    'power_kva pada site',
+                    'data survey yang ditandai lengkap oleh AssignmentSurveyData::isComplete()',
+                    'foto pendukung sesuai form survey',
+                ],
+                'construction' => [
+                    'cons_wo_number dari admin sebelum pekerjaan konstruksi bisa berjalan normal',
+                    'tanggal mulai dan tanggal selesai aktual',
+                    'machine_serial_number',
+                    'foto machine serial number',
+                    'catatan progres dan foto konstruksi bila diminta workflow',
+                ],
+                'bast' => [
+                    'sim_provider',
+                    'nomor_simcard',
+                    'commissioning_date',
+                    'foto BAST',
+                ],
+            ],
+            'operating_rules' => [
+                'Super admin/admin dapat mengisi dan memperbaiki data assignment dari sisi admin.',
+                'Subcontractor diarahkan untuk melihat assignment yang relevan; akses tulis harus mengikuti policy dan route yang aktif.',
+                'Survey yang lengkap tetapi status belum DOCUMENT dianggap workflow gap.',
+                'Construction tanpa WO number dianggap blocker karena assignment terkunci.',
+                'VERIFIED tetapi belum REPORTED dianggap perlu ditindaklanjuti ke proses report.',
+            ],
+            'suggested_questions' => [
+                'Cek gap workflow',
+                'Apa yang siap dibuat laporan?',
+                'Assignment mana yang telat?',
+                'Apa prioritas tindakan saya hari ini?',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    public function resolveEntityContext(string $query, array $context = []): array
+    {
+        $normalized = Str::lower($query);
+        $searchTerm = $this->entitySearchTerm($normalized);
+
+        $projects = Project::query()
+            ->select(['id', 'name'])
+            ->when($searchTerm !== '', fn ($query) => $query->where('name', 'like', "%{$searchTerm}%"))
+            ->limit(8)
+            ->get()
+            ->filter(fn (Project $project): bool => $searchTerm !== '' || Str::contains($normalized, Str::lower($project->name)))
+            ->map(fn (Project $project): array => [
+                'type' => 'project',
+                'id' => $project->id,
+                'label' => $project->name,
+                'context' => ['type' => 'project', 'id' => $project->id, 'project_id' => $project->id, 'label' => $project->name],
+            ])
+            ->values();
+
+        $sites = Site::query()
+            ->select(['id', 'project_id', 'site_code', 'location_name'])
+            ->when($searchTerm !== '', function ($query) use ($searchTerm): void {
+                $query->where(function ($query) use ($searchTerm): void {
+                    $query->where('site_code', 'like', "%{$searchTerm}%")
+                        ->orWhere('location_name', 'like', "%{$searchTerm}%");
+                });
+            })
+            ->limit(8)
+            ->get()
+            ->filter(fn (Site $site): bool => $searchTerm !== ''
+                || Str::contains($normalized, Str::lower((string) $site->site_code))
+                || Str::contains($normalized, Str::lower((string) $site->location_name)))
+            ->map(fn (Site $site): array => [
+                'type' => 'site',
+                'id' => $site->id,
+                'label' => trim($site->site_code.' '.$site->location_name),
+                'context' => ['type' => 'site', 'id' => $site->id, 'site_id' => $site->id, 'project_id' => $site->project_id, 'label' => trim($site->site_code.' '.$site->location_name)],
+            ])
+            ->values();
+
+        $subcontractors = Subcontractor::query()
+            ->select(['id', 'name', 'code'])
+            ->when($searchTerm !== '', function ($query) use ($searchTerm): void {
+                $query->where(function ($query) use ($searchTerm): void {
+                    $query->where('name', 'like', "%{$searchTerm}%")
+                        ->orWhere('code', 'like', "%{$searchTerm}%");
+                });
+            })
+            ->limit(8)
+            ->get()
+            ->filter(fn (Subcontractor $subcontractor): bool => $searchTerm !== ''
+                || Str::contains($normalized, Str::lower($subcontractor->name))
+                || Str::contains($normalized, Str::lower((string) $subcontractor->code)))
+            ->map(fn (Subcontractor $subcontractor): array => [
+                'type' => 'subcontractor',
+                'id' => $subcontractor->id,
+                'label' => $subcontractor->name,
+                'context' => ['type' => 'subcontractor', 'id' => $subcontractor->id, 'label' => $subcontractor->name],
+            ])
+            ->values();
+
+        $matches = $projects->concat($sites)->concat($subcontractors)->values();
+
+        return [
+            'generated_at' => now()->toIso8601String(),
+            'query' => $query,
+            'search_term' => $searchTerm,
+            'current_context' => $this->normalizedContext($context),
+            'match_count' => $matches->count(),
+            'needs_clarification' => $matches->count() > 1,
+            'projects' => $projects->all(),
+            'sites' => $sites->all(),
+            'subcontractors' => $subcontractors->all(),
+            'suggestions' => $matches
+                ->take(5)
+                ->map(fn (array $match): string => "Bahas {$match['type']} {$match['label']}")
+                ->all(),
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $context
      * @return Collection<int, Assignment>
      */
@@ -1037,6 +1189,126 @@ class AiAssistantService
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    public function decorateToolPayload(string $toolName, array $payload, array $context = []): array
+    {
+        return array_merge($payload, [
+            'sources' => $payload['sources'] ?? $this->toolSources($toolName),
+            'follow_up_suggestions' => $payload['follow_up_suggestions'] ?? $this->followUpSuggestions($toolName),
+            'record_links' => $payload['record_links'] ?? $this->recordLinks($payload),
+            'assistant_context' => $payload['assistant_context'] ?? $this->normalizedContext($context),
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function toolSources(string $toolName): array
+    {
+        return match ($toolName) {
+            'workflow_knowledge' => ['NexPM workflow rules', 'Application implementation'],
+            'query_database' => ['Live database query'],
+            'resolve_entity_context' => ['Projects', 'Sites', 'Subcontractors'],
+            'list_users' => ['Users'],
+            default => ['Assignments', 'Sites', 'Projects'],
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function followUpSuggestions(string $toolName): array
+    {
+        return match ($toolName) {
+            'workflow_knowledge' => [
+                'Cek gap workflow',
+                'Apa yang siap dibuat laporan?',
+                'Assignment mana yang telat?',
+            ],
+            'check_report_readiness' => [
+                'Cek gap workflow untuk assignment siap laporan',
+                'Apa prioritas tindakan saya hari ini?',
+            ],
+            'detect_workflow_gaps' => [
+                'Apa prioritas tindakan saya hari ini?',
+                'Assignment mana yang paling urgent?',
+            ],
+            'summarize_subcontractor_blockers' => [
+                'Subcon mana yang perlu follow up dulu?',
+                'Apa assignment paling lama?',
+            ],
+            'summarize_project_risks', 'project_health_briefing' => [
+                'Apa risiko terbesar saat ini?',
+                'Apa prioritas tindakan saya hari ini?',
+                'Apa yang siap dibuat laporan?',
+            ],
+            'resolve_entity_context' => [
+                'Bahas project yang paling berisiko',
+                'Cek assignment telat untuk project itu',
+            ],
+            default => [
+                'Briefing proyek hari ini',
+                'Cek gap workflow',
+                'Apa prioritas tindakan saya hari ini?',
+            ],
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<array{label: string, url: string}>
+     */
+    private function recordLinks(array $payload): array
+    {
+        $links = collect($this->extractRecordLinks($payload))
+            ->filter(fn (array $link): bool => filled($link['url'] ?? null))
+            ->unique('url')
+            ->take(5)
+            ->values()
+            ->all();
+
+        return $links;
+    }
+
+    /**
+     * @param  mixed  $value
+     * @return list<array{label: string, url: string}>
+     */
+    private function extractRecordLinks($value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $links = [];
+
+        if (isset($value['url']) && is_string($value['url'])) {
+            $label = $value['site_code'] ?? $value['site_name'] ?? $value['project'] ?? $value['label'] ?? ('Assignment #'.($value['id'] ?? $value['assignment_id'] ?? ''));
+            $links[] = ['label' => (string) $label, 'url' => $value['url']];
+        }
+
+        foreach ($value as $child) {
+            $links = array_merge($links, $this->extractRecordLinks($child));
+        }
+
+        return $links;
+    }
+
+    private function entitySearchTerm(string $normalized): string
+    {
+        if (! preg_match('/(?:project|proyek|site|lokasi|subcon|subkon|subcontractor)\s+([a-z0-9][a-z0-9\s._-]{1,80})/i', $normalized, $matches)) {
+            return '';
+        }
+
+        $term = preg_replace('/\b(lambat|telat|terlambat|bermasalah|stuck|macet|ini|itu|kenapa|mengapa|apa|status|risiko|risk|blocker|progress|progres)\b.*$/i', '', $matches[1]) ?? '';
+
+        return trim($term);
+    }
+
+    /**
      * @param  array<string, mixed>  $toolPayload
      */
     private function fallbackAnswerInIndonesian(string $toolName, array $toolPayload): string
@@ -1050,6 +1322,13 @@ class AiAssistantService
                 $this->formatCounts($toolPayload['role_counts'] ?? [], 'id')
             ),
             'general_help' => 'Saya bisa membantu melihat risiko proyek, assignment telat, blocker subcon, kesiapan laporan, dan prioritas tindakan PM hari ini.',
+            'workflow_knowledge' => 'Ringkasan workflow: PENDING berarti data belum siap, REVISION perlu diperbaiki, DOCUMENT berarti data lengkap untuk tahap dokumen/kesiapan laporan, VERIFIED sudah direview admin, dan REPORTED sudah masuk report. Survey lengkap tetapi belum DOCUMENT adalah gap yang perlu dicek.',
+            'resolve_entity_context' => sprintf(
+                'Pencarian konteks menemukan %d project, %d site, dan %d subcon. Jika hasilnya lebih dari satu, pilih nama yang paling spesifik.',
+                count($toolPayload['projects'] ?? []),
+                count($toolPayload['sites'] ?? []),
+                count($toolPayload['subcontractors'] ?? []),
+            ),
             'contextual_page_summary' => sprintf(
                 'Ringkasan konteks: ditemukan %d gap workflow untuk halaman ini.',
                 count($toolPayload['gaps'] ?? [])

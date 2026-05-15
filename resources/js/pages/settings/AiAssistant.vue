@@ -31,7 +31,7 @@ type Props = {
     conversations: Conversation[];
 };
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 defineOptions({
     layout: {

@@ -9,11 +9,13 @@ use App\Ai\Tools\FindBlockedAssignmentsTool;
 use App\Ai\Tools\GeneralHelpTool;
 use App\Ai\Tools\ListUsersTool;
 use App\Ai\Tools\ProjectHealthBriefingTool;
+use App\Ai\Tools\ResolveEntityContextTool;
 use App\Ai\Tools\SummarizeDashboardTool;
 use App\Ai\Tools\SummarizePriorityActionsTool;
 use App\Ai\Tools\SummarizeProjectRisksTool;
 use App\Ai\Tools\SummarizeSubcontractorBlockersTool;
 use App\Ai\Tools\ToolResultBag;
+use App\Ai\Tools\WorkflowKnowledgeTool;
 use App\Models\AiMessage;
 use App\Services\Ai\AiAssistantService;
 use Laravel\Ai\Attributes\MaxSteps;
@@ -54,6 +56,8 @@ class NexpmAssistantAgent implements Agent, Conversational, HasTools
 You are NexPM's read-only project management assistant for super admins.
 Use only the supplied application data from tools. Do not claim that you changed records, sent messages, generated reports, or updated workflow state.
 Answer concisely with concrete project risks, blockers, counts, and recommended next actions. If the data is insufficient, say what is missing.
+For workflow/status/process questions, use the workflow knowledge tool before saying data is unavailable.
+For project/site/subcontractor names or codes, use entity lookup before saying data is unavailable.
 Reply in the same language as the user's question.
 PROMPT;
     }
@@ -68,6 +72,8 @@ PROMPT;
             new SummarizeSubcontractorBlockersTool($this->service, $this->context, $this->bag),
             new SummarizePriorityActionsTool($this->service, $this->context, $this->bag),
             new ProjectHealthBriefingTool($this->service, $this->context, $this->bag),
+            new WorkflowKnowledgeTool($this->service, $this->context, $this->bag),
+            new ResolveEntityContextTool($this->service, $this->context, $this->bag),
             new ContextualPageSummaryTool($this->service, $this->context, $this->bag),
             new DetectWorkflowGapsTool($this->service, $this->context, $this->bag),
             new ListUsersTool($this->service, $this->context, $this->bag),
