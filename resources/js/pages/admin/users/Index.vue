@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Plus, Users } from 'lucide-vue-next';
+import { Pencil, Plus, Users } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/UserController';
 import InputError from '@/components/InputError.vue';
@@ -88,6 +88,48 @@ function submit() {
     });
 }
 
+// ── Edit modal ───────────────────────────────────────────────────
+const editOpen = ref(false);
+const editingUser = ref<User | null>(null);
+const editForm = useForm({
+    name: '',
+    email: '',
+    password: '',
+    role: '',
+    main_contractor_id: '',
+    subcontractor_id: '',
+});
+
+watch(
+    () => editForm.role,
+    () => {
+        editForm.main_contractor_id = '';
+        editForm.subcontractor_id = '';
+    },
+);
+
+function openEdit(user: User) {
+    editingUser.value = user;
+    editForm.name = user.name;
+    editForm.email = user.email;
+    editForm.password = '';
+    editForm.role = user.role;
+    editForm.main_contractor_id = user.main_contractor ? String(user.main_contractor.id) : '';
+    editForm.subcontractor_id = user.subcontractor ? String(user.subcontractor.id) : '';
+    editOpen.value = true;
+}
+
+function submitEdit() {
+    if (!editingUser.value) return;
+
+    editForm.put(Actions.update(editingUser.value.id).url, {
+        onSuccess: () => {
+            editOpen.value = false;
+            editingUser.value = null;
+        },
+    });
+}
+
 const roleBadgeVariant = (role: string) => {
     if (role === 'super_admin') {
         return 'destructive';
@@ -134,6 +176,7 @@ const roleBadgeVariant = (role: string) => {
                             <th class="px-4 py-3 text-left font-medium">
                                 Organization
                             </th>
+                            <th class="px-4 py-3 text-left font-medium"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y">
@@ -159,6 +202,15 @@ const roleBadgeVariant = (role: string) => {
                                     user.subcontractor?.name ??
                                     '—'
                                 }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="openEdit(user)"
+                                >
+                                    <Pencil class="h-4 w-4" />
+                                </Button>
                             </td>
                         </tr>
                         <tr v-if="!users.data.length">
@@ -293,6 +345,76 @@ const roleBadgeVariant = (role: string) => {
                     <Button type="submit" :disabled="form.processing"
                         >Create User</Button
                     >
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Edit dialog -->
+    <Dialog v-model:open="editOpen">
+        <DialogContent class="max-w-lg">
+            <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
+            <form class="space-y-4" @submit.prevent="submitEdit">
+                <div class="grid gap-1.5">
+                    <Label>Name <span class="text-destructive">*</span></Label>
+                    <Input v-model="editForm.name" placeholder="Full name" autofocus />
+                    <InputError :message="editForm.errors.name" />
+                </div>
+                <div class="grid gap-1.5">
+                    <Label>Email <span class="text-destructive">*</span></Label>
+                    <Input v-model="editForm.email" type="email" placeholder="user@example.com" />
+                    <InputError :message="editForm.errors.email" />
+                </div>
+                <div class="grid gap-1.5">
+                    <Label>Password <span class="text-muted-foreground text-xs">(leave blank to keep current)</span></Label>
+                    <Input v-model="editForm.password" type="password" placeholder="Min 8 characters" />
+                    <InputError :message="editForm.errors.password" />
+                </div>
+                <div class="grid gap-1.5">
+                    <Label>Role <span class="text-destructive">*</span></Label>
+                    <Select v-model="editForm.role">
+                        <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="subcontractor">Subcontractor</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="editForm.errors.role" />
+                </div>
+
+                <div v-if="editForm.role === 'admin'" class="grid gap-1.5">
+                    <Label>Main Contractor <span class="text-destructive">*</span></Label>
+                    <Select v-model="editForm.main_contractor_id">
+                        <SelectTrigger><SelectValue placeholder="Select contractor" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="mc in mainContractors"
+                                :key="mc.id"
+                                :value="String(mc.id)"
+                            >{{ mc.name }}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="editForm.errors.main_contractor_id" />
+                </div>
+
+                <div v-if="editForm.role === 'subcontractor'" class="grid gap-1.5">
+                    <Label>Subcontractor <span class="text-destructive">*</span></Label>
+                    <Select v-model="editForm.subcontractor_id">
+                        <SelectTrigger><SelectValue placeholder="Select subcontractor" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="sc in subcontractors"
+                                :key="sc.id"
+                                :value="String(sc.id)"
+                            >{{ sc.name }}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="editForm.errors.subcontractor_id" />
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" type="button" @click="editOpen = false">Cancel</Button>
+                    <Button type="submit" :disabled="editForm.processing">Save Changes</Button>
                 </DialogFooter>
             </form>
         </DialogContent>

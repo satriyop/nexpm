@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Plus, Trash2, Wrench } from 'lucide-vue-next';
+import { Pencil, Plus, Trash2, Wrench } from 'lucide-vue-next';
 import { ref } from 'vue';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/SubcontractorController';
 import InputError from '@/components/InputError.vue';
@@ -84,6 +84,56 @@ function submit() {
                 props.mainContractors.length === 1
                     ? [props.mainContractors[0].id]
                     : [];
+        },
+    });
+}
+
+// ── Edit modal ───────────────────────────────────────────────────
+const editOpen = ref(false);
+const editingSubcontractor = ref<Subcontractor | null>(null);
+const editForm = useForm({
+    name: '',
+    code: '',
+    main_contractor_ids: [] as number[],
+    pic: '',
+    phone: '',
+    email: '',
+});
+
+function openEdit(sc: Subcontractor) {
+    editingSubcontractor.value = sc;
+    editForm.name = sc.name;
+    editForm.code = sc.code;
+    editForm.main_contractor_ids = sc.main_contractors.map((mc) => mc.id);
+    editForm.pic = sc.pic ?? '';
+    editForm.phone = sc.phone ?? '';
+    editForm.email = sc.email ?? '';
+    editOpen.value = true;
+}
+
+function toggleEditMainContractor(id: number) {
+    const current = [...editForm.main_contractor_ids];
+    const index = current.indexOf(id);
+
+    if (index === -1) {
+        current.push(id);
+    } else {
+        current.splice(index, 1);
+    }
+
+    editForm.main_contractor_ids = current;
+    editForm.clearErrors('main_contractor_ids');
+}
+
+function submitEdit() {
+    if (!editingSubcontractor.value) {
+        return;
+    }
+
+    editForm.put(Actions.update(editingSubcontractor.value.id).url, {
+        onSuccess: () => {
+            editOpen.value = false;
+            editingSubcontractor.value = null;
         },
     });
 }
@@ -185,14 +235,23 @@ function submitDelete() {
                                 {{ sc.phone ?? '—' }}
                             </td>
                             <td class="px-4 py-3">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    class="text-destructive hover:text-destructive"
-                                    @click="openDelete(sc)"
-                                >
-                                    <Trash2 class="h-4 w-4" />
-                                </Button>
+                                <div class="flex items-center gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="openEdit(sc)"
+                                    >
+                                        <Pencil class="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        class="text-destructive hover:text-destructive"
+                                        @click="openDelete(sc)"
+                                    >
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </td>
                         </tr>
                         <tr v-if="!subcontractors.data.length">
@@ -309,6 +368,74 @@ function submitDelete() {
                     <Button type="submit" :disabled="form.processing"
                         >Save</Button
                     >
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Edit dialog -->
+    <Dialog v-model:open="editOpen">
+        <DialogContent class="max-w-lg">
+            <DialogHeader
+                ><DialogTitle>Edit Subcontractor</DialogTitle></DialogHeader
+            >
+            <form class="space-y-4" @submit.prevent="submitEdit">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="grid gap-1.5">
+                        <Label
+                            >Name <span class="text-destructive">*</span></Label
+                        >
+                        <Input v-model="editForm.name" placeholder="PT Mitra Jaya…" autofocus />
+                        <InputError :message="editForm.errors.name" />
+                    </div>
+                    <div class="grid gap-1.5">
+                        <Label
+                            >Code <span class="text-destructive">*</span></Label
+                        >
+                        <Input v-model="editForm.code" placeholder="MJ-01" />
+                        <InputError :message="editForm.errors.code" />
+                    </div>
+                </div>
+                <div class="grid gap-1.5">
+                    <Label
+                        >Main Contractor
+                        <span class="text-destructive">*</span></Label
+                    >
+                    <div class="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
+                        <div
+                            v-for="mc in mainContractors"
+                            :key="mc.id"
+                            class="flex items-center gap-2"
+                        >
+                            <Checkbox
+                                :id="'edit-mc-' + mc.id"
+                                :checked="editForm.main_contractor_ids.includes(mc.id)"
+                                @update:model-value="toggleEditMainContractor(mc.id)"
+                            />
+                            <Label :for="'edit-mc-' + mc.id" class="cursor-pointer font-normal">
+                                {{ mc.name }}
+                            </Label>
+                        </div>
+                    </div>
+                    <InputError :message="editForm.errors.main_contractor_ids" />
+                </div>
+                <div class="grid gap-1.5">
+                    <Label>PIC</Label>
+                    <Input v-model="editForm.pic" placeholder="Contact person" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="grid gap-1.5">
+                        <Label>Phone</Label>
+                        <Input v-model="editForm.phone" placeholder="+62 812…" />
+                    </div>
+                    <div class="grid gap-1.5">
+                        <Label>Email</Label>
+                        <Input v-model="editForm.email" type="email" />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" type="button" @click="editOpen = false">Cancel</Button>
+                    <Button type="submit" :disabled="editForm.processing">Save Changes</Button>
                 </DialogFooter>
             </form>
         </DialogContent>

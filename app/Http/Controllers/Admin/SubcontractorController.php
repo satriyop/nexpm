@@ -58,6 +58,43 @@ class SubcontractorController extends Controller
         return back()->with('success', 'Subcontractor created.');
     }
 
+    public function update(Request $request, Subcontractor $subcontractor): RedirectResponse
+    {
+        $user = $this->currentUser();
+
+        abort_if(
+            ! $user->isSuperAdmin()
+            && ! $subcontractor->mainContractors()->whereKey($user->main_contractor_id)->exists(),
+            403
+        );
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50', Rule::unique('subcontractors', 'code')->ignore($subcontractor->id)],
+            'main_contractor_ids' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'array', 'min:1'],
+            'main_contractor_ids.*' => ['required', 'integer', Rule::exists('main_contractors', 'id')],
+            'pic' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+        ]);
+
+        $subcontractor->update([
+            'name' => $validated['name'],
+            'code' => $validated['code'],
+            'pic' => $validated['pic'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'email' => $validated['email'] ?? null,
+        ]);
+
+        $mainContractorIds = $user->isSuperAdmin()
+            ? $validated['main_contractor_ids']
+            : [$user->main_contractor_id];
+
+        $subcontractor->mainContractors()->sync($mainContractorIds);
+
+        return back()->with('success', 'Subcontractor updated.');
+    }
+
     public function destroy(Subcontractor $subcontractor): RedirectResponse
     {
         abort_if(

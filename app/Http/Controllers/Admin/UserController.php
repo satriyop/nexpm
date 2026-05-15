@@ -74,4 +74,32 @@ class UserController extends Controller
 
         return back()->with('success', 'User created successfully.');
     }
+
+    public function update(Request $request, User $user): RedirectResponse
+    {
+        $currentUser = $this->currentUser();
+        abort_unless($currentUser->isSuperAdmin(), 403);
+
+        $mainContractorId = $request->integer('main_contractor_id') ?: null;
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'password' => ['nullable', Password::min(8)],
+            'role' => ['required', 'in:admin,subcontractor'],
+            'main_contractor_id' => ['required_if:role,admin', 'nullable', Rule::exists('main_contractors', 'id')],
+            'subcontractor_id' => ['required_if:role,subcontractor', 'nullable', Rule::exists('subcontractors', 'id')],
+        ]);
+
+        $user->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'role' => Role::from($validated['role']),
+            'main_contractor_id' => $validated['role'] === Role::Admin->value ? $mainContractorId : null,
+            'subcontractor_id' => $validated['subcontractor_id'] ?? null,
+            ...($validated['password'] ? ['password' => $validated['password']] : []),
+        ]);
+
+        return back()->with('success', 'User updated.');
+    }
 }
