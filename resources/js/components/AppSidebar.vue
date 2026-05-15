@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    Briefcase,
     Building2,
     ClipboardList,
     FileBarChart2,
     FolderKanban,
+    HelpCircle,
     LayoutGrid,
     Settings2,
     Users,
     Wrench,
-    Briefcase,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
@@ -95,6 +96,12 @@ const navGroups = computed<NavGroup[]>(() => {
                     },
                 ],
             },
+            {
+                label: 'Bantuan',
+                items: [
+                    { title: 'Pusat Bantuan', href: '/faq', icon: HelpCircle },
+                ],
+            },
         ];
     }
 
@@ -108,6 +115,7 @@ const navGroups = computed<NavGroup[]>(() => {
                         href: SubAssignmentActions.index().url,
                         icon: ClipboardList,
                     },
+                    { title: 'Pusat Bantuan', href: '/faq', icon: HelpCircle },
                 ],
             },
         ];

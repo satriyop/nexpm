@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FaqController;
 // Admin sub-controllers referenced via Admin\ControllerName syntax
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Subcontractor;
@@ -14,6 +15,7 @@ Route::inertia('/', 'Welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('faq', [FaqController::class, 'index'])->name('faq');
 });
 
 Route::middleware(['auth'])->group(function () {
