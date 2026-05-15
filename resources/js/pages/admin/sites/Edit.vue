@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { AlertTriangle, ArrowLeft, LockKeyhole } from 'lucide-vue-next';
+import { AlertTriangle, ArrowLeft, Check, Clipboard, LockKeyhole } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import * as ProjectActions from '@/actions/App/Http/Controllers/Admin/ProjectController';
@@ -184,6 +184,26 @@ function submit(): void {
         machine_type_id:
             data.machine_type_id === NONE ? null : data.machine_type_id,
     })).patch(SiteActions.update(props.site).url);
+}
+
+// Auto-calculate DPP amounts from approved budget
+watch(
+    () => form.approved_budget,
+    (budget) => {
+        const b = Number(budget) || 0;
+        form.dp_35_dpp_amount = b > 0 ? Math.round(b * 0.35) : '';
+        form.invoice_60_dpp_amount = b > 0 ? Math.round(b * 0.60) : '';
+        form.invoice_5_dpp_amount = b > 0 ? Math.round(b * 0.05) : '';
+    },
+);
+
+// Copy to clipboard with brief ✓ feedback
+const copiedField = ref<string | null>(null);
+function copyToClipboard(value: string | number, field: string): void {
+    navigator.clipboard.writeText(String(value)).then(() => {
+        copiedField.value = field;
+        setTimeout(() => { copiedField.value = null; }, 1500);
+    });
 }
 
 // --- Dirty form guard ---
@@ -716,14 +736,26 @@ function removeAssignment(assignment: Assignment): void {
                             </div>
                             <div class="grid gap-1.5">
                                 <Label for="dp_35_dpp_amount">35% DPP Amount</Label>
-                                <Input
-                                    id="dp_35_dpp_amount"
-                                    v-model="form.dp_35_dpp_amount"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="0"
-                                />
+                                <div class="relative">
+                                    <Input
+                                        id="dp_35_dpp_amount"
+                                        v-model="form.dp_35_dpp_amount"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0"
+                                        class="pr-9"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        :title="copiedField === 'dp_35' ? 'Copied!' : 'Copy'"
+                                        @click="copyToClipboard(form.dp_35_dpp_amount, 'dp_35')"
+                                    >
+                                        <Check v-if="copiedField === 'dp_35'" class="h-4 w-4 text-green-500" />
+                                        <Clipboard v-else class="h-4 w-4" />
+                                    </button>
+                                </div>
                                 <InputError :message="form.errors.dp_35_dpp_amount" />
                             </div>
                         </div>
@@ -764,14 +796,26 @@ function removeAssignment(assignment: Assignment): void {
                             </div>
                             <div class="grid gap-1.5">
                                 <Label for="invoice_60_dpp_amount">60% DPP Amount</Label>
-                                <Input
-                                    id="invoice_60_dpp_amount"
-                                    v-model="form.invoice_60_dpp_amount"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="0"
-                                />
+                                <div class="relative">
+                                    <Input
+                                        id="invoice_60_dpp_amount"
+                                        v-model="form.invoice_60_dpp_amount"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0"
+                                        class="pr-9"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        :title="copiedField === 'inv_60' ? 'Copied!' : 'Copy'"
+                                        @click="copyToClipboard(form.invoice_60_dpp_amount, 'inv_60')"
+                                    >
+                                        <Check v-if="copiedField === 'inv_60'" class="h-4 w-4 text-green-500" />
+                                        <Clipboard v-else class="h-4 w-4" />
+                                    </button>
+                                </div>
                                 <InputError :message="form.errors.invoice_60_dpp_amount" />
                             </div>
                         </div>
@@ -812,14 +856,26 @@ function removeAssignment(assignment: Assignment): void {
                             </div>
                             <div class="grid gap-1.5">
                                 <Label for="invoice_5_dpp_amount">5% DPP Amount</Label>
-                                <Input
-                                    id="invoice_5_dpp_amount"
-                                    v-model="form.invoice_5_dpp_amount"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="0"
-                                />
+                                <div class="relative">
+                                    <Input
+                                        id="invoice_5_dpp_amount"
+                                        v-model="form.invoice_5_dpp_amount"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0"
+                                        class="pr-9"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        :title="copiedField === 'inv_5' ? 'Copied!' : 'Copy'"
+                                        @click="copyToClipboard(form.invoice_5_dpp_amount, 'inv_5')"
+                                    >
+                                        <Check v-if="copiedField === 'inv_5'" class="h-4 w-4 text-green-500" />
+                                        <Clipboard v-else class="h-4 w-4" />
+                                    </button>
+                                </div>
                                 <InputError :message="form.errors.invoice_5_dpp_amount" />
                             </div>
                         </div>
