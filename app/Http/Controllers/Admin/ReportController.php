@@ -359,9 +359,20 @@ class ReportController extends Controller
 
         $pdfFooterNote = AppSetting::get('pdf.footer_note', '');
 
+        // Resolve per-contractor theme (case-insensitive name match, fallback to default)
+        $themes = config('ssr_themes', []);
+        $theme = $themes['default'] ?? [];
+        foreach ($themes as $key => $t) {
+            if ($key !== 'default' && strcasecmp($key, $contractorName) === 0) {
+                $theme = $t;
+                break;
+            }
+        }
+
         $data = compact(
             'assignment', 'survey', 'site', 'photos', 'mockupPath', 'sitePlanPath', 'baSurveyPath',
-            'clientName', 'clientLogoAbs', 'contractorName', 'contractorLogoAbs', 'pdfFooterNote'
+            'clientName', 'clientLogoAbs', 'contractorName', 'contractorLogoAbs', 'pdfFooterNote',
+            'theme'
         );
 
         return Pdf::loadView('pdf.site-survey-report', $data)->setPaper('a4', 'portrait');

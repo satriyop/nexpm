@@ -4,39 +4,40 @@
 <meta charset="UTF-8">
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #1a1a1a; }
+    body { font-family: {{ $theme['font_family'] }}; font-size: 10pt; color: #1a1a1a; }
 
     table { border-collapse: collapse; }
 
     /* ── Section wrapper ─────────────────────────────── */
     .section {
         width: 100%;
-        border: 1.5px solid #333;
+        border: 1.5px solid {{ $theme['border_color'] }};
         margin-bottom: 14px;
     }
 
     /* ── Section header row ──────────────────────────── */
     .section-head {
-        background: #d9d9d9;
+        background: {{ $theme['section_head_bg'] }};
+        color: {{ $theme['section_head_fg'] }};
         font-weight: bold;
         font-size: 10pt;
         padding: 7px 10px;
-        border-bottom: 1px solid #888;
+        border-bottom: 1px solid {{ $theme['border_color'] }};
     }
-    .section-head-blue {
-        background: #1a56db;
+    .section-head-accent {
+        background: {{ $theme['accent_color'] }};
         color: #fff;
         font-weight: bold;
         font-size: 10pt;
         padding: 7px 10px;
-        border-bottom: 1px solid #1a56db;
+        border-bottom: 1px solid {{ $theme['accent_color'] }};
     }
 
     /* ── Info rows ───────────────────────────────────── */
     .info-table { width: 100%; border-collapse: collapse; }
     .info-table td {
         padding: 5px 10px;
-        border: 1px solid #ccc;
+        border: 1px solid {{ $theme['cell_border'] }};
         vertical-align: top;
         font-size: 9.5pt;
     }
@@ -45,14 +46,16 @@
         font-weight: bold;
         text-transform: uppercase;
         font-size: 8.5pt;
-        color: #222;
+        background: {{ $theme['label_bg'] }};
+        color: {{ $theme['label_fg'] }};
+        border: 1px solid {{ $theme['label_border'] }};
     }
     .info-table .val { color: #111; }
-    .info-table .val a { color: #1a56db; }
+    .info-table .val a { color: {{ $theme['accent_color'] }}; }
 
     /* ── Photos ──────────────────────────────────────── */
     .photo-cell { width: 50%; padding: 6px; text-align: center; vertical-align: top; }
-    .photo-img  { max-width: 100%; max-height: 190px; border: 1px solid #ccc; }
+    .photo-img  { max-width: 100%; max-height: 190px; border: 1px solid {{ $theme['cell_border'] }}; }
     .photo-placeholder {
         width: 100%;
         height: 150px;
@@ -70,7 +73,7 @@
     .sig-table td {
         width: 33.33%;
         text-align: center;
-        border: 1px solid #999;
+        border: 1px solid {{ $theme['cell_border'] }};
         padding: 5px 4px;
         font-size: 8.5pt;
         color: #333;
@@ -93,19 +96,19 @@
 <table class="section" style="margin-bottom:14px;">
     {{-- Title row --}}
     <tr>
-        <td colspan="2" style="text-align:center; font-size:14pt; font-weight:bold; letter-spacing:1.5px; padding:10px 8px; border-bottom:1px solid #bbb;">
+        <td colspan="2" style="text-align:center; font-size:14pt; font-weight:bold; letter-spacing:1.5px; padding:10px 8px; border-bottom:1px solid {{ $theme['cell_border'] }}; background:{{ $theme['accent_color'] }}; color:#fff;">
             SITE SURVEY REPORT
         </td>
     </tr>
     {{-- Logo / company name rows --}}
     <tr>
-        <td style="width:50%; text-align:center; padding:10px 8px; border-right:1px solid #bbb; border-bottom:1px solid #bbb; font-size:10pt; font-weight:bold; color:#333;">
+        <td style="width:50%; text-align:center; padding:10px 8px; border-right:1px solid {{ $theme['cell_border'] }}; border-bottom:1px solid {{ $theme['cell_border'] }}; font-size:10pt; font-weight:bold; color:#333;">
             @if($clientLogoAbs)
                 <img src="{{ $clientLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Client logo">
             @endif
             {{ $clientName }}
         </td>
-        <td style="width:50%; text-align:center; padding:10px 8px; border-bottom:1px solid #bbb; font-size:10pt; font-weight:bold; color:#333;">
+        <td style="width:50%; text-align:center; padding:10px 8px; border-bottom:1px solid {{ $theme['cell_border'] }}; font-size:10pt; font-weight:bold; color:#333;">
             @if($contractorLogoAbs)
                 <img src="{{ $contractorLogoAbs }}" style="max-height:60px; max-width:160px; display:block; margin:0 auto 4px auto;" alt="Contractor logo">
             @endif
@@ -114,7 +117,7 @@
     </tr>
     {{-- Version --}}
     <tr>
-        <td colspan="2" style="padding:5px 10px; font-weight:bold; font-size:9pt;">
+        <td colspan="2" style="padding:5px 10px; font-weight:bold; font-size:9pt; background:{{ $theme['section_head_bg'] }}; color:{{ $theme['section_head_fg'] }};">
             SSR V1.1
         </td>
     </tr>
@@ -127,62 +130,62 @@
     </tr>
     <tr><td colspan="2" style="height:6px;"></td></tr>
     <tr>
-        <td class="info-table lbl" style="padding:5px 10px; border:1px solid #ccc; width:38%; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">PLANT NAME</td>
-        <td class="info-table val" style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $site->location_name ?? '' }}</td>
+        <td class="info-table lbl" style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; width:38%; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">PLANT NAME</td>
+        <td class="info-table val" style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $site->location_name ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">PLANT ADDRESS</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $site->address ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">PLANT ADDRESS</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $site->address ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">GMAPS LINK</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">GMAPS LINK</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">
             @if($site->google_map_url)
-                <a href="{{ $site->google_map_url }}" style="color:#1a56db;">{{ $site->google_map_url }}</a>
+                <a href="{{ $site->google_map_url }}" style="color:{{ $theme['accent_color'] }};">{{ $site->google_map_url }}</a>
             @endif
         </td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">CHARGER TYPE</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->charger_type ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">CHARGER TYPE</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->charger_type ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">SURVEY DATE</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">SURVEY DATE</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">
             {{ $survey?->ss_schedule_date?->format('d/m/Y') ?? '' }}
         </td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">SURVEYOR NAME</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->surveyor_name ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">SURVEYOR NAME</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->surveyor_name ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">PLANT PIC</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->pic_location_name ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">PLANT PIC</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->pic_location_name ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">PLANT PIC CONTACT</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->pic_location_phone ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">PLANT PIC CONTACT</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->pic_location_phone ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">CHARGER SPACE AVAILABLE</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->parking_slot ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">CHARGER SPACE AVAILABLE</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->parking_slot ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">POWER SOURCE</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->cable_pulling_type ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">POWER SOURCE</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->cable_pulling_type ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">POWER GRID AVAILABLE</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->pln_network_type ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">POWER GRID AVAILABLE</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->pln_network_type ?? '' }}</td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">MACHINE SN (IF ANY)</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;"></td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">MACHINE SN (IF ANY)</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;"></td>
     </tr>
     <tr>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-weight:bold; font-size:8.5pt; text-transform:uppercase;">OTHER INFORMATION</td>
-        <td style="padding:5px 10px; border:1px solid #ccc; font-size:9.5pt;">{{ $survey?->additional_info ?? '' }}</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">OTHER INFORMATION</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->additional_info ?? '' }}</td>
     </tr>
 </table>
 
@@ -191,7 +194,7 @@
     $photoLabels = [
         'Foto Tampak Keseluruhan Site',
         'Foto Lahan Parkir EVCS / Lokasi BSS',
-        'Foto Lahan Sudut Pandang Lain',
+        'Jalan Akses Menuju Lokasi',
         'Foto Jaringan PLN Terdekat',
         'Foto Satelit GMaps',
     ];
@@ -225,6 +228,26 @@
         </tr>
     @endforeach
 </table>
+
+{{-- ── MOCK UP 3D (moved: now after Documentation, before BA Survey) ── --}}
+@if($mockupPath || $survey?->file_mockup_3d)
+<table class="section">
+    <tr>
+        <td class="section-head">MOCK UP 3D</td>
+    </tr>
+    <tr>
+        <td style="padding:10px 14px; text-align:center;">
+            @if($mockupPath)
+                <img src="{{ $mockupPath }}" style="max-width:100%; max-height:280px;" alt="Mock Up 3D">
+            @else
+                <a href="{{ url(Storage::url($survey->file_mockup_3d)) }}" style="color:{{ $theme['accent_color'] }}; font-size:9.5pt;">
+                    View Mock Up 3D File
+                </a>
+            @endif
+        </td>
+    </tr>
+</table>
+@endif
 
 {{-- ── BA SURVEY ────────────────────────────────────────────── --}}
 <table class="section">
@@ -315,28 +338,8 @@
     </tr>
 </table>
 
-{{-- ── MOCK UP 3D ───────────────────────────────────────────── --}}
-@if($mockupPath || $survey?->file_mockup_3d)
-<table class="section">
-    <tr>
-        <td class="section-head">MOCK UP 3D</td>
-    </tr>
-    <tr>
-        <td style="padding:10px 14px; text-align:center;">
-            @if($mockupPath)
-                <img src="{{ $mockupPath }}" style="max-width:100%; max-height:280px;" alt="Mock Up 3D">
-            @else
-                <a href="{{ url(Storage::url($survey->file_mockup_3d)) }}" style="color:#1a56db; font-size:9.5pt;">
-                    View Mock Up 3D File
-                </a>
-            @endif
-        </td>
-    </tr>
-</table>
-@endif
-
 @if($pdfFooterNote)
-<div style="margin-top:12px; padding:6px 10px; border-top:1px solid #ccc; font-size:7.5pt; color:#777; font-style:italic;">
+<div style="margin-top:12px; padding:6px 10px; border-top:1px solid {{ $theme['cell_border'] }}; font-size:7.5pt; color:#777; font-style:italic;">
     {{ $pdfFooterNote }}
 </div>
 @endif
