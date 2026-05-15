@@ -26,6 +26,12 @@ class ConstructionFields
                 'reports' => ['daily'],
             ],
             [
+                'key' => 'foto_machine_sn', 'label' => 'Foto Machine SN',
+                'type' => 'image', 'required' => false, 'max' => 10240,
+                'section' => 'general', 'reportable' => false, 'report_order' => 35,
+                'reports' => [],
+            ],
+            [
                 'key' => 'catatan_progres', 'label' => 'Catatan Progres',
                 'type' => 'textarea', 'required' => false,
                 'section' => 'general', 'reportable' => false, 'report_order' => 40,

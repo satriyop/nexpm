@@ -105,7 +105,7 @@ Route::middleware(['auth', 'verified', 'role:subcontractor'])->prefix('subcontra
     Route::get('assignments/{assignment}', [Subcontractor\AssignmentController::class, 'show'])->name('assignments.show');
     Route::match(['post', 'patch'], 'assignments/{assignment}/survey', [Subcontractor\AssignmentController::class, 'updateSurveyData'])->name('assignments.survey');
     Route::patch('assignments/{assignment}/pln', [Subcontractor\AssignmentController::class, 'updatePlnData'])->name('assignments.pln');
-    Route::patch('assignments/{assignment}/construction', [Subcontractor\AssignmentController::class, 'updateConstructionData'])->name('assignments.construction');
+    Route::match(['post', 'patch'], 'assignments/{assignment}/construction', [Subcontractor\AssignmentController::class, 'updateConstructionData'])->name('assignments.construction');
     Route::post('assignments/{assignment}/construction/photos', [Subcontractor\AssignmentController::class, 'storeConstructionPhoto'])->name('assignments.construction.photos');
     Route::delete('assignments/{assignment}/construction/photos/{photo}', [Subcontractor\AssignmentController::class, 'destroyConstructionPhoto'])->name('assignments.construction.photos.destroy');
     Route::post('assignments/{assignment}/submit', [Subcontractor\AssignmentController::class, 'submitForReview'])->name('assignments.submit');

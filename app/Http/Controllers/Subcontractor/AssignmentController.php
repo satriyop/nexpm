@@ -172,6 +172,11 @@ class AssignmentController extends Controller
 
         $validated = $request->validated();
 
+        if ($request->hasFile('foto_machine_sn')) {
+            $constructionData->foto_machine_sn = $request->file('foto_machine_sn')->store('construction', 'public');
+        }
+        unset($validated['foto_machine_sn']);
+
         $constructionData->fill($validated)->save();
 
         return back()->with('success', 'Construction data saved.');

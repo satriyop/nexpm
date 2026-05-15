@@ -16,6 +16,7 @@ const props = defineProps<{
 }>();
 
 const constructionForm = useForm({
+    _method: 'patch',
     cons_actual_start_date:
         props.assignment.construction_data?.cons_actual_start_date ?? '',
     cons_actual_done_date:
@@ -23,12 +24,15 @@ const constructionForm = useForm({
     machine_serial_number:
         props.assignment.construction_data?.machine_serial_number ?? '',
     catatan_progres: props.assignment.construction_data?.catatan_progres ?? '',
+    foto_machine_sn: null as File | null,
 });
 
 function submitConstruction() {
-    constructionForm.patch(
-        SubActions.updateConstructionData(props.assignment).url,
-    );
+    constructionForm
+        .transform((data) => ({ ...data, _method: 'patch' }))
+        .post(SubActions.updateConstructionData(props.assignment).url, {
+            forceFormData: true,
+        });
 }
 
 const uploadingPhoto = ref(false);
@@ -170,6 +174,30 @@ function storageUrl(path: string) {
                                 :message="
                                     constructionForm.errors
                                         .machine_serial_number
+                                "
+                            />
+                        </div>
+                        <div class="grid gap-1.5 sm:col-span-2">
+                            <Label>Foto Machine Serial Number</Label>
+                            <PhotoUpload
+                                :model-value="constructionForm.foto_machine_sn"
+                                :current-url="
+                                    assignment.construction_data
+                                        ?.foto_machine_sn
+                                        ? storageUrl(
+                                              assignment.construction_data
+                                                  .foto_machine_sn,
+                                          )
+                                        : null
+                                "
+                                :readonly="isReadOnly"
+                                @update:model-value="
+                                    constructionForm.foto_machine_sn = $event
+                                "
+                            />
+                            <InputError
+                                :message="
+                                    constructionForm.errors.foto_machine_sn
                                 "
                             />
                         </div>
