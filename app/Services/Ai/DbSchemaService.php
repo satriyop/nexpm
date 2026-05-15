@@ -42,9 +42,33 @@ class DbSchemaService
             }
         }
 
-        $lines[] = "IMPORTANT: Always scope queries with the relevant main_contractor_id = {$mainContractorId}.";
-        $lines[] = 'Projects, sites, and assignments all belong to a main_contractor via the projects.main_contractor_id column.';
-        $lines[] = 'Use JOINs: assignments JOIN sites ON assignments.site_id = sites.id JOIN projects ON sites.project_id = projects.id WHERE projects.main_contractor_id = '.$mainContractorId;
+        $mcId = $mainContractorId;
+        $lines[] = <<<NOTES
+== DOMAIN MODEL (read carefully before writing queries) ==
+
+ENTITY CONCEPTS — use the correct table for each concept:
+- "Subkontraktor" / subcontractor companies → query `subcontractors` table (has: id, main_contractor_id, name, code, phone, email, pic)
+- "User subkontraktor" / individuals working for a subcontractor → query `users` WHERE role = 'subcontractor' (each user has subcontractor_id FK)
+- "Main contractor" / contractor company → query `main_contractors` table (has: id, name)
+- "User admin / main contractor staff" → query `users` WHERE role IN ('admin', 'super_admin')
+- "Assignment" / work order per site per activity → query `assignments`
+- "Site" / location → query `sites`
+
+SCOPING RULES — always filter to main_contractor_id = {$mcId}:
+- `subcontractors`:    WHERE subcontractors.main_contractor_id = {$mcId}
+- `users`:             WHERE users.main_contractor_id = {$mcId}
+- `projects`:          WHERE projects.main_contractor_id = {$mcId}
+- `sites`:             JOIN projects ON sites.project_id = projects.id WHERE projects.main_contractor_id = {$mcId}
+- `assignments`:       JOIN sites ON assignments.site_id = sites.id JOIN projects ON sites.project_id = projects.id WHERE projects.main_contractor_id = {$mcId}
+
+COMMON QUERY PATTERNS:
+- List all subcontractor companies:
+  SELECT id, name, code FROM subcontractors WHERE main_contractor_id = {$mcId}
+- List all users who are subcontractors:
+  SELECT u.id, u.name, s.name AS company FROM users u JOIN subcontractors s ON u.subcontractor_id = s.id WHERE u.main_contractor_id = {$mcId} AND u.role = 'subcontractor'
+- Count assignments per subcontractor company:
+  SELECT s.name, COUNT(a.id) AS total FROM subcontractors s LEFT JOIN users u ON u.subcontractor_id = s.id AND u.role = 'subcontractor' LEFT JOIN assignments a ON a.subcontractor_id = u.id WHERE s.main_contractor_id = {$mcId} GROUP BY s.id, s.name
+NOTES;
 
         return implode("\n", $lines);
     }
