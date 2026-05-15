@@ -122,7 +122,7 @@ function openEdit(user: User) {
 function submitEdit() {
     if (!editingUser.value) return;
 
-    editForm.put(Actions.update(editingUser.value.id).url, {
+    editForm.post(Actions.update(editingUser.value.id).url, {
         onSuccess: () => {
             editOpen.value = false;
             editingUser.value = null;

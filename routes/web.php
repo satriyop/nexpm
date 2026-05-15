@@ -43,12 +43,12 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin'])->prefix('admin
 
     Route::get('subcontractors', [Admin\SubcontractorController::class, 'index'])->name('subcontractors.index');
     Route::post('subcontractors', [Admin\SubcontractorController::class, 'store'])->name('subcontractors.store');
-    Route::put('subcontractors/{subcontractor}', [Admin\SubcontractorController::class, 'update'])->name('subcontractors.update');
+    Route::post('subcontractors/{subcontractor}', [Admin\SubcontractorController::class, 'update'])->name('subcontractors.update');
     Route::delete('subcontractors/{subcontractor}', [Admin\SubcontractorController::class, 'destroy'])->name('subcontractors.destroy');
 
     Route::get('users', [Admin\UserController::class, 'index'])->name('users.index');
     Route::post('users', [Admin\UserController::class, 'store'])->name('users.store');
-    Route::put('users/{user}', [Admin\UserController::class, 'update'])->name('users.update');
+    Route::post('users/{user}', [Admin\UserController::class, 'update'])->name('users.update');
 
     Route::get('assignments', [Admin\AssignmentController::class, 'index'])->name('assignments.index');
     Route::post('assignments/bulk-drop', [Admin\AssignmentController::class, 'bulkDrop'])->name('assignments.bulk-drop');

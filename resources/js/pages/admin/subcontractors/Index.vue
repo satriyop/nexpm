@@ -130,7 +130,7 @@ function submitEdit() {
         return;
     }
 
-    editForm.put(Actions.update(editingSubcontractor.value.id).url, {
+    editForm.post(Actions.update(editingSubcontractor.value.id).url, {
         onSuccess: () => {
             editOpen.value = false;
             editingSubcontractor.value = null;
