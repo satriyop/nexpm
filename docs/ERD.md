@@ -1,6 +1,6 @@
 # NexPM — Entity Relationship Diagram
 
-**Last updated:** 2026-05-13
+**Last updated:** 2026-05-16
 
 ---
 
@@ -154,7 +154,8 @@ erDiagram
         bigint subcontractor_id FK
         enum activity_type "SURVEY|PLN_CONNECTION|CONSTRUCTION|BAST"
         enum status "PENDING|DROP|VERIFIED|REPORTED|SURVEY|DOCUMENT|CONSTRUCTION|MACHINE_ONSITE|DONE|LIVE|REGISTRATION|BILLING|CONNECTION|KWH_DONE|SUBMITTED|REVISION"
-        text revision_comment "nullable"
+        text revision_comment "nullable — BAST revision note"
+        text unverify_reason "nullable — filled on unverify"
         timestamp verified_at "nullable"
         bigint verified_by FK "nullable → users.id"
         timestamp reported_at "nullable"
@@ -203,7 +204,7 @@ erDiagram
     ASSIGNMENT_PLN_DATA {
         bigint id PK
         bigint assignment_id FK UK
-        string pln_status
+        string pln_status "admin/super_admin only — read-only for subcontractors"
         date nidi_slo_date_acquired
         string type_rate
         string file_slo
@@ -365,7 +366,13 @@ Tenant ownership is anchored on `main_contractor_id`. Projects and Admin users c
 
 Status lives directly on the `assignments` row rather than in a separate status-history table.
 
-**Why:** Current screens mostly need the current state, while `assignment_audit_logs` records major admin events such as verification, revision, drop, restore, reassignment, and edits.
+**Why:** Current screens mostly need the current state, while `assignment_audit_logs` records major admin events such as verification, unverification, revision, drop, restore, reassignment, and edits.
+
+### 4a. Unverify Reverts to Pre-Verified Status
+
+When Admin/Super Admin unverifies a VERIFIED assignment, status reverts to the activity-specific last verifiable status (DOCUMENT → Survey, SUBMITTED → BAST, LIVE → Construction, KWH_DONE → PLN). `verified_at` and `verified_by` are cleared. `unverify_reason` is stored on the row. The audit log records the event with the reason.
+
+**Why:** Preserving all activity data on unverify avoids data loss. The per-activity revert target is deterministic — each activity type has exactly one verifiable status — so no separate "previous status" field is needed. REPORTED assignments cannot be unverified since they are part of a finalized export record.
 
 ### 5. Construction Assignment Prerequisite Lock
 
