@@ -189,6 +189,7 @@ export interface Assignment {
     activity_type: ActivityType;
     status: AssignmentStatus;
     revision_comment: string | null;
+    unverify_reason: string | null;
     verified_at: string | null;
     reported_at: string | null;
     updated_at: string | null;

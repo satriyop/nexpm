@@ -16,6 +16,7 @@ import {
     MapPin,
     Pencil,
     RefreshCw,
+    RotateCcw,
     RotateCw,
     Send,
     Trash2,
@@ -179,6 +180,26 @@ function submitRevise(): void {
         onSuccess: () => {
             reviseOpen.value = false;
             reviseForm.reset();
+        },
+    });
+}
+
+// --- Unverify dialog ---
+const unverifyOpen = ref(false);
+const unverifyForm = useForm({ unverify_reason: '' });
+
+function openUnverifyDialog(): void {
+    unverifyForm.reset();
+    unverifyForm.clearErrors();
+    unverifyOpen.value = true;
+}
+
+function submitUnverify(): void {
+    unverifyForm.post(AdminAssignmentActions.unverify(props.assignment.id).url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            unverifyOpen.value = false;
+            unverifyForm.reset();
         },
     });
 }
@@ -2364,6 +2385,15 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                             >
                                 by {{ assignment.verified_by.name }}
                             </p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                class="mt-3 w-full border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                                @click="openUnverifyDialog"
+                            >
+                                <RotateCcw class="size-3.5" />
+                                Unverify
+                            </Button>
                         </div>
 
                         <div
@@ -2738,6 +2768,50 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                         </Button>
                         <Button type="submit" :disabled="reviseForm.processing">
                             Send Revision Request
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Unverify Dialog -->
+        <Dialog v-model:open="unverifyOpen">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Unverify Assignment?</DialogTitle>
+                    <DialogDescription>
+                        The assignment will be reverted to its previous state and the
+                        subcontractor will be able to edit it again. Please provide
+                        a reason.
+                    </DialogDescription>
+                </DialogHeader>
+                <form class="flex flex-col gap-3" @submit.prevent="submitUnverify">
+                    <div class="grid gap-1.5">
+                        <Label for="unverify_reason">Reason</Label>
+                        <textarea
+                            id="unverify_reason"
+                            v-model="unverifyForm.unverify_reason"
+                            rows="4"
+                            class="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            placeholder="e.g. Client rejected — wrong charger type"
+                            required
+                        />
+                        <InputError :message="unverifyForm.errors.unverify_reason" />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="unverifyOpen = false"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="destructive"
+                            :disabled="unverifyForm.processing"
+                        >
+                            Confirm Unverify
                         </Button>
                     </DialogFooter>
                 </form>

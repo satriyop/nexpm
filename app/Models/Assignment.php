@@ -31,6 +31,7 @@ class Assignment extends Model
         'activity_type',
         'status',
         'revision_comment',
+        'unverify_reason',
         'verified_at',
         'verified_by',
         'reported_at',
@@ -179,6 +180,22 @@ class Assignment extends Model
 
         $subconUsers = User::query()->where('subcontractor_id', $this->subcontractor_id)->get();
         Notification::send($subconUsers, new AssignmentVerifiedNotification($this));
+    }
+
+    public function markUnverified(User $user, string $reason): void
+    {
+        $revertStatus = match ($this->activity_type) {
+            ActivityType::Survey => AssignmentStatus::Document,
+            ActivityType::Construction => AssignmentStatus::Live,
+            ActivityType::PlnConnection => AssignmentStatus::KwhDone,
+            ActivityType::Bast => AssignmentStatus::Submitted,
+        };
+
+        $this->status = $revertStatus;
+        $this->unverify_reason = $reason;
+        $this->verified_at = null;
+        $this->verified_by = null;
+        $this->save();
     }
 
     public function sendToRevision(string $comment): void

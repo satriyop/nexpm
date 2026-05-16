@@ -233,6 +233,32 @@ class AssignmentController extends Controller
         return back()->with('success', 'Submitted for review.');
     }
 
+    public function unverify(Request $request, Assignment $assignment): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+
+        abort_unless(
+            $assignment->status === AssignmentStatus::Verified,
+            422,
+            'Only verified assignments can be unverified.',
+        );
+
+        $validated = $request->validate([
+            'unverify_reason' => ['required', 'string', 'min:1'],
+        ]);
+
+        $assignment->markUnverified($this->currentUser(), $validated['unverify_reason']);
+
+        AssignmentAuditLog::create([
+            'assignment_id' => $assignment->id,
+            'user_id' => $this->currentUser()->id,
+            'event' => 'unverified',
+            'payload' => ['unverify_reason' => $validated['unverify_reason']],
+        ]);
+
+        return back()->with('success', 'Assignment unverified.');
+    }
+
     public function revise(Request $request, Assignment $assignment): RedirectResponse
     {
         $this->ensureCanAccessAssignment($assignment);
