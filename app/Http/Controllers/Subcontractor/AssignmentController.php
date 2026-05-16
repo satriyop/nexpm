@@ -138,6 +138,7 @@ class AssignmentController extends Controller
         abort_unless($assignment->activity_type === ActivityType::PlnConnection, 422, 'Activity type mismatch.');
 
         $validated = $request->validated();
+        unset($validated['pln_status']); // subcontractors may not change PLN status
 
         $fileFields = collect(PlnFields::all())
             ->filter(fn (array $f) => in_array($f['type'], ['image', 'file'], true))

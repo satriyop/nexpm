@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
 import * as SubActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
 import FileUpload from '@/components/FileUpload.vue';
 import InputError from '@/components/InputError.vue';
@@ -36,6 +37,9 @@ const plnForm = useForm({
     id_pelanggan: props.assignment.pln_data?.id_pelanggan ?? '',
     catatan_progres: props.assignment.pln_data?.catatan_progres ?? '',
 });
+
+const page = usePage();
+const isSubcontractor = computed(() => (page.props.auth as any)?.user?.role === 'subcontractor');
 
 const plnStatusOptions = [
     'NOT YET REGISTER',
@@ -97,7 +101,7 @@ function currentDocumentUrl(key: PlnFileKey): string | null {
                         <Label>PLN Status</Label>
                         <Select
                             v-model="plnForm.pln_status"
-                            :disabled="isReadOnly"
+                            :disabled="isReadOnly || isSubcontractor"
                         >
                             <SelectTrigger
                                 ><SelectValue placeholder="Select status"
