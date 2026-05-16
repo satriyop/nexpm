@@ -47,7 +47,7 @@ const plnStatusOptions = [
 ];
 
 function submitPln() {
-    plnForm.post(SubActions.updatePlnData(props.assignment).url, {
+    plnForm.patch(SubActions.updatePlnData(props.assignment).url, {
         forceFormData: true,
         onSuccess: () =>
             plnForm.reset('file_slo', 'file_nidi', 'file_reg', 'file_pk'),

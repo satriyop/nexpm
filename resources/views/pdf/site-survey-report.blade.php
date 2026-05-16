@@ -130,6 +130,10 @@
     </tr>
     <tr><td colspan="2" style="height:6px;"></td></tr>
     <tr>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">WO NUMBER</td>
+        <td style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $survey?->ss_wo_number ?? $site->ss_wo_number ?? '' }}</td>
+    </tr>
+    <tr>
         <td class="info-table lbl" style="padding:5px 10px; border:1px solid {{ $theme['label_border'] }}; width:38%; font-weight:bold; font-size:8.5pt; text-transform:uppercase; background:{{ $theme['label_bg'] }}; color:{{ $theme['label_fg'] }};">PLANT NAME</td>
         <td class="info-table val" style="padding:5px 10px; border:1px solid {{ $theme['cell_border'] }}; font-size:9.5pt;">{{ $site->location_name ?? '' }}</td>
     </tr>
