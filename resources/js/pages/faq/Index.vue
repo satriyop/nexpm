@@ -364,6 +364,10 @@ const allCategories: FaqCategory[] = [
                 steps: [
                     { text: 'Buka assignment bertipe PLN Connection.' },
                     {
+                        text: 'Perhatikan field "PLN Status" — field ini hanya bisa diisi oleh Admin/Super Admin, bukan subkontraktor. Anda bisa melihat nilainya tapi tidak bisa mengubahnya.',
+                        note: 'PLN Status mencerminkan kondisi proses perizinan yang dikelola admin.',
+                    },
+                    {
                         text: 'Upload File SLO, File NIDI, dan File REG → status berubah ke REGISTRATION.',
                         note: 'Ketiga file ini harus diupload sekaligus untuk status naik.',
                     },
@@ -551,7 +555,28 @@ const allCategories: FaqCategory[] = [
                     { icon: '⚡', text: 'PLN Connection → verifiable saat status KWH_DONE (ID Pelanggan & kWh meter lengkap).' },
                 ],
                 tips: ['Setelah menemukan assignment di status verifiable, buka halaman detailnya, review semua data, lalu klik tombol "Verify" dan konfirmasi'],
-                warning: 'Verifikasi tidak bisa dibatalkan. Pastikan review data sudah lengkap sebelum menekan Verify.',
+                warning: 'Setelah diverifikasi, subkontraktor tidak bisa mengedit data. Jika klien menolak, Admin/Super Admin dapat membatalkan verifikasi (Unverify) dengan memberikan alasan.',
+            },
+            {
+                id: 'unverify-assignment',
+                question: 'Bagaimana cara membatalkan verifikasi (Unverify) jika klien menolak?',
+                answer:
+                    'Admin dan Super Admin dapat membatalkan verifikasi assignment yang berstatus VERIFIED. Fitur ini tersedia untuk kasus seperti klien menolak hasil survey atau konstruksi. Semua data subkontraktor TETAP UTUH — hanya status dan data verifikasi yang direset:',
+                steps: [
+                    { text: 'Buka halaman detail assignment yang berstatus VERIFIED.' },
+                    { text: 'Di bagian status card (pojok kanan), klik tombol "Unverify" (berwarna merah) di bawah badge Verified.' },
+                    { text: 'Dialog konfirmasi muncul. Isi kolom "Reason" dengan alasan pembatalan yang jelas.' },
+                    {
+                        text: 'Klik "Confirm Unverify" → status kembali ke status sebelum verifikasi dan subkontraktor bisa mengedit kembali.',
+                        note: 'SURVEY → DOCUMENT, BAST → SUBMITTED, CONSTRUCTION → LIVE, PLN → KWH_DONE.',
+                    },
+                ],
+                tips: [
+                    'Semua data form, foto, dan file subkontraktor tetap tersimpan — tidak ada yang terhapus',
+                    'Alasan unverify tersimpan di sistem sebagai catatan audit',
+                    'Assignment berstatus REPORTED tidak bisa di-unverify — hanya VERIFIED',
+                ],
+                warning: 'Isi alasan yang jelas dan spesifik (contoh: "Klien menolak — tipe charger tidak sesuai"). Alasan ini dicatat di log sistem.',
             },
             {
                 id: 'request-revision',

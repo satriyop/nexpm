@@ -3,7 +3,7 @@
 **Application:** NexPM  
 **Owner:** PT Nusantara Energi Khatulistiwa (nex)  
 **Client context:** vGreen (https://vgreencharge.id) EV Charging Station rollout  
-**Last updated:** 2026-05-13
+**Last updated:** 2026-05-16
 
 ---
 
@@ -149,8 +149,9 @@ The core work unit: one Site × one Activity × one SubContractor.
 | activity_type             | enum                    | SURVEY, PLN_CONNECTION, CONSTRUCTION, BAST                                                                                                                      |
 | subcontractor_id          | FK → SubContractor      |                                                                                                                                                                 |
 | status                    | enum                    | PENDING, DROP, VERIFIED, REPORTED, SURVEY, DOCUMENT, CONSTRUCTION, MACHINE_ONSITE, DONE, LIVE, REGISTRATION, BILLING, CONNECTION, KWH_DONE, SUBMITTED, REVISION |
-| revision_comment          | text                    | Filled by Admin when sending back for revision                                                                                                                  |
-| verified_at / verified_by | timestamp / FK users.id | Filled when Admin verifies                                                                                                                                      |
+| revision_comment          | text                    | Filled by Admin when sending BAST back for revision                                                                                                             |
+| unverify_reason           | text                    | Filled by Admin/Super Admin when reverting a VERIFIED assignment                                                                                                |
+| verified_at / verified_by | timestamp / FK users.id | Filled when Admin verifies; cleared on unverify                                                                                                                 |
 | reported_at               | timestamp               | Filled when included in a generated report                                                                                                                      |
 
 ---
@@ -224,14 +225,15 @@ Statuses are forward-only for activity progress. Clearing a required field after
 
 ### 5.2 Negative / Exception Flows
 
-| Flow                                  | Current behavior                                                                                                  |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Assignment leaves scope               | Admin can mark it `DROP`. Dropped assignments are hidden from active dashboards/lists unless filtered.            |
-| Assignment returns to scope           | Admin can restore a `DROP` assignment, which resets status to `PENDING`.                                          |
-| Wrong subcontractor                   | Admin can reassign. Existing activity data is deleted and the assignment is reset to `PENDING`.                   |
-| Pending assignment created by mistake | Admin can delete only assignments that are still `PENDING`.                                                       |
-| Verified or reported assignment       | Subcontractor edits are blocked. Admin actions are limited by controller rules.                                   |
-| BAST revision                         | Only BAST assignments in `SUBMITTED` can be sent to `REVISION`. The revision comment is stored on the assignment. |
+| Flow                                  | Current behavior                                                                                                                                                                                               |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Assignment leaves scope               | Admin can mark it `DROP`. Dropped assignments are hidden from active dashboards/lists unless filtered.                                                                                                          |
+| Assignment returns to scope           | Admin can restore a `DROP` assignment, which resets status to `PENDING`.                                                                                                                                        |
+| Wrong subcontractor                   | Admin can reassign. Existing activity data is deleted and the assignment is reset to `PENDING`.                                                                                                                 |
+| Pending assignment created by mistake | Admin can delete only assignments that are still `PENDING`.                                                                                                                                                     |
+| Client rejects a verified assignment  | Admin/Super Admin can **unverify** the assignment. Requires a mandatory reason. Status reverts to the pre-verified state (DOCUMENT / SUBMITTED / LIVE / KWH_DONE). All activity data is preserved, not deleted. |
+| Verified or reported assignment       | Subcontractor edits are blocked. `REPORTED` assignments cannot be unverified.                                                                                                                                   |
+| BAST revision                         | Only BAST assignments in `SUBMITTED` can be sent to `REVISION`. The revision comment is stored on the assignment.                                                                                               |
 
 ### 5.3 Activity Assignment Rules
 
@@ -290,7 +292,7 @@ The PLN assignment advances through `REGISTRATION`, `BILLING`, `CONNECTION`, and
 
 | Field                           | Input Type                                         |
 | ------------------------------- | -------------------------------------------------- |
-| PLN Status                      | select (DONE KWH, NOT YET REGISTERED, WAITING KWH) |
+| PLN Status                      | select (DONE KWH, NOT YET REGISTERED, WAITING KWH) — **Admin/Super Admin only; read-only for Sub-Contractor** |
 | NIDI SLO Date Acquired          | date                                               |
 | Type Rate                       | text                                               |
 | File SLO                        | file upload                                        |
@@ -422,7 +424,7 @@ There is no parallel subcontractor assignment for the same Site + Activity. If a
 
 ### 9.1 Report Types
 
-- **SSR (Site Survey Report):** One PDF per verified Survey assignment. A single selected assignment downloads as PDF; multiple selected assignments download as a ZIP of PDFs.
+- **SSR (Site Survey Report):** One PDF per verified Survey assignment. A single selected assignment downloads as PDF; multiple selected assignments download as a ZIP of PDFs. The PDF Plant Information section includes WO NUMBER as its first row (sourced from `assignment_survey_data.ss_wo_number`, falling back to `sites.ss_wo_number`).
 - **BAST Report:** One COMM-TEST XLSX per verified BAST assignment. A single selected assignment downloads as XLSX; multiple selected assignments download as a ZIP of XLSX files.
 - **Daily Monitoring Report:** One row per **site** (not per assignment). Combines all activity data horizontally. Split into two sheets by site type: BSS and EVCS.
 
