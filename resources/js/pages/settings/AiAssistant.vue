@@ -64,7 +64,7 @@ const formatDate = (dateStr: string) =>
             />
 
             <Form
-                v-bind="AiAssistantSettingsController.update.form()"
+                :action="AiAssistantSettingsController.update()"
                 class="space-y-6"
                 v-slot="{ processing }"
             >

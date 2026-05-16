@@ -4,6 +4,9 @@ import {
     ArrowRight,
     CheckCircle2,
     Activity,
+    AlertTriangle,
+    Bot,
+    Clock,
     HelpCircle,
     TrendingDown,
     TrendingUp,
@@ -159,9 +162,46 @@ interface ForecastItem {
     projected_finish: string | null;
     end_date: string | null;
     on_track: boolean | null;
+    risk_level: 'done' | 'on_track' | 'at_risk' | 'late' | 'stalled';
+    delay_days: number | null;
+    confidence: 'high' | 'medium' | 'low';
+    blocker_count: number;
+    main_cause: string;
+    recommended_action: string;
+}
+
+interface ControlTowerItem {
+    severity: 'critical' | 'high' | 'medium';
+    severity_score: number;
+    type: string;
+    project_id: number;
+    project: string;
+    site_id: number;
+    site_code: string;
+    site_name: string;
+    assignment_id: number;
+    activity_type: string;
+    status: string;
+    owner: string;
+    problem: string;
+    recommended_action: string;
+    url: string;
+    ai_prompt: string;
+}
+
+interface ControlTower {
+    generated_at: string;
+    metrics: {
+        critical_actions: number;
+        projects_at_risk: number;
+        ready_for_report: number;
+        stalled: number;
+    };
+    priority_queue: ControlTowerItem[];
 }
 
 const props = defineProps<{
+    controlTower: ControlTower | null;
     deadlineRisk: DeadlineRisk[] | null;
     statusCounts: StatusCounts | null;
     activityMatrix: ActivityMatrix | null;
@@ -185,6 +225,7 @@ usePoll(30_000, {
         'projectBreakdowns',
         'recentActivity',
         'activityChart',
+        'controlTower',
         'deadlineRisk',
         'subcontractorLeaderboard',
         'velocityTrend',
@@ -491,6 +532,35 @@ function assignmentFilterUrl(params: Record<string, string>): string {
     const q = new URLSearchParams(params).toString();
 
     return `/admin/assignments${q ? '?' + q : ''}`;
+}
+
+function askAi(prompt: string): void {
+    window.dispatchEvent(
+        new CustomEvent('nexpm:ai-assistant:ask', {
+            detail: { prompt },
+        }),
+    );
+}
+
+function severityClass(severity: ControlTowerItem['severity']): string {
+    return {
+        critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+        high: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+        medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    }[severity];
+}
+
+function forecastRiskClass(riskLevel: ForecastItem['risk_level']): string {
+    return {
+        done: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+        on_track:
+            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+        at_risk:
+            'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+        late: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+        stalled:
+            'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    }[riskLevel];
 }
 
 function cellHighlight(statusKey: string, count: number): string {
@@ -908,6 +978,188 @@ function timeAgo(isoString: string): string {
             </div>
         </div>
 
+        <!-- Section: Project Control Tower -->
+        <div
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div
+                class="flex flex-wrap items-start justify-between gap-3 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+            >
+                <div>
+                    <h2 class="text-sm font-semibold">
+                        Project Control Tower
+                    </h2>
+                    <p class="text-xs text-muted-foreground">
+                        Today's highest-impact blockers, owners, and next
+                        actions
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="controlTower == null"
+                    @click="askAi('Briefing Project Control Tower hari ini')"
+                >
+                    <Bot class="size-3.5" />
+                    Ask AI
+                </button>
+            </div>
+            <template v-if="controlTower != null">
+                <div class="grid grid-cols-2 gap-3 border-b p-4 lg:grid-cols-4">
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <AlertTriangle class="size-3.5" />
+                            Critical Actions
+                        </div>
+                        <p class="mt-1 text-2xl font-semibold text-red-600">
+                            {{ controlTower.metrics.critical_actions }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <TrendingDown class="size-3.5" />
+                            Projects At Risk
+                        </div>
+                        <p class="mt-1 text-2xl font-semibold text-amber-600">
+                            {{ controlTower.metrics.projects_at_risk }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <CheckCircle2 class="size-3.5" />
+                            Ready for Report
+                        </div>
+                        <p
+                            class="mt-1 text-2xl font-semibold text-emerald-600"
+                        >
+                            {{ controlTower.metrics.ready_for_report }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <Clock class="size-3.5" />
+                            Stalled
+                        </div>
+                        <p class="mt-1 text-2xl font-semibold text-orange-600">
+                            {{ controlTower.metrics.stalled }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead
+                            class="bg-muted/40 text-xs tracking-wide uppercase"
+                        >
+                            <tr>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Severity
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Project / Site
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Problem
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Owner
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Recommended Action
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-right font-medium text-muted-foreground"
+                                >
+                                    AI
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="item in controlTower.priority_queue"
+                                :key="`${item.type}-${item.assignment_id}`"
+                                class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            >
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                                        :class="severityClass(item.severity)"
+                                    >
+                                        {{ item.severity }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <Link
+                                        :href="item.url"
+                                        class="font-medium hover:underline"
+                                    >
+                                        {{ item.project }}
+                                    </Link>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{ item.site_code }} ·
+                                        {{ item.activity_type }} ·
+                                        {{ item.status }}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ item.problem }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ item.owner }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    {{ item.recommended_action }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs transition hover:bg-accent"
+                                        @click="askAi(item.ai_prompt)"
+                                    >
+                                        <Bot class="size-3" />
+                                        Ask
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="controlTower.priority_queue.length === 0">
+                                <td
+                                    colspan="6"
+                                    class="px-4 py-8 text-center text-sm text-muted-foreground"
+                                >
+                                    No critical control tower actions right now.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+            <div v-else class="flex flex-col gap-2 p-4">
+                <div
+                    v-for="n in 4"
+                    :key="n"
+                    class="h-10 animate-pulse rounded bg-muted"
+                />
+            </div>
+        </div>
+
         <!-- Section: Deadline Risk -->
         <div
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
@@ -1165,7 +1417,12 @@ function timeAgo(isoString: string): string {
                                 <th
                                     class="px-4 py-3 text-center font-medium text-muted-foreground"
                                 >
-                                    Status
+                                    Risk
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Main Cause
                                 </th>
                             </tr>
                         </thead>
@@ -1182,8 +1439,13 @@ function timeAgo(isoString: string): string {
                                     )
                                 "
                             >
-                                <td class="px-4 py-3 font-medium">
-                                    {{ item.name }}
+                                <td class="px-4 py-3">
+                                    <div class="font-medium">
+                                        {{ item.name }}
+                                    </div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{ item.recommended_action }}
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 text-center tabular-nums">
                                     {{ item.remaining }}
@@ -1201,8 +1463,8 @@ function timeAgo(isoString: string): string {
                                 <td class="px-4 py-3 text-center font-medium">
                                     <span
                                         v-if="item.projected_finish === 'Done'"
-                                        class="text-purple-600 dark:text-purple-400"
-                                        >Done ✓</span
+                                        class="text-emerald-600 dark:text-emerald-400"
+                                        >Done</span
                                     >
                                     <span v-else-if="item.projected_finish">{{
                                         item.projected_finish
@@ -1212,6 +1474,12 @@ function timeAgo(isoString: string): string {
                                         class="text-xs text-muted-foreground"
                                         >Insufficient data</span
                                     >
+                                    <div
+                                        v-if="item.delay_days && item.delay_days > 0"
+                                        class="text-xs text-red-600 dark:text-red-400"
+                                    >
+                                        +{{ item.delay_days }}d delay
+                                    </div>
                                 </td>
                                 <td
                                     class="px-4 py-3 text-center text-muted-foreground"
@@ -1220,38 +1488,28 @@ function timeAgo(isoString: string): string {
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     <span
-                                        v-if="item.projected_finish === 'Done'"
-                                        class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-purple-700 uppercase dark:bg-purple-900/30 dark:text-purple-400"
-                                        >Done</span
-                                    >
-                                    <span
-                                        v-else-if="item.on_track === true"
-                                        class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase dark:bg-emerald-900/30 dark:text-emerald-400"
-                                        >✓ On Track</span
-                                    >
-                                    <span
-                                        v-else-if="item.on_track === false"
-                                        class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-red-700 uppercase dark:bg-red-900/30 dark:text-red-400"
-                                        >✕ Late</span
-                                    >
-                                    <span
-                                        v-else-if="
-                                            item.weekly_rate === 0 &&
-                                            item.remaining > 0
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                                        :class="
+                                            forecastRiskClass(item.risk_level)
                                         "
-                                        class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-700 uppercase dark:bg-amber-900/30 dark:text-amber-400"
-                                        >⚠ Stalled</span
+                                        >{{
+                                            item.risk_level.replace('_', ' ')
+                                        }}</span
                                     >
-                                    <span
-                                        v-else
-                                        class="text-xs text-muted-foreground"
-                                        >—</span
-                                    >
+                                    <div class="mt-1 text-xs text-muted-foreground">
+                                        {{ item.confidence }} confidence
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div>{{ item.main_cause }}</div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{ item.blocker_count }} blocker signals
+                                    </div>
                                 </td>
                             </tr>
                             <tr v-if="completionForecast.length === 0">
                                 <td
-                                    colspan="6"
+                                    colspan="7"
                                     class="px-4 py-8 text-center text-sm text-muted-foreground"
                                 >
                                     No project data available.

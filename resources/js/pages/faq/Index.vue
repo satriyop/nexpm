@@ -757,8 +757,13 @@ const isSearching = computed(() => searchQuery.value.trim().length > 0);
 
 const searchResults = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
-    if (!q) return [];
+
+    if (!q) {
+return [];
+}
+
     const results: Array<{ question: FaqQuestion; categoryLabel: string; categoryId: string }> = [];
+
     for (const cat of visibleCategories.value) {
         for (const question of cat.questions) {
             if (question.question.toLowerCase().includes(q) || question.answer.toLowerCase().includes(q)) {
@@ -766,6 +771,7 @@ const searchResults = computed(() => {
             }
         }
     }
+
     return results;
 });
 
@@ -775,6 +781,7 @@ function clearSearch() {
 
 function scrollToCategory(id: string) {
     const el = document.getElementById(id);
+
     if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }

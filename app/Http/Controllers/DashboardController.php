@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\MainContractor;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Dashboard\ProjectControlTowerService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, ProjectControlTowerService $controlTower): Response
     {
         /** @var User $user */
         $user = $request->user();
@@ -36,6 +37,8 @@ class DashboardController extends Controller
         };
 
         return Inertia::render('Dashboard', [
+            'controlTower' => Inertia::defer(fn () => $controlTower->build($user, $mainContractorFilter, $projectFilter)),
+
             'deadlineRisk' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
                 $today = now()->startOfDay();
 
@@ -435,68 +438,7 @@ class DashboardController extends Controller
                     ->all();
             }),
 
-            'completionForecast' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
-                $fourWeeksAgo = now()->subWeeks(4);
-
-                $recentCompletions = DB::table('assignments')
-                    ->join('sites', 'sites.id', '=', 'assignments.site_id')
-                    ->join('projects', 'projects.id', '=', 'sites.project_id')
-                    ->tap($applyTenantScope)
-                    ->when($projectFilter, fn ($q) => $q->where('projects.id', $projectFilter))
-                    ->whereIn('assignments.status', ['VERIFIED', 'REPORTED'])
-                    ->whereNotNull('assignments.verified_at')
-                    ->where('assignments.verified_at', '>=', $fourWeeksAgo)
-                    ->select('sites.project_id', DB::raw('count(*) as completed_last_4w'))
-                    ->groupBy('sites.project_id')
-                    ->pluck('completed_last_4w', 'project_id');
-
-                $remaining = DB::table('assignments')
-                    ->join('sites', 'sites.id', '=', 'assignments.site_id')
-                    ->join('projects', 'projects.id', '=', 'sites.project_id')
-                    ->tap($applyTenantScope)
-                    ->when($projectFilter, fn ($q) => $q->where('projects.id', $projectFilter))
-                    ->whereNotIn('assignments.status', ['VERIFIED', 'REPORTED', 'DROP'])
-                    ->select('sites.project_id', DB::raw('count(*) as remaining'))
-                    ->groupBy('sites.project_id')
-                    ->pluck('remaining', 'project_id');
-
-                $projects = DB::table('projects')
-                    ->tap(fn ($q) => $applyTenantScope($q))
-                    ->when($projectFilter, fn ($q) => $q->where('projects.id', $projectFilter))
-                    ->select('id', 'name', 'end_date')
-                    ->get();
-
-                return $projects->map(function ($project) use ($recentCompletions, $remaining) {
-                    $completedLast4w = (int) ($recentCompletions[$project->id] ?? 0);
-                    $remainingCount = (int) ($remaining[$project->id] ?? 0);
-                    $weeklyRate = round($completedLast4w / 4, 1);
-                    $endDate = $project->end_date ? Carbon::parse($project->end_date) : null;
-
-                    $projectedFinish = null;
-                    $weeksToFinish = null;
-                    $onTrack = null;
-
-                    if ($remainingCount === 0) {
-                        $projectedFinish = 'Done';
-                        $onTrack = true;
-                    } elseif ($weeklyRate > 0) {
-                        $weeksToFinish = (int) ceil($remainingCount / $weeklyRate);
-                        $projectedFinish = now()->addWeeks($weeksToFinish)->format('d M Y');
-                        $onTrack = $endDate ? now()->addWeeks($weeksToFinish)->lte($endDate) : null;
-                    }
-
-                    return [
-                        'id' => $project->id,
-                        'name' => $project->name,
-                        'remaining' => $remainingCount,
-                        'weekly_rate' => $weeklyRate,
-                        'weeks_to_finish' => $weeksToFinish,
-                        'projected_finish' => $projectedFinish,
-                        'end_date' => $endDate?->format('d M Y'),
-                        'on_track' => $onTrack,
-                    ];
-                })->values()->all();
-            }),
+            'completionForecast' => Inertia::defer(fn () => $controlTower->completionForecast($user, $mainContractorFilter, $projectFilter)->all()),
 
             'mainContractors' => $user->isSuperAdmin()
                 ? MainContractor::query()->orderBy('name')->get(['id', 'name'])

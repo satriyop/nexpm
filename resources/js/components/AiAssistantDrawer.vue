@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import { AlertCircle, Bot, Loader2, RotateCcw, Send, Settings, Sparkles } from 'lucide-vue-next';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 import { store as storeAiMessage } from '@/actions/App/Http/Controllers/Admin/AiAssistantController';
 import { Badge } from '@/components/ui/badge';
@@ -219,6 +219,29 @@ const resetConversation = () => {
     input.value = '';
     error.value = null;
 };
+
+const handleExternalAsk = (event: Event) => {
+    if (!isSuperAdmin.value || !(event instanceof CustomEvent)) {
+        return;
+    }
+
+    const prompt = (event.detail as { prompt?: string } | undefined)?.prompt;
+
+    if (!prompt) {
+        return;
+    }
+
+    open.value = true;
+    void nextTick(() => ask(prompt));
+};
+
+onMounted(() => {
+    window.addEventListener('nexpm:ai-assistant:ask', handleExternalAsk);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('nexpm:ai-assistant:ask', handleExternalAsk);
+});
 </script>
 
 <template>

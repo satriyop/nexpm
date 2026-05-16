@@ -210,14 +210,33 @@ function copyToClipboard(value: string | number, field: string): void {
 }
 
 function relativeTime(dateStr: string | null | undefined): string {
-    if (!dateStr) return 'No activity yet';
+    if (!dateStr) {
+        return 'No activity yet';
+    }
+
     const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
     const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-    if (diff < 60) return rtf.format(-Math.round(diff), 'second');
-    if (diff < 3600) return rtf.format(-Math.round(diff / 60), 'minute');
-    if (diff < 86400) return rtf.format(-Math.round(diff / 3600), 'hour');
-    if (diff < 2592000) return rtf.format(-Math.round(diff / 86400), 'day');
-    if (diff < 31536000) return rtf.format(-Math.round(diff / 2592000), 'month');
+
+    if (diff < 60) {
+        return rtf.format(-Math.round(diff), 'second');
+    }
+
+    if (diff < 3600) {
+        return rtf.format(-Math.round(diff / 60), 'minute');
+    }
+
+    if (diff < 86400) {
+        return rtf.format(-Math.round(diff / 3600), 'hour');
+    }
+
+    if (diff < 2592000) {
+        return rtf.format(-Math.round(diff / 86400), 'day');
+    }
+
+    if (diff < 31536000) {
+        return rtf.format(-Math.round(diff / 2592000), 'month');
+    }
+
     return rtf.format(-Math.round(diff / 31536000), 'year');
 }
 
@@ -1064,7 +1083,7 @@ function removeAssignment(assignment: Assignment): void {
                 <CardFooter v-if="surveyAssignment" class="border-t pt-0">
                     <div class="flex w-full items-center justify-between gap-2 pt-3">
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(surveyAssignment.surveyData?.updated_at ?? surveyAssignment.updated_at) }}
+                            Updated {{ relativeTime(surveyAssignment.survey_data?.updated_at ?? surveyAssignment.updated_at) }}
                         </span>
                         <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
                             <Link :href="AdminAssignmentActions.show(surveyAssignment.id).url">
@@ -1316,7 +1335,7 @@ function removeAssignment(assignment: Assignment): void {
                 <CardFooter v-if="constructionAssignment" class="border-t pt-0">
                     <div class="flex w-full items-center justify-between gap-2 pt-3">
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(constructionAssignment.constructionData?.updated_at ?? constructionAssignment.updated_at) }}
+                            Updated {{ relativeTime(constructionAssignment.construction_data?.updated_at ?? constructionAssignment.updated_at) }}
                         </span>
                         <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
                             <Link :href="AdminAssignmentActions.show(constructionAssignment.id).url">
@@ -1467,7 +1486,7 @@ function removeAssignment(assignment: Assignment): void {
                 <CardFooter v-if="plnAssignment" class="border-t pt-0">
                     <div class="flex w-full items-center justify-between gap-2 pt-3">
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(plnAssignment.plnData?.updated_at ?? plnAssignment.updated_at) }}
+                            Updated {{ relativeTime(plnAssignment.pln_data?.updated_at ?? plnAssignment.updated_at) }}
                         </span>
                         <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
                             <Link :href="AdminAssignmentActions.show(plnAssignment.id).url">
@@ -1618,7 +1637,7 @@ function removeAssignment(assignment: Assignment): void {
                 <CardFooter v-if="bastAssignment" class="border-t pt-0">
                     <div class="flex w-full items-center justify-between gap-2 pt-3">
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(bastAssignment.bastData?.updated_at ?? bastAssignment.updated_at) }}
+                            Updated {{ relativeTime(bastAssignment.bast_data?.updated_at ?? bastAssignment.updated_at) }}
                         </span>
                         <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
                             <Link :href="AdminAssignmentActions.show(bastAssignment.id).url">
