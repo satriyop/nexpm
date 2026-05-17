@@ -16,6 +16,11 @@ test('project control tower surfaces critical actions and enhanced forecast caus
         'name' => 'EVCS Jakarta',
         'end_date' => now()->addWeek(),
     ]);
+    User::factory()->create([
+        'name' => 'Main Con Admin',
+        'role' => Role::Admin,
+        'main_contractor_id' => $project->main_contractor_id,
+    ]);
     $site = Site::factory()->create([
         'project_id' => $project->id,
         'site_code' => 'JKT-001',
@@ -45,7 +50,7 @@ test('project control tower surfaces critical actions and enhanced forecast caus
     expect($controlTower['metrics']['critical_actions'])->toBeGreaterThanOrEqual(1)
         ->and($controlTower['metrics']['stalled'])->toBeGreaterThanOrEqual(1)
         ->and($controlTower['priority_queue'][0]['type'])->toBe('construction_missing_wo')
-        ->and($controlTower['priority_queue'][0]['owner'])->toBe('Admin')
+        ->and($controlTower['priority_queue'][0]['owner'])->toBe('Admin: Main Con Admin')
         ->and($forecast['blocker_count'])->toBeGreaterThanOrEqual(1)
         ->and($forecast['main_cause'])->toContain('construction assignments missing WO')
         ->and($forecast['recommended_action'])->toBe('Complete missing WO numbers before construction follow-up.');

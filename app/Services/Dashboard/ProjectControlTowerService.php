@@ -4,6 +4,7 @@ namespace App\Services\Dashboard;
 
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
+use App\Enums\Role;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
@@ -142,6 +143,7 @@ class ProjectControlTowerService
         $rows = DB::table('assignments')
             ->join('sites', 'sites.id', '=', 'assignments.site_id')
             ->join('projects', 'projects.id', '=', 'sites.project_id')
+            ->join('main_contractors', 'main_contractors.id', '=', 'projects.main_contractor_id')
             ->leftJoin('subcontractors', 'subcontractors.id', '=', 'assignments.subcontractor_id')
             ->leftJoin('assignment_construction_data', 'assignment_construction_data.assignment_id', '=', 'assignments.id')
             ->tap(fn (Builder $query) => $this->applyTenantScope($query, $user, $mainContractorFilter))
@@ -157,39 +159,77 @@ class ProjectControlTowerService
                 'sites.site_code',
                 'sites.location_name',
                 'sites.power_kva',
+                'projects.main_contractor_id',
                 'projects.name as project_name',
+                'main_contractors.name as main_contractor_name',
                 'subcontractors.name as subcontractor_name',
                 'assignment_construction_data.cons_wo_number',
             ])
             ->get();
 
+        $mainContractorAdminOwners = $this->mainContractorAdminOwners($rows);
+
         return $rows
-            ->flatMap(fn ($row): array => $this->queueItemsForAssignment($row))
+            ->flatMap(fn ($row): array => $this->queueItemsForAssignment($row, $mainContractorAdminOwners))
             ->sortByDesc('severity_score')
             ->values();
     }
 
     /**
+     * @param  Collection<int, object>  $rows
+     * @return Collection<int, string>
+     */
+    private function mainContractorAdminOwners(Collection $rows): Collection
+    {
+        $mainContractorIds = $rows
+            ->pluck('main_contractor_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($mainContractorIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('users')
+            ->where('role', Role::Admin->value)
+            ->whereIn('main_contractor_id', $mainContractorIds)
+            ->orderBy('name')
+            ->select(['name', 'main_contractor_id'])
+            ->get()
+            ->groupBy('main_contractor_id')
+            ->map(function (Collection $admins): string {
+                $adminNames = $admins->pluck('name');
+                $extraAdminCount = max(0, $adminNames->count() - 2);
+                $label = 'Admin: '.$adminNames->take(2)->join(', ');
+
+                return $extraAdminCount > 0 ? "{$label} +{$extraAdminCount}" : $label;
+            });
+    }
+
+    /**
+     * @param  Collection<int, string>  $mainContractorAdminOwners
      * @return list<array<string, mixed>>
      */
-    private function queueItemsForAssignment(object $row): array
+    private function queueItemsForAssignment(object $row, Collection $mainContractorAdminOwners): array
     {
         $items = [];
         $ageDays = (int) Carbon::parse($row->updated_at)->diffInDays(now());
+        $mainContractorOwner = $this->mainContractorOwner($row, $mainContractorAdminOwners);
 
         if (
             $row->activity_type === ActivityType::Construction->value
             && blank($row->cons_wo_number)
             && ! in_array($row->status, [AssignmentStatus::Verified->value, AssignmentStatus::Reported->value], true)
         ) {
-            $items[] = $this->queueItem($row, 'critical', 95, 'construction_missing_wo', 'Admin', 'Construction missing WO number', 'Fill WO number so construction can proceed.');
+            $items[] = $this->queueItem($row, 'critical', 95, 'construction_missing_wo', $mainContractorOwner, 'Construction missing WO number', 'Fill WO number so construction can proceed.');
         }
 
         if (
             $row->activity_type === ActivityType::Survey->value
             && blank($row->power_kva)
         ) {
-            $items[] = $this->queueItem($row, 'high', 80, 'site_missing_power', 'Admin', 'Survey site power data is missing', 'Complete site power_kva before document/report work.');
+            $items[] = $this->queueItem($row, 'high', 80, 'site_missing_power', $mainContractorOwner, 'Survey site power data is missing', 'Complete site power_kva before document/report work.');
         }
 
         if ($row->status === AssignmentStatus::Verified->value) {
@@ -202,7 +242,7 @@ class ProjectControlTowerService
         ) {
             $severity = $ageDays >= 14 ? 'critical' : 'high';
             $score = $ageDays >= 14 ? 90 : 72;
-            $owner = $row->status === AssignmentStatus::Revision->value ? ($row->subcontractor_name ?? 'Subcon') : 'Admin';
+            $owner = $row->status === AssignmentStatus::Revision->value ? ($row->subcontractor_name ?? 'Subcon') : $mainContractorOwner;
             $items[] = $this->queueItem($row, $severity, $score, 'stalled_assignment', $owner, "{$row->status} for {$ageDays} days", 'Follow up the owner and update progress or revision response.');
         }
 
@@ -211,6 +251,25 @@ class ProjectControlTowerService
         }
 
         return $items;
+    }
+
+    /**
+     * @param  Collection<int, string>  $mainContractorAdminOwners
+     */
+    private function mainContractorOwner(object $row, Collection $mainContractorAdminOwners): string
+    {
+        $mainContractorId = (int) $row->main_contractor_id;
+        $adminOwner = $mainContractorAdminOwners->get($mainContractorId);
+
+        if (filled($adminOwner)) {
+            return $adminOwner;
+        }
+
+        if (filled($row->main_contractor_name)) {
+            return "{$row->main_contractor_name} Admin";
+        }
+
+        return 'Main Contractor Admin';
     }
 
     /**
