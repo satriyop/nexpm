@@ -51,6 +51,7 @@ test('project control tower surfaces critical actions and enhanced forecast caus
         ->and($controlTower['metrics']['stalled'])->toBeGreaterThanOrEqual(1)
         ->and($controlTower['priority_queue'][0]['type'])->toBe('construction_missing_wo')
         ->and($controlTower['priority_queue'][0]['owner'])->toBe('Admin: Main Con Admin')
+        ->and(collect($controlTower['priority_queue'])->firstWhere('type', 'verified_not_reported')['owner'])->toBe('Admin: Main Con Admin')
         ->and($forecast['blocker_count'])->toBeGreaterThanOrEqual(1)
         ->and($forecast['main_cause'])->toContain('construction assignments missing WO')
         ->and($forecast['recommended_action'])->toBe('Complete missing WO numbers before construction follow-up.');

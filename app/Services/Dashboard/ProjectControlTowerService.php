@@ -233,7 +233,7 @@ class ProjectControlTowerService
         }
 
         if ($row->status === AssignmentStatus::Verified->value) {
-            $items[] = $this->queueItem($row, 'medium', 55, 'verified_not_reported', 'Super Admin', 'Verified assignment has not been reported', 'Include this assignment in the next report generation.');
+            $items[] = $this->queueItem($row, 'medium', 55, 'verified_not_reported', $mainContractorOwner, 'Verified assignment has not been reported', 'Include this assignment in the next report generation.');
         }
 
         if (
@@ -247,7 +247,7 @@ class ProjectControlTowerService
         }
 
         if (in_array($row->status, array_map(fn (AssignmentStatus $status): string => $status->value, AssignmentStatus::verifiableStatuses()), true)) {
-            $items[] = $this->queueItem($row, 'medium', 50, 'ready_for_report_review', 'Super Admin', 'Assignment is ready for verification/report flow', 'Review data quality and verify or generate report when valid.');
+            $items[] = $this->queueItem($row, 'medium', 50, 'ready_for_report_review', $mainContractorOwner, 'Assignment is ready for verification/report flow', 'Review data quality and verify or generate report when valid.');
         }
 
         return $items;
