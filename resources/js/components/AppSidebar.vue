@@ -21,6 +21,7 @@ import * as ProjectActions from '@/actions/App/Http/Controllers/Admin/ProjectCon
 import * as AdminReportActions from '@/actions/App/Http/Controllers/Admin/ReportController';
 import * as SubcontractorActions from '@/actions/App/Http/Controllers/Admin/SubcontractorController';
 import * as UserActions from '@/actions/App/Http/Controllers/Admin/UserController';
+import * as DrafterAssignmentActions from '@/actions/App/Http/Controllers/Drafter/AssignmentController';
 import * as SubAssignmentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -99,6 +100,22 @@ const navGroups = computed<NavGroup[]>(() => {
             {
                 label: 'Bantuan',
                 items: [
+                    { title: 'Pusat Bantuan', href: '/faq', icon: HelpCircle },
+                ],
+            },
+        ];
+    }
+
+    if (role.value === 'drafter') {
+        return [
+            {
+                label: 'Menu',
+                items: [
+                    {
+                        title: 'Assignments',
+                        href: DrafterAssignmentActions.index().url,
+                        icon: ClipboardList,
+                    },
                     { title: 'Pusat Bantuan', href: '/faq', icon: HelpCircle },
                 ],
             },

@@ -2,8 +2,9 @@
 
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\FaqController;
+use App\Http\Controllers\Drafter\AssignmentController;
 // Admin sub-controllers referenced via Admin\ControllerName syntax
+use App\Http\Controllers\FaqController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Subcontractor;
 use Illuminate\Support\Facades\Route;
@@ -113,6 +114,11 @@ Route::middleware(['auth', 'verified', 'role:subcontractor'])->prefix('subcontra
     Route::patch('assignments/{assignment}/bast', [Subcontractor\AssignmentController::class, 'updateBastData'])->name('assignments.bast');
     Route::post('assignments/{assignment}/bast/photos', [Subcontractor\AssignmentController::class, 'storeBastPhoto'])->name('assignments.bast.photos');
     Route::delete('assignments/{assignment}/bast/photos/{photo}', [Subcontractor\AssignmentController::class, 'destroyBastPhoto'])->name('assignments.bast.photos.destroy');
+});
+
+Route::middleware(['auth', 'verified', 'role:drafter'])->prefix('drafter')->name('drafter.')->group(function () {
+    Route::get('assignments', [AssignmentController::class, 'index'])->name('assignments.index');
+    Route::get('assignments/{assignment}', [AssignmentController::class, 'show'])->name('assignments.show');
 });
 
 require __DIR__.'/settings.php';

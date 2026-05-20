@@ -49,7 +49,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', Password::min(8)],
-            'role' => ['required', 'in:admin,subcontractor'],
+            'role' => ['required', 'in:admin,subcontractor,drafter'],
             'main_contractor_id' => [
                 'required_if:role,admin',
                 'nullable',
@@ -86,7 +86,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', Password::min(8)],
-            'role' => ['required', 'in:admin,subcontractor'],
+            'role' => ['required', 'in:admin,subcontractor,drafter'],
             'main_contractor_id' => ['required_if:role,admin', 'nullable', Rule::exists('main_contractors', 'id')],
             'subcontractor_id' => ['required_if:role,subcontractor', 'nullable', Rule::exists('subcontractors', 'id')],
         ]);

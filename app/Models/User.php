@@ -73,4 +73,9 @@ class User extends Authenticatable
     {
         return $this->role === Role::Subcontractor;
     }
+
+    public function isDrafter(): bool
+    {
+        return $this->role === Role::Drafter;
+    }
 }

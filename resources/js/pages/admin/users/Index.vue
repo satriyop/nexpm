@@ -290,6 +290,7 @@ const roleBadgeVariant = (role: string) => {
                             <SelectItem value="subcontractor"
                                 >Subcontractor</SelectItem
                             >
+                            <SelectItem value="drafter">Drafter</SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError :message="form.errors.role" />
@@ -379,6 +380,7 @@ const roleBadgeVariant = (role: string) => {
                         <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="subcontractor">Subcontractor</SelectItem>
+                            <SelectItem value="drafter">Drafter</SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError :message="editForm.errors.role" />

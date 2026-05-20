@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\Dashboard\ProjectControlTowerService;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -15,10 +16,14 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, ProjectControlTowerService $controlTower): Response
+    public function __invoke(Request $request, ProjectControlTowerService $controlTower): Response|RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
+
+        if ($user->isDrafter()) {
+            return redirect()->route('drafter.assignments.index');
+        }
 
         $mainContractorFilter = $user->isSuperAdmin() && $request->filled('main_contractor_id')
             ? $request->integer('main_contractor_id')
