@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { ExternalLink, FileText } from 'lucide-vue-next';
+import { ExternalLink, FileText, MapPin } from 'lucide-vue-next';
 import * as DrafterAssignmentActions from '@/actions/App/Http/Controllers/Drafter/AssignmentController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
+import { computed } from 'vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import type { Assignment } from '@/types';
@@ -37,6 +38,13 @@ function storageUrl(path: string | null | undefined): string | null {
     }
     return `/storage/${path}`;
 }
+
+const mapsUrl = computed<string | null>(() => {
+    const site = props.assignment.site;
+    if (site.google_map_url) return site.google_map_url;
+    if (site.latitude && site.longitude) return `https://maps.google.com/?q=${site.latitude},${site.longitude}`;
+    return null;
+});
 
 const photoFields: { key: keyof typeof props.assignment.survey_data & string; label: string }[] = [
     { key: 'photo_overall_site', label: 'Foto Tampak Keseluruhan Site' },
@@ -80,6 +88,38 @@ const photoFields: { key: keyof typeof props.assignment.survey_data & string; la
                 <StatusBadge :status="assignment.status" />
             </div>
         </div>
+
+        <!-- Location card -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Lokasi / Site Location</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid gap-1">
+                        <p class="text-xs font-medium text-muted-foreground">Address</p>
+                        <p class="text-sm">{{ assignment.site.address || '—' }}</p>
+                    </div>
+                    <div class="grid gap-1">
+                        <p class="text-xs font-medium text-muted-foreground">Coordinates</p>
+                        <p class="text-sm font-mono">
+                            {{ assignment.site.latitude ?? '—' }}, {{ assignment.site.longitude ?? '—' }}
+                        </p>
+                    </div>
+                </div>
+                <a
+                    v-if="mapsUrl"
+                    :href="mapsUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex items-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                >
+                    <MapPin class="size-4" />
+                    Open in Google Maps
+                    <ExternalLink class="size-3 opacity-70" />
+                </a>
+            </CardContent>
+        </Card>
 
         <!-- No survey data -->
         <Card v-if="!assignment.survey_data">
