@@ -57,6 +57,7 @@ class SiteImportController extends Controller
             '15.5',
             '2',
             '50kVA',
+            '1500000000',
         ];
 
         // Use semicolon separator so Indonesian-locale Excel auto-splits into columns.

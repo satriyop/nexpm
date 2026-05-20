@@ -31,6 +31,7 @@ class SiteMasterDataImport
         'cable_length_to_panel',
         'charging_station_count',
         'power_kva',
+        'approved_budget',
     ];
 
     /**

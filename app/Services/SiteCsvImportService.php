@@ -62,6 +62,24 @@ class SiteCsvImportService
                 }
             }
 
+            $approvedBudget = null;
+            $approvedBudgetProvided = false;
+            $rawBudget = $row['approved_budget'] ?? '';
+
+            if ($rawBudget !== '') {
+                // Strip Indonesian Excel thousands separators (e.g. "1.500.000.000" or "1,500,000,000").
+                $normalized = preg_replace('/[.,\s]/', '', $rawBudget);
+
+                if (! ctype_digit($normalized ?? '')) {
+                    $errors[] = "Row {$rowNumber}: approved_budget must be a non-negative integer.";
+
+                    continue;
+                }
+
+                $approvedBudget = (int) $normalized;
+                $approvedBudgetProvided = true;
+            }
+
             $attributes = [
                 'project_id' => $projectId,
                 'location_name' => $row['location_name'],
@@ -79,6 +97,16 @@ class SiteCsvImportService
                 'charging_station_count' => $row['charging_station_count'] !== '' ? (int) $row['charging_station_count'] : null,
                 'power_kva' => $row['power_kva'] ?: null,
             ];
+
+            // Additive: only write budget fields when CSV explicitly provides a value.
+            // Empty or absent values preserve whatever is already stored.
+            // To clear approved_budget, use the site Edit page instead.
+            if ($approvedBudgetProvided) {
+                $attributes['approved_budget'] = $approvedBudget;
+                $attributes['dp_35_dpp_amount'] = (int) round($approvedBudget * 0.35);
+                $attributes['invoice_60_dpp_amount'] = (int) round($approvedBudget * 0.60);
+                $attributes['invoice_5_dpp_amount'] = (int) round($approvedBudget * 0.05);
+            }
 
             $existing = Site::query()->where('site_code', $row['site_code'])->first();
 
