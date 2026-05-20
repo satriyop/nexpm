@@ -10,7 +10,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,11 +41,7 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'main_contractor_id' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'exists:main_contractors,id'],
-            'client_id' => [
-                'required',
-                Rule::exists('client_main_contractor', 'client_id')
-                    ->where('main_contractor_id', $mainContractorId),
-            ],
+            'client_id' => ['required', 'exists:clients,id'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'budget' => ['nullable', 'numeric', 'min:0'],

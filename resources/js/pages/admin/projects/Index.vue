@@ -2,7 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Eye, FileSpreadsheet, FolderKanban, Plus } from 'lucide-vue-next';
 import type { AcceptableValue } from 'reka-ui';
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import * as ImportActions from '@/actions/App/Http/Controllers/Admin/ManualProjectImportController';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ProjectController';
 import InputError from '@/components/InputError.vue';
@@ -64,17 +64,6 @@ defineOptions({
 });
 
 const open = ref(false);
-const selectedMcId = ref('');
-const filteredClients = computed(() =>
-    selectedMcId.value
-        ? props.clients.filter((client) =>
-              client.main_contractors.some(
-                  (mainContractor) =>
-                      String(mainContractor.id) === selectedMcId.value,
-              ),
-          )
-        : props.clients,
-);
 
 const form = useForm({
     name: '',
@@ -90,9 +79,7 @@ function onMcChange(value: AcceptableValue): void {
         return;
     }
 
-    const mainContractorId = String(value);
-    selectedMcId.value = mainContractorId;
-    form.main_contractor_id = mainContractorId;
+    form.main_contractor_id = String(value);
     form.client_id = '';
 }
 
@@ -255,7 +242,7 @@ function submit() {
                         /></SelectTrigger>
                         <SelectContent>
                             <SelectItem
-                                v-for="c in filteredClients"
+                                v-for="c in clients"
                                 :key="c.id"
                                 :value="String(c.id)"
                                 >{{ c.name }}</SelectItem

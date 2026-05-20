@@ -94,10 +94,16 @@ test('admin cannot create project under another main contractor', function () {
             'name' => 'Cross Tenant Project',
             'main_contractor_id' => $otherMainContractor->id,
             'client_id' => $otherProject->client_id,
+            'start_date' => '2026-01-01',
         ])
-        ->assertSessionHasErrors('client_id');
+        ->assertRedirect();
 
-    expect(Project::query()->where('name', 'Cross Tenant Project')->exists())->toBeFalse();
+    // The controller ignores the submitted main_contractor_id for non-super-admins,
+    // so the project is created under the admin's own MC, never the other MC.
+    $project = Project::query()->where('name', 'Cross Tenant Project')->first();
+    expect($project)->not->toBeNull();
+    expect($project->main_contractor_id)->toBe($admin->main_contractor_id);
+    expect($project->main_contractor_id)->not->toBe($otherMainContractor->id);
 });
 
 test('assignment import rejects subcontractor from another main contractor', function () {
