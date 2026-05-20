@@ -29,6 +29,11 @@ import type {
     PaginatedData,
 } from '@/types';
 
+interface MachineType {
+    id: number;
+    name: string;
+}
+
 interface SiteRow {
     id: number;
     site_code: string;
@@ -36,6 +41,7 @@ interface SiteRow {
     city: string | null;
     province: string | null;
     site_type: { id: number; name: string } | null;
+    machine_type: { id: number; name: string } | null;
     project: { id: number; name: string } | null;
     assignments: Assignment[];
 }
@@ -63,12 +69,14 @@ type Filters = {
     subcontractor_id?: number;
     main_contractor_id?: number;
     project_id?: number;
+    machine_type_id?: number;
 };
 
 const props = defineProps<{
     sites: PaginatedData<SiteRow>;
     subcontractors: Subcontractor[];
     projects: Project[];
+    machineTypes: MachineType[];
     mainContractors: MainContractor[] | null;
     filters: Filters;
     per_page: number;
@@ -91,6 +99,7 @@ const activityType = ref<string>(ALL);
 const subcontractorId = ref<string>(ALL);
 const mainContractorId = ref<string>(ALL);
 const projectId = ref<string>(ALL);
+const machineTypeId = ref<string>(ALL);
 
 watch(
     () => props.filters,
@@ -104,6 +113,8 @@ watch(
             mainContractorId.value =
                 (next as any).main_contractor_id?.toString() ?? ALL;
             projectId.value = (next as any).project_id?.toString() ?? ALL;
+            machineTypeId.value =
+                (next as any).machine_type_id?.toString() ?? ALL;
         } else {
             search.value = '';
             status.value = ALL;
@@ -111,6 +122,7 @@ watch(
             subcontractorId.value = ALL;
             mainContractorId.value = ALL;
             projectId.value = ALL;
+            machineTypeId.value = ALL;
         }
     },
     { immediate: true },
@@ -147,7 +159,8 @@ const hasActiveFilters = computed(
         activityType.value !== ALL ||
         subcontractorId.value !== ALL ||
         mainContractorId.value !== ALL ||
-        projectId.value !== ALL,
+        projectId.value !== ALL ||
+        machineTypeId.value !== ALL,
 );
 
 function applyFilters(): void {
@@ -177,6 +190,10 @@ function applyFilters(): void {
         query.project_id = projectId.value;
     }
 
+    if (machineTypeId.value !== ALL) {
+        query.machine_type_id = machineTypeId.value;
+    }
+
     router.get('/admin/assignments', query, {
         preserveState: true,
         preserveScroll: true,
@@ -197,6 +214,7 @@ function resetFilters(): void {
     subcontractorId.value = ALL;
     mainContractorId.value = ALL;
     projectId.value = ALL;
+    machineTypeId.value = ALL;
     applyFilters();
 }
 
@@ -457,6 +475,28 @@ function exportSelected(): void {
                 </div>
                 <div class="grid gap-1.5">
                     <label class="text-xs font-medium text-muted-foreground"
+                        >Machine Type</label
+                    >
+                    <Select
+                        v-model="machineTypeId"
+                        @update:model-value="applyFilters"
+                    >
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="All types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All types</SelectItem>
+                            <SelectItem
+                                v-for="mt in machineTypes"
+                                :key="mt.id"
+                                :value="mt.id.toString()"
+                                >{{ mt.name }}</SelectItem
+                            >
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid gap-1.5">
+                    <label class="text-xs font-medium text-muted-foreground"
                         >Subcontractor</label
                     >
                     <Select
@@ -596,6 +636,11 @@ function exportSelected(): void {
                             <th
                                 class="px-4 py-3 text-left font-medium text-muted-foreground"
                             >
+                                Machine Type
+                            </th>
+                            <th
+                                class="px-4 py-3 text-left font-medium text-muted-foreground"
+                            >
                                 Survey
                             </th>
                             <th
@@ -671,6 +716,9 @@ function exportSelected(): void {
                                         ? site.project.name
                                         : '—'
                                 }}
+                            </td>
+                            <td class="px-4 py-3 text-muted-foreground">
+                                {{ site.machine_type?.name ?? '—' }}
                             </td>
 
                             <template

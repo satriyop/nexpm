@@ -24,6 +24,10 @@ class SiteRowResource extends JsonResource
                 'id' => $this->siteType->id,
                 'name' => $this->siteType->name,
             ] : null,
+            'machine_type' => $this->machineType ? [
+                'id' => $this->machineType->id,
+                'name' => $this->machineType->name,
+            ] : null,
             'project' => $this->project ? [
                 'id' => $this->project->id,
                 'name' => $this->project->name,

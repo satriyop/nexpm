@@ -15,6 +15,7 @@ use App\Models\AssignmentConstructionPhoto;
 use App\Models\AssignmentLegacyReport;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
+use App\Models\MachineType;
 use App\Models\MainContractor;
 use App\Models\Project;
 use App\Models\Site;
@@ -36,6 +37,7 @@ class AssignmentController extends Controller
         $query = Site::query()
             ->with([
                 'siteType',
+                'machineType',
                 'project',
                 'assignments.subcontractor',
                 'assignments.constructionData',
@@ -80,6 +82,10 @@ class AssignmentController extends Controller
             $query->where('project_id', $request->integer('project_id'));
         }
 
+        if ($request->filled('machine_type_id')) {
+            $query->where('machine_type_id', $request->integer('machine_type_id'));
+        }
+
         $perPage = (int) $request->input('per_page', 20);
         $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 20;
 
@@ -109,11 +115,12 @@ class AssignmentController extends Controller
             'sites' => $sites,
             'subcontractors' => $subcontractors,
             'projects' => $projects,
+            'machineTypes' => MachineType::query()->orderBy('name')->get(['id', 'name']),
             'mainContractors' => $user->isSuperAdmin()
                 ? MainContractor::query()->orderBy('name')->get(['id', 'name'])
                 : null,
             'per_page' => $perPage,
-            'filters' => (object) $request->only(['search', 'status', 'activity_type', 'subcontractor_id', 'main_contractor_id', 'project_id']),
+            'filters' => (object) $request->only(['search', 'status', 'activity_type', 'subcontractor_id', 'main_contractor_id', 'project_id', 'machine_type_id']),
         ]);
     }
 
