@@ -85,6 +85,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin,project_manager',
     Route::delete('assignments/{assignment}/bast/photos/{photo}', [Admin\AssignmentController::class, 'destroyBastPhoto'])->name('assignments.bast.photos.destroy');
     Route::patch('assignments/{assignment}/admin-bast', [Admin\AssignmentController::class, 'updateBastData'])->name('assignments.admin-bast');
     Route::patch('assignments/{assignment}/reassign', [Admin\AssignmentController::class, 'reassign'])->name('assignments.reassign');
+    Route::get('assignments/{assignment}/legacy-reports/{legacy_report}/download', [Admin\AssignmentController::class, 'downloadLegacyReport'])->name('assignments.legacy-reports.download');
     Route::post('assignments/{assignment}/legacy-reports', [Admin\AssignmentController::class, 'storeLegacyReport'])->name('assignments.legacy-reports.store');
     Route::delete('assignments/{assignment}/legacy-reports/{legacy_report}', [Admin\AssignmentController::class, 'destroyLegacyReport'])->name('assignments.legacy-reports.destroy');
 

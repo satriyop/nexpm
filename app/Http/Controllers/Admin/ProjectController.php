@@ -163,14 +163,24 @@ class ProjectController extends Controller
                 $paths->push(...DB::table('assignment_bast_photos')->whereIn('assignment_bast_data_id', $bastDataIds)->pluck('photo_path'));
             }
 
-            // Legacy report files
-            $paths->push(...DB::table('assignment_legacy_reports')->whereIn('assignment_id', $assignmentIds)->pluck('file_path'));
         }
 
         $filesToDelete = $paths->filter()->unique()->values()->all();
 
         if ($filesToDelete !== []) {
             Storage::disk('public')->delete($filesToDelete);
+        }
+
+        // Legacy report files live on the local (private) disk
+        if ($assignmentIds->isNotEmpty()) {
+            $legacyPaths = DB::table('assignment_legacy_reports')
+                ->whereIn('assignment_id', $assignmentIds)
+                ->pluck('file_path')
+                ->filter()->unique()->values()->all();
+
+            if ($legacyPaths !== []) {
+                Storage::disk()->delete($legacyPaths);
+            }
         }
     }
 }

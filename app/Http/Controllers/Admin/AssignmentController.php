@@ -29,6 +29,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AssignmentController extends Controller
 {
@@ -860,6 +861,15 @@ class AssignmentController extends Controller
         ]);
     }
 
+    public function downloadLegacyReport(Assignment $assignment, AssignmentLegacyReport $legacyReport): StreamedResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+        abort_unless($legacyReport->assignment_id === $assignment->id, 403);
+        abort_unless(Storage::disk()->exists($legacyReport->file_path), 404);
+
+        return Storage::disk()->download($legacyReport->file_path, $legacyReport->original_filename);
+    }
+
     public function storeLegacyReport(Request $request, Assignment $assignment): RedirectResponse
     {
         $this->ensureCanAccessAssignment($assignment);
@@ -871,7 +881,7 @@ class AssignmentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $path = $file->store('legacy-reports', 'public');
+        $path = $file->store('legacy-reports');
 
         AssignmentLegacyReport::query()->create([
             'assignment_id' => $assignment->id,
@@ -890,7 +900,7 @@ class AssignmentController extends Controller
         abort_unless($this->currentUser()->isSuperAdmin(), 403, 'Super admin access required.');
         abort_unless($legacyReport->assignment_id === $assignment->id, 403);
 
-        Storage::disk('public')->delete($legacyReport->file_path);
+        Storage::disk()->delete($legacyReport->file_path);
         $legacyReport->delete();
 
         return back()->with('success', 'Legacy report removed.');

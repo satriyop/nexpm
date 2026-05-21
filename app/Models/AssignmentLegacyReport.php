@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class AssignmentLegacyReport extends Model
 {
@@ -21,7 +20,10 @@ class AssignmentLegacyReport extends Model
 
     protected function downloadUrl(): Attribute
     {
-        return Attribute::get(fn () => Storage::disk('public')->url($this->file_path));
+        return Attribute::get(fn () => route('admin.assignments.legacy-reports.download', [
+            'assignment' => $this->assignment_id,
+            'legacy_report' => $this->id,
+        ]));
     }
 
     /**

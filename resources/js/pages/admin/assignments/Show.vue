@@ -2588,9 +2588,9 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
             </div>
         </div>
 
-        <!-- Legacy Reports (superadmin only) -->
+        <!-- Legacy Reports (download: all roles; upload/delete: superadmin only) -->
         <div
-            v-if="isSuperAdmin"
+            v-if="legacyReports.length > 0 || isSuperAdmin"
             class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
@@ -2598,7 +2598,7 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
             >
                 <FileArchive class="size-4 text-muted-foreground" />
                 <h2 class="text-sm font-semibold">Legacy Reports</h2>
-                <span class="ml-auto text-xs text-muted-foreground">Superadmin only</span>
+                <span v-if="isSuperAdmin" class="ml-auto text-xs text-muted-foreground">Superadmin only</span>
             </div>
 
             <!-- Existing reports list -->
@@ -2615,12 +2615,12 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                     </div>
                     <a
                         :href="report.download_url"
-                        target="_blank"
                         class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >
                         <Download class="size-3" />Download
                     </a>
                     <button
+                        v-if="isSuperAdmin"
                         class="ml-1 text-muted-foreground hover:text-destructive"
                         @click="deleteLegacyReport(report)"
                     >
@@ -2632,8 +2632,8 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                 No legacy reports uploaded yet.
             </div>
 
-            <!-- Upload form -->
-            <div class="border-t border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+            <!-- Upload form (superadmin only) -->
+            <div v-if="isSuperAdmin" class="border-t border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
                 <form class="flex flex-wrap items-end gap-3" @submit.prevent="submitLegacyReport">
                     <div class="space-y-1">
                         <label class="text-xs font-medium text-muted-foreground">Report Type</label>
