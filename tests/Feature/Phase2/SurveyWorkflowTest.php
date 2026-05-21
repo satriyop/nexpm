@@ -31,7 +31,7 @@ function completeSurveyUploadPayload(): array
         'photo_access_route' => UploadedFile::fake()->image('access.jpg'),
         'photo_pln_network' => UploadedFile::fake()->image('pln.jpg'),
         'photo_satellite_gmaps' => UploadedFile::fake()->image('satellite.jpg'),
-        'file_mockup_3d' => UploadedFile::fake()->create('mockup.pdf', 64, 'application/pdf'),
+        'file_mockup_3d' => UploadedFile::fake()->image('mockup.jpg'),
         'file_site_plan' => UploadedFile::fake()->image('site-plan.jpg'),
         'file_ba_survey' => UploadedFile::fake()->image('ba-survey.jpg'),
     ];
