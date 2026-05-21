@@ -105,7 +105,7 @@ class ManualProjectImport
 
                 $row = [];
                 foreach (self::COLUMNS as $idx => $column) {
-                    $row[$column] = isset($data[$idx]) ? trim((string) $data[$idx]) : '';
+                    $row[$column] = isset($data[$idx]) ? $this->toUtf8(trim((string) $data[$idx])) : '';
                 }
 
                 $rows[] = $row;
@@ -120,6 +120,15 @@ class ManualProjectImport
     /**
      * @param  array<int, mixed>  $row
      */
+    private function toUtf8(string $value): string
+    {
+        if (mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        return mb_convert_encoding($value, 'UTF-8', 'Windows-1252');
+    }
+
     private function isEmpty(array $row): bool
     {
         foreach ($row as $value) {
