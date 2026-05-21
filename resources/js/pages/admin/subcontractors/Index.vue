@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Trash2, Wrench } from 'lucide-vue-next';
 import { ref } from 'vue';
+import { usePermissions } from '@/composables/usePermissions';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/SubcontractorController';
 import InputError from '@/components/InputError.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
@@ -49,6 +50,8 @@ defineOptions({
         ],
     },
 });
+
+const { canEdit } = usePermissions();
 
 const open = ref(false);
 const form = useForm({
@@ -169,7 +172,7 @@ function submitDelete() {
     <div class="space-y-6 p-6">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-semibold">Subcontractors</h1>
-            <Button @click="open = true"
+            <Button v-if="canEdit" @click="open = true"
                 ><Plus class="mr-1.5 h-4 w-4" />Add Subcontractor</Button
             >
         </div>
@@ -235,7 +238,7 @@ function submitDelete() {
                                 {{ sc.phone ?? '—' }}
                             </td>
                             <td class="px-4 py-3">
-                                <div class="flex items-center gap-1">
+                                <div v-if="canEdit" class="flex items-center gap-1">
                                     <Button
                                         variant="ghost"
                                         size="sm"

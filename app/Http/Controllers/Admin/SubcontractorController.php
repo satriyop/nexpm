@@ -22,7 +22,7 @@ class SubcontractorController extends Controller
             'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractors')->latest('id')->paginate($perPage)->withQueryString(),
             'per_page' => $perPage,
             'mainContractors' => MainContractor::query()
-                ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
+                ->when(! $this->currentUser()->isGlobalAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
@@ -35,14 +35,14 @@ class SubcontractorController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', 'unique:subcontractors,code'],
-            'main_contractor_ids' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'array', 'min:1'],
+            'main_contractor_ids' => [$user->isGlobalAdmin() ? 'required' : 'nullable', 'array', 'min:1'],
             'main_contractor_ids.*' => ['required', 'integer', Rule::exists('main_contractors', 'id')],
             'pic' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
         ]);
 
-        $mainContractorIds = $user->isSuperAdmin()
+        $mainContractorIds = $user->isGlobalAdmin()
             ? $validated['main_contractor_ids']
             : [$user->main_contractor_id];
 
@@ -63,7 +63,7 @@ class SubcontractorController extends Controller
         $user = $this->currentUser();
 
         abort_if(
-            ! $user->isSuperAdmin()
+            ! $user->isGlobalAdmin()
             && ! $subcontractor->mainContractors()->whereKey($user->main_contractor_id)->exists(),
             403
         );
@@ -71,7 +71,7 @@ class SubcontractorController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', Rule::unique('subcontractors', 'code')->ignore($subcontractor->id)],
-            'main_contractor_ids' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'array', 'min:1'],
+            'main_contractor_ids' => [$user->isGlobalAdmin() ? 'required' : 'nullable', 'array', 'min:1'],
             'main_contractor_ids.*' => ['required', 'integer', Rule::exists('main_contractors', 'id')],
             'pic' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -86,7 +86,7 @@ class SubcontractorController extends Controller
             'email' => $validated['email'] ?? null,
         ]);
 
-        $mainContractorIds = $user->isSuperAdmin()
+        $mainContractorIds = $user->isGlobalAdmin()
             ? $validated['main_contractor_ids']
             : [$user->main_contractor_id];
 
@@ -98,7 +98,7 @@ class SubcontractorController extends Controller
     public function destroy(Subcontractor $subcontractor): RedirectResponse
     {
         abort_if(
-            ! $this->currentUser()->isSuperAdmin()
+            ! $this->currentUser()->isGlobalAdmin()
             && ! $subcontractor->mainContractors()->whereKey($this->currentUser()->main_contractor_id)->exists(),
             403
         );

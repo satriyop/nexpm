@@ -23,7 +23,7 @@ abstract class Controller
         $user = $this->currentUser();
 
         abort_unless(
-            $user->isSuperAdmin()
+            $user->isGlobalAdmin()
             || ($mainContractorId !== null && $user->main_contractor_id === $mainContractorId),
             403,
             'Unauthorized tenant access.'
@@ -53,7 +53,7 @@ abstract class Controller
     {
         $user = $this->currentUser();
 
-        if ($user->isSuperAdmin()) {
+        if ($user->isGlobalAdmin()) {
             return;
         }
 

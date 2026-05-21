@@ -27,7 +27,7 @@ class UserController extends Controller
             'per_page' => $perPage,
             'subcontractors' => Subcontractor::query()->whereScopedToMainContractor()->with('mainContractors:id')->orderBy('name')->get(['id', 'name']),
             'mainContractors' => MainContractor::query()
-                ->when(! $currentUser->isSuperAdmin(), fn ($query) => $query->whereKey($currentUser->main_contractor_id))
+                ->when(! $currentUser->isGlobalAdmin(), fn ($query) => $query->whereKey($currentUser->main_contractor_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
@@ -36,11 +36,11 @@ class UserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $currentUser = $this->currentUser();
-        $mainContractorId = $currentUser->isSuperAdmin()
+        $mainContractorId = $currentUser->isGlobalAdmin()
             ? $request->integer('main_contractor_id')
             : $currentUser->main_contractor_id;
 
-        $subcontractorRule = $currentUser->isSuperAdmin()
+        $subcontractorRule = $currentUser->isGlobalAdmin()
             ? Rule::exists('subcontractors', 'id')
             : Rule::exists('main_contractor_subcontractor', 'subcontractor_id')
                 ->where('main_contractor_id', $mainContractorId);
@@ -49,7 +49,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', Password::min(8)],
-            'role' => ['required', 'in:admin,subcontractor,drafter'],
+            'role' => ['required', 'in:admin,subcontractor,drafter,project_manager'],
             'main_contractor_id' => [
                 'required_if:role,admin',
                 'nullable',
@@ -86,7 +86,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', Password::min(8)],
-            'role' => ['required', 'in:admin,subcontractor,drafter'],
+            'role' => ['required', 'in:admin,subcontractor,drafter,project_manager'],
             'main_contractor_id' => ['required_if:role,admin', 'nullable', Rule::exists('main_contractors', 'id')],
             'subcontractor_id' => ['required_if:role,subcontractor', 'nullable', Rule::exists('subcontractors', 'id')],
         ]);

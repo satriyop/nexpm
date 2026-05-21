@@ -78,4 +78,14 @@ class User extends Authenticatable
     {
         return $this->role === Role::Drafter;
     }
+
+    public function isProjectManager(): bool
+    {
+        return $this->role === Role::ProjectManager;
+    }
+
+    public function isGlobalAdmin(): bool
+    {
+        return $this->isSuperAdmin() || $this->isProjectManager();
+    }
 }

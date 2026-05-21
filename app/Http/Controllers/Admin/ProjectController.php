@@ -24,7 +24,7 @@ class ProjectController extends Controller
             'projects' => Project::query()->whereScopedToMainContractor()->with(['mainContractor', 'client'])->latest('id')->paginate($perPage)->withQueryString(),
             'per_page' => $perPage,
             'mainContractors' => MainContractor::query()
-                ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
+                ->when(! $this->currentUser()->isGlobalAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'clients' => Client::query()->whereScopedToMainContractor()->with('mainContractors')->orderBy('name')->get(['id', 'name']),
@@ -34,13 +34,13 @@ class ProjectController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = $this->currentUser();
-        $mainContractorId = $user->isSuperAdmin()
+        $mainContractorId = $user->isGlobalAdmin()
             ? $request->integer('main_contractor_id')
             : $user->main_contractor_id;
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'main_contractor_id' => [$user->isSuperAdmin() ? 'required' : 'nullable', 'exists:main_contractors,id'],
+            'main_contractor_id' => [$user->isGlobalAdmin() ? 'required' : 'nullable', 'exists:main_contractors,id'],
             'client_id' => ['required', 'exists:clients,id'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],

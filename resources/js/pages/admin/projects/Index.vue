@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Eye, FileSpreadsheet, FolderKanban, Plus } from 'lucide-vue-next';
 import type { AcceptableValue } from 'reka-ui';
 import { ref } from 'vue';
+import { usePermissions } from '@/composables/usePermissions';
 import * as ImportActions from '@/actions/App/Http/Controllers/Admin/ManualProjectImportController';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ProjectController';
 import InputError from '@/components/InputError.vue';
@@ -63,6 +64,8 @@ defineOptions({
     },
 });
 
+const { canEdit } = usePermissions();
+
 const open = ref(false);
 
 const form = useForm({
@@ -94,7 +97,7 @@ function submit() {
     <div class="space-y-6 p-6">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-semibold">Projects</h1>
-            <div class="flex items-center gap-2">
+            <div v-if="canEdit" class="flex items-center gap-2">
                 <Button variant="outline" as-child>
                     <Link :href="ImportActions.index().url">
                         <FileSpreadsheet class="mr-1.5 h-4 w-4" />Import Manual Projects

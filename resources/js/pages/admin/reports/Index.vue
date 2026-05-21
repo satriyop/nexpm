@@ -10,6 +10,7 @@ import {
     Search,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import { usePermissions } from '@/composables/usePermissions';
 import * as AdminReportActions from '@/actions/App/Http/Controllers/Admin/ReportController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -199,6 +200,8 @@ function toggleReportExpand(id: number): void {
     expandedReportId.value = expandedReportId.value === id ? null : id;
 }
 
+const { canEdit } = usePermissions();
+
 // ── Generate report ───────────────────────────────────────────────────────────
 const form = useForm({
     report_type: '' as ReportType,
@@ -316,7 +319,7 @@ function formatDate(iso: string): string {
                     </p>
                 </div>
                 <div class="flex justify-center">
-                    <Button :disabled="dailyForm.processing" @click="generateDailyReport">
+                    <Button v-if="canEdit" :disabled="dailyForm.processing" @click="generateDailyReport">
                         <FileText class="size-4" />
                         {{ dailyForm.processing ? 'Generating…' : 'Generate Daily Report' }}
                     </Button>
@@ -359,6 +362,7 @@ function formatDate(iso: string): string {
                     </div>
                 </div>
                 <Button
+                    v-if="canEdit"
                     :disabled="selectedIds.length === 0 || form.processing"
                     @click="generateReport"
                 >

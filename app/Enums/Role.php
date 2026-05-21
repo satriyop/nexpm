@@ -8,4 +8,5 @@ enum Role: string
     case Admin = 'admin';
     case Subcontractor = 'subcontractor';
     case Drafter = 'drafter';
+    case ProjectManager = 'project_manager';
 }

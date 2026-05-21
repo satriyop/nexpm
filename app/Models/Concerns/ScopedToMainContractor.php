@@ -2,7 +2,6 @@
 
 namespace App\Models\Concerns;
 
-use App\Enums\Role;
 use App\Models\Client;
 use App\Models\Subcontractor;
 use App\Models\User;
@@ -18,7 +17,7 @@ trait ScopedToMainContractor
         /** @var User|null $user */
         $user = auth()->user();
 
-        if ($user === null || $user->role === Role::SuperAdmin) {
+        if ($user === null || $user->isGlobalAdmin()) {
             return;
         }
 

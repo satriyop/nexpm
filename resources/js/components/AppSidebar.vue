@@ -44,7 +44,7 @@ const role = computed(
 );
 
 const navGroups = computed<NavGroup[]>(() => {
-    if (role.value === 'admin' || role.value === 'super_admin') {
+    if (role.value === 'admin' || role.value === 'super_admin' || role.value === 'project_manager') {
         return [
             {
                 label: 'Operations',

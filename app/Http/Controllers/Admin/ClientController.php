@@ -28,7 +28,7 @@ class ClientController extends Controller
                 ->withQueryString(),
             'per_page' => $perPage,
             'mainContractors' => MainContractor::query()
-                ->when(! $this->currentUser()->isSuperAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
+                ->when(! $this->currentUser()->isGlobalAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
@@ -99,7 +99,7 @@ class ClientController extends Controller
     {
         $user = $this->currentUser();
 
-        if ($user->isSuperAdmin()) {
+        if ($user->isGlobalAdmin()) {
             return;
         }
 

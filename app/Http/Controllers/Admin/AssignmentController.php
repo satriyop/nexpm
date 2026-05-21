@@ -74,7 +74,7 @@ class AssignmentController extends Controller
 
         $user = $this->currentUser();
 
-        if ($user->isSuperAdmin() && $request->filled('main_contractor_id')) {
+        if ($user->isGlobalAdmin() && $request->filled('main_contractor_id')) {
             $query->whereHas('project', fn ($q) => $q->where('main_contractor_id', $request->integer('main_contractor_id')));
         }
 
@@ -95,19 +95,19 @@ class AssignmentController extends Controller
             $sites->getCollection()->map(fn ($site) => (new SiteRowResource($site))->resolve())
         );
 
-        $mainContractorFilter = $user->isSuperAdmin() && $request->filled('main_contractor_id')
+        $mainContractorFilter = $user->isGlobalAdmin() && $request->filled('main_contractor_id')
             ? $request->integer('main_contractor_id')
             : null;
 
         $subcontractors = Subcontractor::query()
             ->when($mainContractorFilter, fn ($q) => $q->whereHas('mainContractors', fn ($query) => $query->whereKey($mainContractorFilter)))
-            ->when(! $user->isSuperAdmin(), fn ($q) => $q->whereScopedToMainContractor())
+            ->when(! $user->isGlobalAdmin(), fn ($q) => $q->whereScopedToMainContractor())
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 
         $projects = Project::query()
             ->when($mainContractorFilter, fn ($q) => $q->where('main_contractor_id', $mainContractorFilter))
-            ->when(! $user->isSuperAdmin(), fn ($q) => $q->whereScopedToMainContractor())
+            ->when(! $user->isGlobalAdmin(), fn ($q) => $q->whereScopedToMainContractor())
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -116,7 +116,7 @@ class AssignmentController extends Controller
             'subcontractors' => $subcontractors,
             'projects' => $projects,
             'machineTypes' => MachineType::query()->orderBy('name')->get(['id', 'name']),
-            'mainContractors' => $user->isSuperAdmin()
+            'mainContractors' => $user->isGlobalAdmin()
                 ? MainContractor::query()->orderBy('name')->get(['id', 'name'])
                 : null,
             'per_page' => $perPage,
@@ -628,7 +628,7 @@ class AssignmentController extends Controller
         $this->ensureCanAccessAssignment($assignment);
 
         $user = $this->currentUser();
-        $mainContractorId = $user->isSuperAdmin()
+        $mainContractorId = $user->isGlobalAdmin()
             ? $assignment->load('site.project')->site->project->main_contractor_id
             : $user->main_contractor_id;
 
@@ -701,7 +701,7 @@ class AssignmentController extends Controller
         $this->ensureCanAccessSite($site);
 
         $user = $this->currentUser();
-        $mainContractorId = $user->isSuperAdmin()
+        $mainContractorId = $user->isGlobalAdmin()
             ? $site->load('project')->project->main_contractor_id
             : $user->main_contractor_id;
 

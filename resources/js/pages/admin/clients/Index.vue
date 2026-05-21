@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { Briefcase, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { ref } from 'vue';
+import { usePermissions } from '@/composables/usePermissions';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ClientController';
 import InputError from '@/components/InputError.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
@@ -50,6 +51,8 @@ defineOptions({
         ],
     },
 });
+
+const { canEdit } = usePermissions();
 
 // ── Add modal ──────────────────────────────────────────────────
 const addOpen = ref(false);
@@ -208,7 +211,7 @@ function submitDelete() {
     <div class="space-y-6 p-6">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-semibold">Clients</h1>
-            <Button @click="addOpen = true"
+            <Button v-if="canEdit" @click="addOpen = true"
                 ><Plus class="mr-1.5 h-4 w-4" />Add Client</Button
             >
         </div>
@@ -283,7 +286,7 @@ function submitDelete() {
                                 {{ client.phone ?? '—' }}
                             </td>
                             <td class="px-4 py-3">
-                                <div class="flex gap-1">
+                                <div v-if="canEdit" class="flex gap-1">
                                     <Button
                                         variant="ghost"
                                         size="sm"

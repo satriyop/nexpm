@@ -9,6 +9,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import { usePermissions } from '@/composables/usePermissions';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Button } from '@/components/ui/button';
@@ -346,6 +347,8 @@ watch(
     },
 );
 
+const { canEdit } = usePermissions();
+
 const bulkDropForm = useForm({ assignment_ids: [] as number[] });
 
 function bulkDropSelected(): void {
@@ -576,6 +579,7 @@ function exportSelected(): void {
                 >
                 <div class="ml-auto flex items-center gap-2">
                     <Button
+                        v-if="canEdit"
                         size="sm"
                         variant="outline"
                         :disabled="bulkDropForm.processing"

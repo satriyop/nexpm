@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Users } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
+import { usePermissions } from '@/composables/usePermissions';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/UserController';
 import InputError from '@/components/InputError.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
@@ -60,6 +61,8 @@ defineOptions({
         ],
     },
 });
+
+const { canEdit } = usePermissions();
 
 const open = ref(false);
 const form = useForm({
@@ -151,7 +154,7 @@ const roleBadgeVariant = (role: string) => {
     <div class="space-y-6 p-6">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-semibold">Users</h1>
-            <Button @click="open = true"
+            <Button v-if="canEdit" @click="open = true"
                 ><Plus class="mr-1.5 h-4 w-4" />Add User</Button
             >
         </div>
@@ -207,6 +210,7 @@ const roleBadgeVariant = (role: string) => {
                             </td>
                             <td class="px-4 py-3">
                                 <Button
+                                    v-if="canEdit"
                                     variant="ghost"
                                     size="sm"
                                     @click="openEdit(user)"
@@ -291,6 +295,7 @@ const roleBadgeVariant = (role: string) => {
                                 >Subcontractor</SelectItem
                             >
                             <SelectItem value="drafter">Drafter</SelectItem>
+                            <SelectItem value="project_manager">Project Manager</SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError :message="form.errors.role" />
@@ -381,6 +386,7 @@ const roleBadgeVariant = (role: string) => {
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="subcontractor">Subcontractor</SelectItem>
                             <SelectItem value="drafter">Drafter</SelectItem>
+                            <SelectItem value="project_manager">Project Manager</SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError :message="editForm.errors.role" />
