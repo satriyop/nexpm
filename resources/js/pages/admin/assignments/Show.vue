@@ -99,6 +99,10 @@ defineOptions({
 
 const page = usePage();
 const isSuperAdmin = computed(() => (page.props.auth as any)?.user?.role === 'super_admin');
+const isAdminOrSuperAdmin = computed(() => {
+    const role = (page.props.auth as any)?.user?.role;
+    return role === 'admin' || role === 'super_admin';
+});
 
 const survey = computed(() => props.assignment.survey_data);
 const pln = computed(() => props.assignment.pln_data);
@@ -286,6 +290,7 @@ const adminSurveyForm = useForm({
     file_mockup_3d: null as File | null,
     file_site_plan: null as File | null,
     file_ba_survey: null as File | null,
+    file_boq: null as File | null,
 });
 
 function submitAdminSurvey(): void {
@@ -952,11 +957,22 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                                         <ImageIcon class="size-3.5" />
                                         BA Survey
                                     </a>
+                                    <a
+                                        v-if="survey.file_boq"
+                                        :href="storageUrl(survey.file_boq)"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
+                                    >
+                                        <FileText class="size-3.5" />
+                                        BoQ
+                                    </a>
                                     <span
                                         v-if="
                                             !survey.file_mockup_3d &&
                                             !survey.file_site_plan &&
-                                            !survey.file_ba_survey
+                                            !survey.file_ba_survey &&
+                                            !survey.file_boq
                                         "
                                         class="text-xs text-muted-foreground"
                                     >
@@ -1237,6 +1253,36 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                                             :message="
                                                 adminSurveyForm.errors[key]
                                             "
+                                        />
+                                    </div>
+                                    <div
+                                        v-if="isAdminOrSuperAdmin"
+                                        class="grid gap-1"
+                                    >
+                                        <span class="text-xs font-medium">BoQ</span>
+                                        <a
+                                            v-if="survey?.file_boq"
+                                            :href="storageUrl(survey.file_boq)"
+                                            target="_blank"
+                                            class="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                                        >
+                                            Current file
+                                        </a>
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.xlsx,.xls"
+                                            class="text-xs"
+                                            @change="
+                                                (e) => {
+                                                    const f = (
+                                                        e.target as HTMLInputElement
+                                                    ).files?.[0];
+                                                    if (f) adminSurveyForm.file_boq = f;
+                                                }
+                                            "
+                                        />
+                                        <InputError
+                                            :message="adminSurveyForm.errors.file_boq"
                                         />
                                     </div>
                                 </div>

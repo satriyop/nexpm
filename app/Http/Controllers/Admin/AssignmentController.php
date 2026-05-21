@@ -375,6 +375,7 @@ class AssignmentController extends Controller
             'file_mockup_3d' => ['nullable', 'file', 'image', 'max:20480'],
             'file_site_plan' => ['nullable', 'file', 'image', 'max:20480'],
             'file_ba_survey' => ['nullable', 'file', 'image', 'max:10240'],
+            'file_boq' => ['nullable', 'file', 'mimes:pdf,xlsx,xls', 'max:20480'],
             'ss_report_submission_date' => ['nullable', 'date'],
         ]);
 
@@ -384,7 +385,13 @@ class AssignmentController extends Controller
             'photo_overall_site', 'photo_parking_evcs', 'photo_access_route',
             'photo_pln_network', 'photo_satellite_gmaps',
             'file_mockup_3d', 'file_site_plan', 'file_ba_survey',
+            'file_boq',
         ];
+
+        $user = $this->currentUser();
+        if (! $user->isAdmin() && ! $user->isSuperAdmin()) {
+            unset($validated['file_boq']);
+        }
 
         $survey = $assignment->surveyData()->firstOrNew([]);
         $survey->assignment_id = $assignment->id;
