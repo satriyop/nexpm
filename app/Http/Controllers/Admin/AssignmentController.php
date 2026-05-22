@@ -396,15 +396,20 @@ class AssignmentController extends Controller
 
         $survey = $assignment->surveyData()->firstOrNew([]);
         $survey->assignment_id = $assignment->id;
-        $auditPayload = $validated;
+        $rawOriginal = $survey->exists ? $survey->getRawOriginal() : [];
+        $auditDiff = [];
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
                 $path = $request->file($key)->store('survey', 'public');
+                $auditDiff[$key] = ['old' => $rawOriginal[$key] ?? null, 'new' => $path];
                 $survey->{$key} = $path;
-                $auditPayload[$key] = $path;
             } elseif (! in_array($key, $fileFields)) {
+                $oldValue = $rawOriginal[$key] ?? null;
                 $survey->{$key} = $value;
+                if ($oldValue !== $value && ! ($oldValue === null && $value === null)) {
+                    $auditDiff[$key] = ['old' => $oldValue, 'new' => $value];
+                }
             }
             // File fields with no upload are skipped — existing paths preserved
         }
@@ -415,7 +420,7 @@ class AssignmentController extends Controller
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'survey_edited',
-            'payload' => $auditPayload,
+            'payload' => $auditDiff ?: null,
         ]);
 
         return back()->with('success', 'Survey data updated.');
@@ -445,15 +450,20 @@ class AssignmentController extends Controller
 
         $pln = $assignment->plnData()->firstOrNew([]);
         $pln->assignment_id = $assignment->id;
-        $auditPayload = $validated;
+        $rawOriginal = $pln->exists ? $pln->getRawOriginal() : [];
+        $auditDiff = [];
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
                 $path = $request->file($key)->store('pln', 'public');
+                $auditDiff[$key] = ['old' => $rawOriginal[$key] ?? null, 'new' => $path];
                 $pln->{$key} = $path;
-                $auditPayload[$key] = $path;
             } elseif (! in_array($key, $plnFileFields)) {
+                $oldValue = $rawOriginal[$key] ?? null;
                 $pln->{$key} = $value;
+                if ($oldValue !== $value && ! ($oldValue === null && $value === null)) {
+                    $auditDiff[$key] = ['old' => $oldValue, 'new' => $value];
+                }
             }
             // File fields with no upload are skipped — existing paths preserved
         }
@@ -464,7 +474,7 @@ class AssignmentController extends Controller
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'pln_edited',
-            'payload' => $auditPayload,
+            'payload' => $auditDiff ?: null,
         ]);
 
         return back()->with('success', 'PLN data updated.');
@@ -485,15 +495,20 @@ class AssignmentController extends Controller
         ]);
 
         $construction = $assignment->constructionData()->firstOrCreate(['assignment_id' => $assignment->id]);
-        $auditPayload = $validated;
+        $rawOriginal = $construction->wasRecentlyCreated ? [] : $construction->getRawOriginal();
+        $auditDiff = [];
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
                 $path = $request->file($key)->store('construction', 'public');
+                $auditDiff[$key] = ['old' => $rawOriginal[$key] ?? null, 'new' => $path];
                 $construction->{$key} = $path;
-                $auditPayload[$key] = $path;
             } elseif ($key !== 'foto_machine_sn') {
+                $oldValue = $rawOriginal[$key] ?? null;
                 $construction->{$key} = $value;
+                if ($oldValue !== $value && ! ($oldValue === null && $value === null)) {
+                    $auditDiff[$key] = ['old' => $oldValue, 'new' => $value];
+                }
             }
             // foto_machine_sn with no upload is skipped — existing path preserved
         }
@@ -504,7 +519,7 @@ class AssignmentController extends Controller
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'construction_edited',
-            'payload' => $auditPayload,
+            'payload' => $auditDiff ?: null,
         ]);
 
         return back()->with('success', 'Construction data updated.');
@@ -618,6 +633,17 @@ class AssignmentController extends Controller
 
         $bast = $assignment->bastData()->firstOrNew([]);
         $bast->assignment_id = $assignment->id;
+        $rawOriginal = $bast->exists ? $bast->getRawOriginal() : [];
+        $auditDiff = [];
+
+        foreach ($validated as $key => $value) {
+            $oldValue = $rawOriginal[$key] ?? null;
+            $oldNorm = is_string($oldValue) ? (json_decode($oldValue, true) ?? $oldValue) : $oldValue;
+            if ($oldNorm !== $value && ! ($oldNorm === null && $value === null)) {
+                $auditDiff[$key] = ['old' => $oldNorm, 'new' => $value];
+            }
+        }
+
         $bast->fill($validated);
         $bast->save();
 
@@ -625,7 +651,7 @@ class AssignmentController extends Controller
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'bast_edited',
-            'payload' => $validated,
+            'payload' => $auditDiff ?: null,
         ]);
 
         return back()->with('success', 'BAST data updated.');

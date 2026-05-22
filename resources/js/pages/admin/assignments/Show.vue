@@ -598,6 +598,53 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
         { preserveScroll: true },
     );
 }
+
+// ── Audit log helpers ──────────────────────────────────────────────────────
+const auditKeyLabels: Record<string, string> = {
+    surveyor_name: 'Surveyor Name', pic_location_name: 'PIC Location',
+    pic_location_phone: 'PIC Phone', charger_type: 'Charger Type',
+    ss_schedule_date: 'Schedule Date', cable_pulling_type: 'Cable Type',
+    pln_network_type: 'PLN Network', parking_slot: 'Parking Slot',
+    additional_info: 'Additional Info', ss_report_submission_date: 'Report Date',
+    power_kva: 'Power (kVA)', photo_overall_site: 'Photo (Overall)',
+    photo_parking_evcs: 'Photo (Parking)', photo_access_route: 'Photo (Access)',
+    photo_pln_network: 'Photo (PLN)', photo_satellite_gmaps: 'Photo (Satellite)',
+    file_mockup_3d: 'File (3D Mockup)', file_site_plan: 'File (Site Plan)',
+    file_ba_survey: 'File (BA Survey)', file_boq: 'File (BoQ)',
+    pln_status: 'PLN Status', nidi_slo_date_acquired: 'NIDI/SLO Date',
+    type_rate: 'Type Rate', kwh_meter_installation_date: 'KWH Install Date',
+    id_pelanggan: 'ID Pelanggan', catatan_progres: 'Progress Notes',
+    email_bpujl_req_date: 'BPUJL Request Date', bpujl_acquired_date: 'BPUJL Acquired',
+    file_slo: 'File (SLO)', file_nidi: 'File (NIDI)', file_reg: 'File (REG)',
+    file_pk: 'File (PK)', foto_kwh: 'Photo (KWH)', cons_actual_start_date: 'Start Date',
+    cons_actual_done_date: 'Done Date', machine_serial_number: 'Serial Number',
+    foto_machine_sn: 'Photo (Machine)', go_live_date_pln: 'Go Live (PLN)',
+    go_live_date_pln_pass: 'Go Live Pass', sim_provider: 'SIM Provider',
+    nomor_simcard: 'SIM Number', commissioning_date: 'Commissioning Date',
+    measurements: 'Measurements', unverify_reason: 'Reason',
+    revision_comment: 'Comment', new_subcontractor_id: 'Subcontractor ID',
+    subcontractor_id: 'Subcontractor ID',
+};
+
+function formatAuditKey(key: string): string {
+    return auditKeyLabels[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatAuditValue(val: unknown): string {
+    if (val === null || val === undefined || val === '') return '—';
+    if (Array.isArray(val)) return (val as unknown[]).filter(Boolean).join(', ') || '—';
+    const str = String(val);
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const d = new Date(str);
+        return isNaN(d.getTime()) ? str : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    if (/^[a-z-]+\/[A-Za-z0-9_.]+$/.test(str)) return str.split('/').pop() ?? str;
+    return str;
+}
+
+function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
+    return typeof val === 'object' && val !== null && !Array.isArray(val) && 'old' in val && 'new' in val;
+}
 </script>
 
 <template>
@@ -2710,20 +2757,31 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
                                     >by {{ log.user.name }}</span
                                 >
                             </div>
-                            <div
-                                v-if="
-                                    log.payload &&
-                                    Object.keys(log.payload).length
-                                "
-                                class="mt-1 rounded-md bg-muted/50 px-2 py-1 font-mono text-xs text-muted-foreground"
+                            <dl
+                                v-if="log.payload && Object.keys(log.payload).length"
+                                class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs"
                             >
-                                <span
-                                    v-for="(val, key) in log.payload"
-                                    :key="String(key)"
-                                >
-                                    {{ key }}: {{ String(val) }}
-                                </span>
-                            </div>
+                                <template v-for="(val, key) in log.payload" :key="String(key)">
+                                    <template v-if="!isDiffEntry(val) && val !== null">
+                                        <dt class="whitespace-nowrap font-medium text-muted-foreground">
+                                            {{ formatAuditKey(String(key)) }}
+                                        </dt>
+                                        <dd class="font-mono">{{ formatAuditValue(val) }}</dd>
+                                    </template>
+                                    <template v-else-if="isDiffEntry(val)">
+                                        <dt class="whitespace-nowrap font-medium text-muted-foreground">
+                                            {{ formatAuditKey(String(key)) }}
+                                        </dt>
+                                        <dd class="flex items-center gap-1.5">
+                                            <span class="font-mono text-muted-foreground line-through">{{
+                                                formatAuditValue(val.old)
+                                            }}</span>
+                                            <span class="text-muted-foreground">→</span>
+                                            <span class="font-mono">{{ formatAuditValue(val.new) }}</span>
+                                        </dd>
+                                    </template>
+                                </template>
+                            </dl>
                         </div>
                         <span class="shrink-0 text-xs text-muted-foreground">
                             {{
