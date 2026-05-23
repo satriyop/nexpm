@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useForm, Head } from '@inertiajs/vue3';
-import { AlertTriangle, CheckCircle, Lock, Send } from 'lucide-vue-next';
+import { AlertTriangle, CheckCircle, Lock, MapPin, Send } from 'lucide-vue-next';
 import { computed } from 'vue';
 import * as SubAssignmentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
 import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
@@ -65,6 +65,19 @@ function submitForReview() {
                     {{ assignment.site.project?.name ?? '—' }} ·
                     {{ assignment.site.project?.main_contractor?.name ?? '—' }}
                 </p>
+                <p v-if="assignment.site.address" class="mt-1 text-sm text-muted-foreground">
+                    {{ assignment.site.address }}
+                </p>
+                <a
+                    v-if="assignment.site.google_map_url"
+                    :href="assignment.site.google_map_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-1 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                >
+                    <MapPin class="size-3.5" />
+                    Open in Google Maps
+                </a>
             </div>
             <div class="flex items-center gap-2">
                 <ActivityTypeBadge :activity-type="assignment.activity_type" />
