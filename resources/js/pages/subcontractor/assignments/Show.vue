@@ -60,6 +60,7 @@ function submitForReview() {
                 <p class="text-sm text-muted-foreground">
                     {{ assignment.site.site_code }} ·
                     {{ assignment.site.city }}, {{ assignment.site.province }}
+                    <span v-if="assignment.site.machine_type"> · {{ assignment.site.machine_type.name }}</span>
                 </p>
                 <p class="mt-1 text-sm text-muted-foreground">
                     {{ assignment.site.project?.name ?? '—' }} ·

@@ -17,6 +17,7 @@ use App\Models\AssignmentBastPhoto;
 use App\Models\AssignmentConstructionPhoto;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
+use App\Models\MachineType;
 use App\Models\Project;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class AssignmentController extends Controller
 
         $query = Assignment::query()
             ->where('subcontractor_id', $user->subcontractor_id)
-            ->with(['site.project.mainContractor', 'surveyData', 'plnData', 'constructionData', 'bastData']);
+            ->with(['site.project.mainContractor', 'site.machineType', 'surveyData', 'plnData', 'constructionData', 'bastData']);
 
         if ($request->filled('search')) {
             $search = $request->string('search');
@@ -56,6 +57,10 @@ class AssignmentController extends Controller
             $query->whereHas('site', fn ($q) => $q->where('project_id', $request->integer('project_id')));
         }
 
+        if ($request->filled('machine_type_id')) {
+            $query->whereHas('site', fn ($q) => $q->where('machine_type_id', $request->integer('machine_type_id')));
+        }
+
         $assignments = $query->latest('id')->paginate(25)->withQueryString();
 
         $projects = Project::query()
@@ -66,7 +71,8 @@ class AssignmentController extends Controller
         return Inertia::render('subcontractor/assignments/Index', [
             'assignments' => $assignments,
             'projects' => $projects,
-            'filters' => $request->only(['search', 'status', 'activity_type', 'project_id']),
+            'machineTypes' => MachineType::query()->orderBy('name')->get(['id', 'name']),
+            'filters' => $request->only(['search', 'status', 'activity_type', 'project_id', 'machine_type_id']),
         ]);
     }
 

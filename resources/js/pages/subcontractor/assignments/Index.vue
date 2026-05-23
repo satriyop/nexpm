@@ -22,11 +22,13 @@ type Filters = {
     status?: string;
     activity_type?: string;
     project_id?: string;
+    machine_type_id?: string;
 };
 
 const props = defineProps<{
     assignments: PaginatedData<Assignment>;
     projects: { id: number; name: string }[];
+    machineTypes: { id: number; name: string }[];
     filters: Filters;
 }>();
 
@@ -47,6 +49,7 @@ const search = ref<string>(props.filters.search ?? '');
 const status = ref<string>(props.filters.status ?? ALL);
 const activityType = ref<string>(props.filters.activity_type ?? ALL);
 const projectId = ref<string>(props.filters.project_id ?? ALL);
+const machineTypeId = ref<string>(props.filters.machine_type_id ?? ALL);
 
 watch(
     () => props.filters,
@@ -55,6 +58,7 @@ watch(
         status.value = next.status ?? ALL;
         activityType.value = next.activity_type ?? ALL;
         projectId.value = next.project_id ?? ALL;
+        machineTypeId.value = next.machine_type_id ?? ALL;
     },
 );
 
@@ -82,7 +86,8 @@ const hasActiveFilters = computed(
         search.value !== '' ||
         status.value !== ALL ||
         activityType.value !== ALL ||
-        projectId.value !== ALL,
+        projectId.value !== ALL ||
+        machineTypeId.value !== ALL,
 );
 
 function applyFilters(): void {
@@ -104,6 +109,10 @@ function applyFilters(): void {
         query.project_id = projectId.value;
     }
 
+    if (machineTypeId.value !== ALL) {
+        query.machine_type_id = machineTypeId.value;
+    }
+
     router.get(SubAssignmentActions.index().url, query, {
         preserveState: true,
         preserveScroll: true,
@@ -116,6 +125,7 @@ function resetFilters(): void {
     status.value = ALL;
     activityType.value = ALL;
     projectId.value = ALL;
+    machineTypeId.value = ALL;
     applyFilters();
 }
 
@@ -214,7 +224,7 @@ function daysStalled(assignment: Assignment): number | null {
             class="flex flex-col gap-3 rounded-xl border border-sidebar-border/70 bg-card p-4 sm:flex-row sm:items-end dark:border-sidebar-border"
         >
             <div
-                class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5"
             >
                 <div class="grid gap-1.5">
                     <label class="text-xs font-medium text-muted-foreground"
@@ -300,6 +310,29 @@ function daysStalled(assignment: Assignment): number | null {
                         </SelectContent>
                     </Select>
                 </div>
+                <div class="grid gap-1.5">
+                    <label class="text-xs font-medium text-muted-foreground"
+                        >Machine Type</label
+                    >
+                    <Select
+                        v-model="machineTypeId"
+                        @update:model-value="applyFilters"
+                    >
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="All types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All types</SelectItem>
+                            <SelectItem
+                                v-for="mt in machineTypes"
+                                :key="mt.id"
+                                :value="String(mt.id)"
+                            >
+                                {{ mt.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             <Button
@@ -329,6 +362,11 @@ function daysStalled(assignment: Assignment): number | null {
                                 class="px-4 py-3 text-left font-medium text-muted-foreground"
                             >
                                 Location
+                            </th>
+                            <th
+                                class="px-4 py-3 text-left font-medium text-muted-foreground"
+                            >
+                                Machine Type
                             </th>
                             <th
                                 class="px-4 py-3 text-left font-medium text-muted-foreground"
@@ -381,6 +419,9 @@ function daysStalled(assignment: Assignment): number | null {
                                         {{ assignment.site?.province }}
                                     </span>
                                 </div>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-muted-foreground">
+                                {{ assignment.site?.machine_type?.name ?? '—' }}
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-col">
@@ -473,7 +514,7 @@ function daysStalled(assignment: Assignment): number | null {
 
                         <tr v-if="assignments.data.length === 0">
                             <td
-                                colspan="7"
+                                colspan="8"
                                 class="px-4 py-12 text-center text-sm text-muted-foreground"
                             >
                                 <div
