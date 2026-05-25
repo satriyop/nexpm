@@ -20,6 +20,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -280,7 +281,7 @@ class ReportController extends Controller
         if ($assignments->count() === 1) {
             $assignment = $assignments->first();
             $pdf = $this->buildSsrPdf($assignment);
-            $filename = sprintf('SSR-%s-%s.pdf', $assignment->site->site_code, now()->format('Ymd'));
+            $filename = sprintf('SSR-%s-%s.pdf', Str::slug($assignment->site->location_name), now()->format('Ymd'));
 
             return response()->stream(function () use ($pdf) {
                 echo $pdf->output();
@@ -298,7 +299,7 @@ class ReportController extends Controller
 
         foreach ($assignments as $assignment) {
             $pdf = $this->buildSsrPdf($assignment);
-            $pdfName = sprintf('SSR-%s-%s.pdf', $assignment->site->site_code, now()->format('Ymd'));
+            $pdfName = sprintf('SSR-%s-%s.pdf', Str::slug($assignment->site->location_name), now()->format('Ymd'));
             $zip->addFromString($pdfName, $pdf->output());
         }
 
