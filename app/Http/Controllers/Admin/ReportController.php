@@ -299,7 +299,7 @@ class ReportController extends Controller
 
         foreach ($assignments as $assignment) {
             $pdf = $this->buildSsrPdf($assignment);
-            $pdfName = sprintf('SSR-%s-%s.pdf', Str::slug($assignment->site->location_name), now()->format('Ymd'));
+            $pdfName = sprintf('SSR-%s-%s-%s.pdf', Str::slug($assignment->site->location_name), $assignment->site->site_code, now()->format('Ymd'));
             $zip->addFromString($pdfName, $pdf->output());
         }
 
