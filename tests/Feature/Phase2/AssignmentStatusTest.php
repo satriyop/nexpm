@@ -4,6 +4,7 @@ use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Enums\Role;
 use App\Models\Assignment;
+use App\Models\AssignmentBastData;
 use App\Models\AssignmentSurveyData;
 use App\Models\User;
 
@@ -102,6 +103,46 @@ test('subcontractor can submit BAST assignment for review from PENDING or REVISI
     $this->actingAs($user)->post(route('subcontractor.assignments.submit', $assignment));
 
     expect($assignment->refresh()->status)->toBe(AssignmentStatus::Submitted);
+});
+
+test('admin can update full BAST commissioning data', function () {
+    $assignment = Assignment::factory()->bast()->create();
+    AssignmentBastData::factory()->create([
+        'assignment_id' => $assignment->id,
+        'sim_provider' => 'Indosat',
+    ]);
+    $admin = User::factory()->create(['role' => Role::SuperAdmin]);
+
+    $response = $this->actingAs($admin)->patch(route('admin.assignments.admin-bast', $assignment), [
+        'plant_name' => 'Planet Ban KEBON AGUNG TRIHANGGO',
+        'plant_address' => 'Jl. Kebon Agung',
+        'plant_coordinate' => '-7.7300, 110.3400',
+        'gmaps_link' => 'https://maps.app.goo.gl/example',
+        'charger_type' => 'BSS 65 IP',
+        'sn_unit' => 'BSS-255141000550',
+        'id_pln' => 'ID-PLN-001',
+        'sim_provider' => 'Indosat',
+        'installation_vendor' => 'CV SIGMATEC',
+        'pic_vendor_contact' => 'Topan Gilas',
+        'installation_date' => '2026-04-12',
+        'nomor_simcard' => '081431142676',
+        'commissioning_date' => '2026-05-29',
+        'customer' => 'PT VGreen Global Charging Station Investment Indonesia',
+        'go_live_date_pln_pass' => '2026-04-13',
+        'go_live_date_pln' => '2026-04-14',
+    ]);
+
+    $response->assertRedirect();
+
+    expect($assignment->bastData()->first())
+        ->plant_name->toBe('Planet Ban KEBON AGUNG TRIHANGGO')
+        ->customer->toBe('PT VGreen Global Charging Station Investment Indonesia')
+        ->charger_type->toBe('BSS 65 IP')
+        ->sn_unit->toBe('BSS-255141000550')
+        ->id_pln->toBe('ID-PLN-001')
+        ->installation_vendor->toBe('CV SIGMATEC')
+        ->nomor_simcard->toBe('081431142676')
+        ->commissioning_date->toDateString()->toBe('2026-05-29');
 });
 
 test('survey revision is not a valid admin revision action', function () {

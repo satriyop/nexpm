@@ -98,9 +98,12 @@ defineOptions({
 });
 
 const page = usePage();
-const isSuperAdmin = computed(() => (page.props.auth as any)?.user?.role === 'super_admin');
+const isSuperAdmin = computed(
+    () => (page.props.auth as any)?.user?.role === 'super_admin',
+);
 const isAdminOrSuperAdmin = computed(() => {
     const role = (page.props.auth as any)?.user?.role;
+
     return role === 'admin' || role === 'super_admin';
 });
 
@@ -109,6 +112,24 @@ const pln = computed(() => props.assignment.pln_data);
 const construction = computed(() => props.assignment.construction_data);
 const bast = computed(() => props.assignment.bast_data);
 const legacyReports = computed(() => props.assignment.legacy_reports ?? []);
+const bastSummary = computed(() => ({
+    plant_name: bast.value?.plant_name ?? props.assignment.site.location_name,
+    customer:
+        bast.value?.customer ?? props.assignment.site.project?.client?.name,
+    charger_type:
+        bast.value?.charger_type ??
+        props.assignment.site.machine_type?.name,
+    sn_unit:
+        bast.value?.sn_unit ??
+        props.siblingConstruction?.machine_serial_number,
+    id_pln: bast.value?.id_pln ?? pln.value?.id_pelanggan,
+    sim_provider: bast.value?.sim_provider,
+    installation_date:
+        bast.value?.installation_date ??
+        props.siblingConstruction?.cons_actual_done_date,
+    commissioning_date: bast.value?.commissioning_date,
+    photos_count: bast.value?.bast_photos?.length ?? 0,
+}));
 
 const isConstruction = computed(
     () => props.assignment.activity_type === 'CONSTRUCTION',
@@ -627,18 +648,39 @@ const auditKeyLabels: Record<string, string> = {
 };
 
 function formatAuditKey(key: string): string {
-    return auditKeyLabels[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return (
+        auditKeyLabels[key] ??
+        key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    );
 }
 
 function formatAuditValue(val: unknown): string {
-    if (val === null || val === undefined || val === '') return '—';
-    if (Array.isArray(val)) return (val as unknown[]).filter(Boolean).join(', ') || '—';
+    if (val === null || val === undefined || val === '') {
+        return '—';
+    }
+
+    if (Array.isArray(val)) {
+        return (val as unknown[]).filter(Boolean).join(', ') || '—';
+    }
+
     const str = String(val);
+
     if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
         const d = new Date(str);
-        return isNaN(d.getTime()) ? str : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+        return isNaN(d.getTime())
+            ? str
+            : d.toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+              });
     }
-    if (/^[a-z-]+\/[A-Za-z0-9_.]+$/.test(str)) return str.split('/').pop() ?? str;
+
+    if (/^[a-z-]+\/[A-Za-z0-9_.]+$/.test(str)) {
+        return str.split('/').pop() ?? str;
+    }
+
     return str;
 }
 
@@ -2100,7 +2142,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         Plant Name
                                     </p>
                                     <p class="font-medium">
-                                        {{ bast.plant_name ?? '—' }}
+                                        {{ bastSummary.plant_name ?? '—' }}
                                     </p>
                                 </div>
                                 <div>
@@ -2108,7 +2150,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         Customer
                                     </p>
                                     <p class="font-medium">
-                                        {{ bast.customer ?? '—' }}
+                                        {{ bastSummary.customer ?? '—' }}
                                     </p>
                                 </div>
                                 <div>
@@ -2116,7 +2158,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         Charger Type
                                     </p>
                                     <p class="font-medium">
-                                        {{ bast.charger_type ?? '—' }}
+                                        {{ bastSummary.charger_type ?? '—' }}
                                     </p>
                                 </div>
                                 <div>
@@ -2124,7 +2166,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         Serial Number
                                     </p>
                                     <p class="font-medium">
-                                        {{ bast.sn_unit ?? '—' }}
+                                        {{ bastSummary.sn_unit ?? '—' }}
                                     </p>
                                 </div>
                                 <div>
@@ -2132,7 +2174,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         ID PLN
                                     </p>
                                     <p class="font-medium">
-                                        {{ bast.id_pln ?? '—' }}
+                                        {{ bastSummary.id_pln ?? '—' }}
                                     </p>
                                 </div>
                                 <div>
@@ -2140,7 +2182,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         SIM Provider
                                     </p>
                                     <p class="font-medium">
-                                        {{ bast.sim_provider ?? '—' }}
+                                        {{ bastSummary.sim_provider ?? '—' }}
                                     </p>
                                 </div>
                                 <div>
@@ -2150,7 +2192,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                     <p class="font-medium">
                                         {{
                                             formatDateOnly(
-                                                bast.installation_date,
+                                                bastSummary.installation_date,
                                             )
                                         }}
                                     </p>
@@ -2162,7 +2204,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                     <p class="font-medium">
                                         {{
                                             formatDateOnly(
-                                                bast.commissioning_date,
+                                                bastSummary.commissioning_date,
                                             )
                                         }}
                                     </p>
@@ -2172,7 +2214,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         Photos uploaded
                                     </p>
                                     <p class="font-medium">
-                                        {{ bast.bast_photos?.length ?? 0 }}
+                                        {{ bastSummary.photos_count }}
                                     </p>
                                 </div>
                             </div>

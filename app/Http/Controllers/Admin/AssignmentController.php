@@ -624,9 +624,22 @@ class AssignmentController extends Controller
         $this->ensureCanAccessAssignment($assignment);
 
         $validated = $request->validate([
+            'plant_name' => ['nullable', 'string', 'max:255'],
+            'plant_address' => ['nullable', 'string'],
+            'plant_coordinate' => ['nullable', 'string', 'max:255'],
+            'gmaps_link' => ['nullable', 'string', 'max:255'],
+            'charger_type' => ['nullable', 'string', 'max:255'],
+            'sn_unit' => ['nullable', 'string', 'max:255'],
+            'id_pln' => ['nullable', 'string', 'max:255'],
             'sim_provider' => ['nullable', 'string', 'max:255'],
+            'installation_vendor' => ['nullable', 'string', 'max:255'],
+            'pic_vendor_contact' => ['nullable', 'string', 'max:255'],
+            'installation_date' => ['nullable', 'date'],
             'nomor_simcard' => ['nullable', 'string', 'max:255'],
             'commissioning_date' => ['nullable', 'date'],
+            'customer' => ['nullable', 'string', 'max:255'],
+            'go_live_date_pln_pass' => ['nullable', 'date'],
+            'go_live_date_pln' => ['nullable', 'date'],
             'measurements' => ['nullable', 'array'],
             'measurements.*' => ['nullable', 'string', 'max:255'],
         ]);

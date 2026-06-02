@@ -23,10 +23,23 @@ class AssignmentBastData extends Model
      */
     protected $fillable = [
         'assignment_id',
+        'plant_name',
+        'plant_address',
+        'plant_coordinate',
+        'gmaps_link',
+        'charger_type',
+        'sn_unit',
+        'id_pln',
         'sim_provider',
-        'commissioning_date',
-        'measurements',
+        'installation_vendor',
+        'pic_vendor_contact',
+        'installation_date',
         'nomor_simcard',
+        'commissioning_date',
+        'customer',
+        'go_live_date_pln_pass',
+        'go_live_date_pln',
+        'measurements',
     ];
 
     /**
@@ -35,7 +48,10 @@ class AssignmentBastData extends Model
     protected function casts(): array
     {
         return [
+            'installation_date' => 'date',
             'commissioning_date' => 'date',
+            'go_live_date_pln_pass' => 'date',
+            'go_live_date_pln' => 'date',
             'measurements' => 'array',
         ];
     }
