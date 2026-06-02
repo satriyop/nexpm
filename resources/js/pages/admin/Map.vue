@@ -232,6 +232,9 @@ function initMap(): void {
         maxZoom: 19,
     }).addTo(map);
 
+    // Default to Indonesia — fitBounds will override this when sites exist
+    map.setView([-2.5, 118], 5);
+
     drawMarkers();
 }
 
