@@ -94,6 +94,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin,project_manager',
     Route::get('reports/{report}/download', [Admin\ReportController::class, 'download'])->name('reports.download');
     Route::post('reports/{report}/regenerate', [Admin\ReportController::class, 'regenerate'])->name('reports.regenerate');
 
+    Route::get('map', [Admin\MapController::class, 'index'])->name('map.index');
+
     Route::get('company-settings', [Admin\CompanySettingController::class, 'index'])->name('company-settings.index');
     Route::post('company-settings', [Admin\CompanySettingController::class, 'update'])->name('company-settings.update');
 

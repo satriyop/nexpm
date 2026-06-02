@@ -8,12 +8,14 @@ import {
     FolderKanban,
     HelpCircle,
     LayoutGrid,
+    Map,
     Settings2,
     Users,
     Wrench,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
+import * as MapActions from '@/actions/App/Http/Controllers/Admin/MapController';
 import * as ClientActions from '@/actions/App/Http/Controllers/Admin/ClientController';
 import * as CompanySettingActions from '@/actions/App/Http/Controllers/Admin/CompanySettingController';
 import * as MainContractorActions from '@/actions/App/Http/Controllers/Admin/MainContractorController';
@@ -50,6 +52,7 @@ const navGroups = computed<NavGroup[]>(() => {
                 label: 'Operations',
                 items: [
                     { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+                    { title: 'Dashboard Map', href: MapActions.index().url, icon: Map },
                     {
                         title: 'Projects',
                         href: ProjectActions.index().url,
