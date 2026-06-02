@@ -350,6 +350,11 @@ function resetFilters(): void {
 // --- Lifecycle ---
 onMounted(() => {
     initMap();
+    // Leaflet reads the container size at init time. The SidebarProvider uses
+    // min-h-svh (not height), so flex-1 children may have 0 computed height
+    // when Leaflet initializes. invalidateSize() forces a recalculation once
+    // the browser has finished layout.
+    nextTick(() => map?.invalidateSize());
 });
 
 onUnmounted(() => {
@@ -363,6 +368,10 @@ watch(
         drawMarkers();
     },
 );
+
+watch(showLeftSidebar, () => {
+    nextTick(() => map?.invalidateSize());
+});
 
 watch(
     () => props.filters,
