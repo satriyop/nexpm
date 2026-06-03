@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Assignment;
 use App\Models\MachineType;
 use App\Models\Project;
 use App\Models\Site;
 use App\Models\Subcontractor;
 use App\Support\GoogleMapsCoordinates;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -50,17 +52,11 @@ class MapController extends Controller
             $query->where('machine_type_id', $request->integer('machine_type_id'));
         }
 
-        if ($request->filled('activity_type') || $request->filled('status') || $request->filled('subcontractor_id')) {
+        $hasAssignmentFilters = $this->hasAssignmentFilters($request);
+
+        if ($hasAssignmentFilters) {
             $query->whereHas('assignments', function ($q) use ($request): void {
-                if ($request->filled('activity_type')) {
-                    $q->where('activity_type', $request->string('activity_type'));
-                }
-                if ($request->filled('status')) {
-                    $q->where('status', $request->string('status'));
-                }
-                if ($request->filled('subcontractor_id')) {
-                    $q->where('subcontractor_id', $request->integer('subcontractor_id'));
-                }
+                $this->applyAssignmentFilters($q, $request);
             });
         }
 
@@ -124,22 +120,22 @@ class MapController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $mapSites = $sites->map(function (Site $site) use ($surveyPhotos, $constructionDataByAssignment, $constructionPhotos, $plnPhotos, $bastDataByAssignment, $bastPhotos): ?array {
+        $mapSites = $sites->map(function (Site $site) use ($request, $hasAssignmentFilters, $surveyPhotos, $constructionDataByAssignment, $constructionPhotos, $plnPhotos, $bastDataByAssignment, $bastPhotos): ?array {
             $coordinates = $this->siteCoordinates($site);
 
             if ($coordinates === null) {
                 return null;
             }
 
-            $activeAssignments = $site->assignments->filter(fn ($a) => $a->status->value !== 'DROP');
-            $totalAssignments = $activeAssignments->count();
-            $completedCount = $activeAssignments
+            $visibleAssignments = $this->visibleAssignments($site->assignments, $request, $hasAssignmentFilters);
+            $totalAssignments = $visibleAssignments->count();
+            $completedCount = $visibleAssignments
                 ->filter(fn ($a) => in_array($a->status->value, ['VERIFIED', 'REPORTED']))
                 ->count();
 
             $photos = $this->buildPhotos($site, $surveyPhotos, $constructionDataByAssignment, $constructionPhotos, $plnPhotos, $bastDataByAssignment, $bastPhotos);
 
-            $assignments = $site->assignments->map(fn ($a) => [
+            $assignments = $visibleAssignments->map(fn ($a) => [
                 'id' => $a->id,
                 'activity_type' => $a->activity_type->value,
                 'activity_label' => $a->activity_type->label(),
@@ -188,6 +184,59 @@ class MapController extends Controller
             'stats' => $stats,
             'filters' => $request->only(['project_id', 'activity_type', 'status', 'subcontractor_id', 'machine_type_id', 'province']),
         ]);
+    }
+
+    private function hasAssignmentFilters(Request $request): bool
+    {
+        return $request->filled('activity_type')
+            || $request->filled('status')
+            || $request->filled('subcontractor_id');
+    }
+
+    /**
+     * @param  Builder<Assignment>  $query
+     */
+    private function applyAssignmentFilters(Builder $query, Request $request): void
+    {
+        if ($request->filled('activity_type')) {
+            $query->where('activity_type', $request->string('activity_type'));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
+        }
+
+        if ($request->filled('subcontractor_id')) {
+            $query->where('subcontractor_id', $request->integer('subcontractor_id'));
+        }
+    }
+
+    /**
+     * @param  EloquentCollection<int,Assignment>  $assignments
+     * @return EloquentCollection<int,Assignment>
+     */
+    private function visibleAssignments(EloquentCollection $assignments, Request $request, bool $hasAssignmentFilters): EloquentCollection
+    {
+        $filtered = $assignments;
+
+        if ($request->filled('activity_type')) {
+            $filtered = $filtered->filter(fn ($assignment) => $assignment->activity_type->value === $request->string('activity_type')->toString());
+        }
+
+        if ($request->filled('status')) {
+            $filtered = $filtered->filter(fn ($assignment) => $assignment->status->value === $request->string('status')->toString());
+        }
+
+        if ($request->filled('subcontractor_id')) {
+            $subcontractorId = $request->integer('subcontractor_id');
+            $filtered = $filtered->filter(fn ($assignment) => $assignment->subcontractor_id === $subcontractorId);
+        }
+
+        if (! $hasAssignmentFilters) {
+            $filtered = $filtered->filter(fn ($assignment) => $assignment->status->value !== 'DROP');
+        }
+
+        return $filtered;
     }
 
     /**

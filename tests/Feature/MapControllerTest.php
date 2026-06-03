@@ -1,9 +1,13 @@
 <?php
 
+use App\Enums\ActivityType;
+use App\Enums\AssignmentStatus;
 use App\Enums\Role;
+use App\Models\Assignment;
 use App\Models\MainContractor;
 use App\Models\Project;
 use App\Models\Site;
+use App\Models\Subcontractor;
 use App\Models\User;
 
 test('guests are redirected to login', function () {
@@ -104,5 +108,49 @@ test('map derives marker coordinates from parseable google map urls', function (
             ->where('sites.0.site_code', 'SITE-GMAP')
             ->where('sites.0.latitude', -6.917464)
             ->where('sites.0.longitude', 107.619123)
+        );
+});
+
+test('map assignment filters trim assignment payload and stats consistently', function () {
+    $mainContractor = MainContractor::factory()->create();
+    $user = User::factory()->create([
+        'role' => Role::Admin,
+        'main_contractor_id' => $mainContractor->id,
+    ]);
+    $project = Project::factory()->create(['main_contractor_id' => $mainContractor->id]);
+    $site = Site::factory()->for($project)->create([
+        'site_code' => 'SITE-MIXED',
+        'latitude' => '-6.200000',
+        'longitude' => '106.816666',
+    ]);
+    $matchingSubcontractor = Subcontractor::factory()->create();
+    $otherSubcontractor = Subcontractor::factory()->create();
+
+    Assignment::factory()->for($site)->create([
+        'activity_type' => ActivityType::Bast,
+        'status' => AssignmentStatus::Submitted,
+        'subcontractor_id' => $matchingSubcontractor->id,
+    ]);
+    Assignment::factory()->for($site)->create([
+        'activity_type' => ActivityType::Survey,
+        'status' => AssignmentStatus::Verified,
+        'subcontractor_id' => $otherSubcontractor->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('admin.map.index', [
+            'activity_type' => 'BAST',
+            'status' => 'SUBMITTED',
+            'subcontractor_id' => $matchingSubcontractor->id,
+        ]))
+        ->assertInertia(fn ($page) => $page
+            ->component('admin/Map')
+            ->has('sites', 1)
+            ->has('sites.0.assignments', 1)
+            ->where('sites.0.assignments.0.activity_type', 'BAST')
+            ->where('sites.0.assignments.0.status', 'SUBMITTED')
+            ->where('sites.0.total_assignments', 1)
+            ->where('sites.0.completed_count', 0)
+            ->where('stats.total_assignments', 1)
         );
 });

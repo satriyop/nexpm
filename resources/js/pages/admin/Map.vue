@@ -151,6 +151,10 @@ const visibleAssignments = computed(() => {
             return false;
         }
 
+        if (status.value !== ALL && a.status !== status.value) {
+            return false;
+        }
+
         return true;
     });
 });
@@ -425,6 +429,7 @@ function applyFilters(): void {
     }
 
     selectedSiteId.value = null;
+    router.cancelAll();
     router.get(Actions.index().url, query, {
         preserveState: true,
         preserveScroll: true,
@@ -460,7 +465,15 @@ onUnmounted(() => {
 watch(
     () => props.sites,
     () => {
+        if (
+            selectedSiteId.value !== null &&
+            !props.sites.some((site) => site.id === selectedSiteId.value)
+        ) {
+            selectedSiteId.value = null;
+        }
+
         drawMarkers();
+        nextTick(() => map?.invalidateSize());
     },
 );
 
