@@ -101,6 +101,8 @@ defineOptions({
 
 // --- State ---
 const ALL = '__all__';
+const DEFAULT_MAP_CENTER: L.LatLngTuple = [-7.25, 110.25];
+const DEFAULT_MAP_ZOOM = 7;
 const mapContainer = ref<HTMLElement | null>(null);
 const showLeftSidebar = ref(true);
 const selectedSiteId = ref<number | null>(null);
@@ -300,8 +302,7 @@ function initMap(): void {
         maxZoom: 19,
     }).addTo(map);
 
-    // Default to Indonesia — fitBounds will override this when sites exist
-    map.setView([-2.5, 118], 5);
+    map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
 
     drawMarkers();
 }
@@ -345,6 +346,12 @@ function drawMarkers(): void {
         markerMap.set(site.id, marker);
         bounds.push([site.latitude, site.longitude]);
     });
+
+    if (!hasActiveFilters.value) {
+        map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+
+        return;
+    }
 
     if (bounds.length > 0) {
         map.fitBounds(L.latLngBounds(bounds), {
