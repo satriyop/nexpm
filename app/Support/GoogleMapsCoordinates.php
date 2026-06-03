@@ -27,7 +27,7 @@ class GoogleMapsCoordinates
             return null;
         }
 
-        $decodedUrl = urldecode(trim($text));
+        $decodedUrl = html_entity_decode(urldecode(trim($text)), ENT_QUOTES | ENT_HTML5);
 
         if (preg_match('/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/', $decodedUrl, $matches) === 1) {
             return self::validPair($matches[1], $matches[2]);
@@ -35,6 +35,14 @@ class GoogleMapsCoordinates
 
         if (preg_match('/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/', $decodedUrl, $matches) === 1) {
             return self::validPair($matches[1], $matches[2]);
+        }
+
+        if (preg_match('/[?&]center=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)(?:[&"\'<\s]|$)/', $decodedUrl, $matches) === 1) {
+            return self::validPair($matches[1], $matches[2]);
+        }
+
+        if (preg_match('/!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/', $decodedUrl, $matches) === 1) {
+            return self::validPair($matches[2], $matches[1]);
         }
 
         if (preg_match('/\[\s*(-?\d{1,2}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})\s*\]/', $decodedUrl, $matches) === 1) {

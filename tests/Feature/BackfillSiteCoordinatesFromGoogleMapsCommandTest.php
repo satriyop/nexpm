@@ -118,9 +118,7 @@ test('backfills coordinates from google maps place cid lookup when redirect url 
             'Location' => $placeUrl,
         ]),
         $placeUrl => Http::response('<html>No coordinates in this Google place payload.</html>', 200),
-        'https://www.google.com/maps?cid=4229837775085852126' => Http::response('', 302, [
-            'Location' => 'https://www.google.com/maps/place/Masjid+Arief+Rahman/@-6.164492,106.786891,17z',
-        ]),
+        'https://www.google.com/maps?cid=4229837775085852126' => Http::response('<meta content="https://maps.google.com/maps/api/staticmap?center=-6.164492%2C106.786891&amp;zoom=14" itemprop="image">', 200),
     ]);
 
     $site = Site::factory()->create([
@@ -141,6 +139,29 @@ test('backfills coordinates from google maps place cid lookup when redirect url 
         ->longitude->toBe('106.7868910');
 
     Http::assertSent(fn ($request) => $request->url() === 'https://www.google.com/maps?cid=4229837775085852126');
+});
+
+test('backfills coordinates from google maps static map center metadata', function () {
+    Http::fake([
+        'https://maps.app.goo.gl/staticmap123' => Http::response('<meta content="https://maps.google.com/maps/api/staticmap?center=-7.7517602%2C110.686184&amp;zoom=14" itemprop="image">', 200),
+    ]);
+
+    $site = Site::factory()->create([
+        'google_map_url' => 'https://maps.app.goo.gl/staticmap123',
+        'latitude' => null,
+        'longitude' => null,
+    ]);
+
+    $this->artisan('sites:backfill-coordinates-from-google-maps', [
+        '--limit' => 10,
+        '--sleep' => 0,
+        '--force' => true,
+    ])
+        ->assertSuccessful();
+
+    expect($site->refresh())
+        ->latitude->toBe('-7.7517602')
+        ->longitude->toBe('110.6861840');
 });
 
 test('normalizes malformed short google maps urls before resolving redirects', function () {
