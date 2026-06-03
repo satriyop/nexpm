@@ -80,6 +80,36 @@ test('normalizes whitespace artifacts in google maps urls before resolving redir
     Http::assertSent(fn ($request) => $request->url() === 'https://maps.app.goo.gl/Y7kswcMzEgw3BkV37?g_st=aw');
 });
 
+test('backfills coordinates from resolved google maps response body', function () {
+    $placeUrl = 'https://www.google.com/maps/place/Masjid+Arief+Rahman/data=!4m2!3m1!1s0x2e69f7d9db7725ef:0x3ab3670bb98555de';
+
+    Http::fake([
+        'https://maps.app.goo.gl/body123' => Http::response('', 302, [
+            'Location' => $placeUrl,
+        ]),
+        $placeUrl => Http::response('<script>APP_INITIALIZATION_STATE=[null,null,[-6.445507,107.0437936]];</script>', 200),
+    ]);
+
+    $site = Site::factory()->create([
+        'google_map_url' => 'https://maps.app.goo.gl/body123',
+        'latitude' => null,
+        'longitude' => null,
+    ]);
+
+    $this->artisan('sites:backfill-coordinates-from-google-maps', [
+        '--limit' => 10,
+        '--sleep' => 0,
+        '--force' => true,
+    ])
+        ->assertSuccessful();
+
+    expect($site->refresh())
+        ->latitude->toBe('-6.4455070')
+        ->longitude->toBe('107.0437936');
+
+    Http::assertSentCount(2);
+});
+
 test('dry run resolves coordinates without saving them', function () {
     Http::fake();
 

@@ -15,12 +15,34 @@ class GoogleMapsCoordinates
 
         $decodedUrl = urldecode(trim($url));
 
+        return self::fromText($decodedUrl, parseQueryString: true);
+    }
+
+    /**
+     * @return array{latitude: string, longitude: string}|null
+     */
+    public static function fromText(?string $text, bool $parseQueryString = false): ?array
+    {
+        if (blank($text)) {
+            return null;
+        }
+
+        $decodedUrl = urldecode(trim($text));
+
         if (preg_match('/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/', $decodedUrl, $matches) === 1) {
             return self::validPair($matches[1], $matches[2]);
         }
 
         if (preg_match('/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/', $decodedUrl, $matches) === 1) {
             return self::validPair($matches[1], $matches[2]);
+        }
+
+        if (preg_match('/\[\s*(-?\d{1,2}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})\s*\]/', $decodedUrl, $matches) === 1) {
+            return self::validPair($matches[1], $matches[2]);
+        }
+
+        if (! $parseQueryString) {
+            return null;
         }
 
         $query = parse_url($decodedUrl, PHP_URL_QUERY);

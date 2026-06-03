@@ -90,12 +90,8 @@ class BackfillSiteCoordinatesFromGoogleMaps extends Command
             $source = 'direct';
 
             if ($coordinates === null) {
-                $finalUrl = $this->resolveFinalUrl($googleMapUrl, $timeout);
-
-                if ($finalUrl !== null) {
-                    $coordinates = GoogleMapsCoordinates::fromUrl($finalUrl);
-                    $source = 'redirect';
-                }
+                $coordinates = $this->resolveRemoteCoordinates($googleMapUrl, $timeout);
+                $source = 'redirect';
             }
 
             if ($coordinates === null) {
@@ -151,7 +147,10 @@ class BackfillSiteCoordinatesFromGoogleMaps extends Command
         return preg_replace('/\s+/', '', trim($url)) ?? trim($url);
     }
 
-    private function resolveFinalUrl(string $url, int $timeout): ?string
+    /**
+     * @return array{latitude: string, longitude: string}|null
+     */
+    private function resolveRemoteCoordinates(string $url, int $timeout): ?array
     {
         $currentUrl = $this->normalizeGoogleMapUrl($url);
 
@@ -172,13 +171,15 @@ class BackfillSiteCoordinatesFromGoogleMaps extends Command
             $location = $response->header('Location');
 
             if (! is_string($location) || $location === '') {
-                return $currentUrl;
+                return GoogleMapsCoordinates::fromText($response->body());
             }
 
             $currentUrl = $this->absoluteUrl($location, $currentUrl);
 
-            if (GoogleMapsCoordinates::fromUrl($currentUrl) !== null) {
-                return $currentUrl;
+            $coordinates = GoogleMapsCoordinates::fromUrl($currentUrl);
+
+            if ($coordinates !== null) {
+                return $coordinates;
             }
         }
 
