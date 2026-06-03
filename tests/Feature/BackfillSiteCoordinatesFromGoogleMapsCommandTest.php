@@ -53,6 +53,33 @@ test('backfills coordinates from short google maps redirect urls', function () {
     Http::assertSentCount(1);
 });
 
+test('normalizes whitespace artifacts in google maps urls before resolving redirects', function () {
+    Http::fake([
+        'https://maps.app.goo.gl/Y7kswcMzEgw3BkV37?g_st=aw' => Http::response('', 302, [
+            'Location' => 'https://www.google.com/maps/place/Test/@-6.445507,107.0437936,17z',
+        ]),
+    ]);
+
+    $site = Site::factory()->create([
+        'google_map_url' => "https://maps.app.goo.gl/Y7kswcMzEgw3BkV37?g_ st\n=aw",
+        'latitude' => null,
+        'longitude' => null,
+    ]);
+
+    $this->artisan('sites:backfill-coordinates-from-google-maps', [
+        '--limit' => 10,
+        '--sleep' => 0,
+        '--force' => true,
+    ])
+        ->assertSuccessful();
+
+    expect($site->refresh())
+        ->latitude->toBe('-6.4455070')
+        ->longitude->toBe('107.0437936');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://maps.app.goo.gl/Y7kswcMzEgw3BkV37?g_st=aw');
+});
+
 test('dry run resolves coordinates without saving them', function () {
     Http::fake();
 

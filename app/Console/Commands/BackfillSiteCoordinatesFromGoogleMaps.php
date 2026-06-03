@@ -76,11 +76,12 @@ class BackfillSiteCoordinatesFromGoogleMaps extends Command
         $skipped = 0;
 
         foreach ($sites as $site) {
-            $googleMapUrl = (string) $site->google_map_url;
+            $originalGoogleMapUrl = (string) $site->google_map_url;
+            $googleMapUrl = $this->normalizeGoogleMapUrl($originalGoogleMapUrl);
 
             if (! $this->isAllowedUrl($googleMapUrl)) {
                 $skipped++;
-                $this->warn("Skipping non-Google Maps URL for {$site->site_code}: {$googleMapUrl}");
+                $this->warn("Skipping non-Google Maps URL for {$site->site_code}: {$originalGoogleMapUrl}");
 
                 continue;
             }
@@ -99,7 +100,7 @@ class BackfillSiteCoordinatesFromGoogleMaps extends Command
 
             if ($coordinates === null) {
                 $failed++;
-                $this->warn("Unable to resolve coordinates for {$site->site_code}: {$googleMapUrl}");
+                $this->warn("Unable to resolve coordinates for {$site->site_code}: {$originalGoogleMapUrl}");
                 $this->sleep($sleepMilliseconds);
 
                 continue;
@@ -145,9 +146,14 @@ class BackfillSiteCoordinatesFromGoogleMaps extends Command
         return self::SUCCESS;
     }
 
+    private function normalizeGoogleMapUrl(string $url): string
+    {
+        return preg_replace('/\s+/', '', trim($url)) ?? trim($url);
+    }
+
     private function resolveFinalUrl(string $url, int $timeout): ?string
     {
-        $currentUrl = trim($url);
+        $currentUrl = $this->normalizeGoogleMapUrl($url);
 
         for ($attempt = 0; $attempt < 5; $attempt++) {
             if (! $this->isAllowedUrl($currentUrl)) {
