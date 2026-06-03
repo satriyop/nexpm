@@ -110,6 +110,101 @@ test('backfills coordinates from resolved google maps response body', function (
     Http::assertSentCount(2);
 });
 
+test('backfills coordinates from google maps place cid lookup when redirect url has no coordinates', function () {
+    $placeUrl = 'https://www.google.com/maps/place/Masjid+Arief+Rahman/data=!4m2!3m1!1s0x2e69f7d9db7725ef:0x3ab3670bb98555de';
+
+    Http::fake([
+        'https://maps.app.goo.gl/Y7kswcMzEgw3BkV37?g_st=aw' => Http::response('', 302, [
+            'Location' => $placeUrl,
+        ]),
+        $placeUrl => Http::response('<html>No coordinates in this Google place payload.</html>', 200),
+        'https://www.google.com/maps?cid=4229837775085852126' => Http::response('', 302, [
+            'Location' => 'https://www.google.com/maps/place/Masjid+Arief+Rahman/@-6.164492,106.786891,17z',
+        ]),
+    ]);
+
+    $site = Site::factory()->create([
+        'google_map_url' => 'https://maps.app.goo.gl/Y7kswcMzEgw3BkV37?g_ st=aw',
+        'latitude' => null,
+        'longitude' => null,
+    ]);
+
+    $this->artisan('sites:backfill-coordinates-from-google-maps', [
+        '--limit' => 10,
+        '--sleep' => 0,
+        '--force' => true,
+    ])
+        ->assertSuccessful();
+
+    expect($site->refresh())
+        ->latitude->toBe('-6.1644920')
+        ->longitude->toBe('106.7868910');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://www.google.com/maps?cid=4229837775085852126');
+});
+
+test('normalizes malformed short google maps urls before resolving redirects', function () {
+    Http::fake([
+        'https://maps.app.goo.gl/5oyWXMkPFEr42yE7' => Http::response('', 302, [
+            'Location' => 'https://www.google.com/maps/place/Test/@-7.725123,110.345678,17z',
+        ]),
+        'https://maps.app.goo.gl/JeufXzTBc3gKuH66' => Http::response('', 302, [
+            'Location' => 'https://www.google.com/maps/place/Test/@-7.725124,110.345679,17z',
+        ]),
+    ]);
+
+    $firstSite = Site::factory()->create([
+        'google_map_url' => 'https://maps.app.goo.gl/?5oyWXMkPFEr42yE7',
+        'latitude' => null,
+        'longitude' => null,
+    ]);
+
+    $secondSite = Site::factory()->create([
+        'google_map_url' => 'https://maps.app.goo.gl/JeufXz?TBc3gKuH66',
+        'latitude' => null,
+        'longitude' => null,
+    ]);
+
+    $this->artisan('sites:backfill-coordinates-from-google-maps', [
+        '--limit' => 10,
+        '--sleep' => 0,
+        '--force' => true,
+    ])
+        ->assertSuccessful();
+
+    expect($firstSite->refresh())
+        ->latitude->toBe('-7.7251230')
+        ->longitude->toBe('110.3456780')
+        ->and($secondSite->refresh())
+        ->latitude->toBe('-7.7251240')
+        ->longitude->toBe('110.3456790');
+});
+
+test('allows google share urls when resolving redirects', function () {
+    Http::fake([
+        'https://share.google/GbIywcGaM18FbfooE' => Http::response('', 302, [
+            'Location' => 'https://www.google.com/maps/place/Test/@-6.917464,107.619123,17z',
+        ]),
+    ]);
+
+    $site = Site::factory()->create([
+        'google_map_url' => 'https://share.google/GbIywcGaM18FbfooE',
+        'latitude' => null,
+        'longitude' => null,
+    ]);
+
+    $this->artisan('sites:backfill-coordinates-from-google-maps', [
+        '--limit' => 10,
+        '--sleep' => 0,
+        '--force' => true,
+    ])
+        ->assertSuccessful();
+
+    expect($site->refresh())
+        ->latitude->toBe('-6.9174640')
+        ->longitude->toBe('107.6191230');
+});
+
 test('dry run resolves coordinates without saving them', function () {
     Http::fake();
 
