@@ -17,6 +17,7 @@ use App\Models\Project;
 use App\Models\Site;
 use App\Models\SiteType;
 use App\Models\Subcontractor;
+use App\Support\GoogleMapsCoordinates;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -166,6 +167,8 @@ class ManualProjectCsvImportService
 
                     $existing = Site::query()->where('site_code', $row['site_code'])->first();
 
+                    $coordinates = GoogleMapsCoordinates::fromUrl($row['google_map_url'] ?? '');
+
                     $siteAttributes = [
                         'project_id' => $project->id,
                         'location_name' => $row['location_name'],
@@ -181,6 +184,11 @@ class ManualProjectCsvImportService
                         'cable_length_to_panel' => $row['cable_length_to_panel'] !== '' ? $row['cable_length_to_panel'] : null,
                         'charging_station_count' => $row['charging_station_count'] !== '' ? (int) $row['charging_station_count'] : null,
                     ];
+
+                    if ($coordinates !== null) {
+                        $siteAttributes['latitude'] = $coordinates['latitude'];
+                        $siteAttributes['longitude'] = $coordinates['longitude'];
+                    }
 
                     if ($existing !== null) {
                         $existing->fill($siteAttributes)->save();

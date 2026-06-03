@@ -11,6 +11,8 @@ import {
     X,
 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import * as Actions from '@/actions/App/Http/Controllers/Admin/MapController';
+import * as SiteActions from '@/actions/App/Http/Controllers/Admin/SiteController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -21,8 +23,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import * as Actions from '@/actions/App/Http/Controllers/Admin/MapController';
-import * as SiteActions from '@/actions/App/Http/Controllers/Admin/SiteController';
 import { dashboard } from '@/routes';
 
 // --- Types ---
@@ -132,26 +132,56 @@ const hasActiveFilters = computed(
 );
 
 const visibleAssignments = computed(() => {
-    if (!selectedSite.value) return [];
+    if (!selectedSite.value) {
+        return [];
+    }
+
     return selectedSite.value.assignments.filter((a) => {
-        if (activityType.value !== ALL && a.activity_type !== activityType.value) return false;
-        if (subcontractorId.value !== ALL && a.subcontractor?.id.toString() !== subcontractorId.value) return false;
+        if (
+            activityType.value !== ALL &&
+            a.activity_type !== activityType.value
+        ) {
+            return false;
+        }
+
+        if (
+            subcontractorId.value !== ALL &&
+            a.subcontractor?.id.toString() !== subcontractorId.value
+        ) {
+            return false;
+        }
+
         return true;
     });
 });
 
 // --- Marker helpers ---
 function getMarkerColor(site: MapSite): string {
-    if (site.total_assignments === 0) return '#9ca3af';
-    if (site.assignments.some((a) => a.status === 'REVISION')) return '#ef4444';
-    if (site.completion_ratio >= 1) return '#22c55e';
-    if (site.completion_ratio > 0) return '#f97316';
+    if (site.total_assignments === 0) {
+        return '#9ca3af';
+    }
+
+    if (site.assignments.some((a) => a.status === 'REVISION')) {
+        return '#ef4444';
+    }
+
+    if (site.completion_ratio >= 1) {
+        return '#22c55e';
+    }
+
+    if (site.completion_ratio > 0) {
+        return '#f97316';
+    }
+
     return '#9ca3af';
 }
 
 // Safe same-origin storage URL (rejects anything that isn't a /storage/ relative path)
 function safeStorageUrl(url: string): string | null {
-    if (typeof url !== 'string') return null;
+    if (typeof url !== 'string') {
+        return null;
+    }
+
     return url.startsWith('/storage/') ? url : null;
 }
 
@@ -165,34 +195,61 @@ function buildPopupEl(site: MapSite): HTMLElement {
     });
 
     const title = document.createElement('div');
-    Object.assign(title.style, { fontWeight: '600', fontSize: '13px', marginBottom: '2px' });
+    Object.assign(title.style, {
+        fontWeight: '600',
+        fontSize: '13px',
+        marginBottom: '2px',
+    });
     title.textContent = site.site_code;
     root.appendChild(title);
 
     const sub = document.createElement('div');
-    Object.assign(sub.style, { fontSize: '12px', color: '#6b7280', marginBottom: '8px' });
+    Object.assign(sub.style, {
+        fontSize: '12px',
+        color: '#6b7280',
+        marginBottom: '8px',
+    });
     sub.textContent = site.location_name + (site.city ? ` · ${site.city}` : '');
     root.appendChild(sub);
 
     const strip = document.createElement('div');
-    Object.assign(strip.style, { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' });
+    Object.assign(strip.style, {
+        display: 'flex',
+        gap: '8px',
+        overflowX: 'auto',
+        paddingBottom: '4px',
+    });
 
     if (site.photos.length > 0) {
         for (const photo of site.photos) {
             const safeUrl = safeStorageUrl(photo.url);
-            if (!safeUrl) continue;
+
+            if (!safeUrl) {
+                continue;
+            }
 
             const wrap = document.createElement('div');
             wrap.style.flexShrink = '0';
 
             const lbl = document.createElement('div');
-            Object.assign(lbl.style, { fontSize: '10px', color: '#6b7280', textAlign: 'center', marginBottom: '3px' });
+            Object.assign(lbl.style, {
+                fontSize: '10px',
+                color: '#6b7280',
+                textAlign: 'center',
+                marginBottom: '3px',
+            });
             lbl.textContent = photo.label;
 
             const img = document.createElement('img');
             img.src = safeUrl;
             img.loading = 'lazy';
-            Object.assign(img.style, { height: '80px', width: '80px', objectFit: 'cover', borderRadius: '6px', display: 'block' });
+            Object.assign(img.style, {
+                height: '80px',
+                width: '80px',
+                objectFit: 'cover',
+                borderRadius: '6px',
+                display: 'block',
+            });
 
             wrap.appendChild(lbl);
             wrap.appendChild(img);
@@ -204,10 +261,15 @@ function buildPopupEl(site: MapSite): HTMLElement {
         empty.textContent = 'No photos';
         strip.appendChild(empty);
     }
+
     root.appendChild(strip);
 
     const footer = document.createElement('div');
-    Object.assign(footer.style, { marginTop: '8px', fontSize: '11px', color: '#6b7280' });
+    Object.assign(footer.style, {
+        marginTop: '8px',
+        fontSize: '11px',
+        color: '#6b7280',
+    });
     footer.textContent =
         site.total_assignments > 0
             ? `${site.completed_count}/${site.total_assignments} completed`
@@ -219,7 +281,9 @@ function buildPopupEl(site: MapSite): HTMLElement {
 
 // --- Map functions ---
 function initMap(): void {
-    if (!mapContainer.value) return;
+    if (!mapContainer.value) {
+        return;
+    }
 
     map = L.map(mapContainer.value, {
         zoomControl: true,
@@ -239,13 +303,20 @@ function initMap(): void {
 }
 
 function drawMarkers(): void {
-    if (!map) return;
+    if (!map) {
+        return;
+    }
 
     markerMap.forEach((m) => m.remove());
     markerMap.clear();
 
-    const validSites = props.sites.filter((s) => s.latitude != null && s.longitude != null);
-    if (validSites.length === 0) return;
+    const validSites = props.sites.filter(
+        (s) => s.latitude != null && s.longitude != null,
+    );
+
+    if (validSites.length === 0) {
+        return;
+    }
 
     const bounds: L.LatLngTuple[] = [];
 
@@ -272,17 +343,22 @@ function drawMarkers(): void {
     });
 
     if (bounds.length > 0) {
-        map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 14 });
+        map.fitBounds(L.latLngBounds(bounds), {
+            padding: [40, 40],
+            maxZoom: 14,
+        });
     }
 }
 
 function selectSite(siteId: number): void {
     selectedSiteId.value = siteId;
     const marker = markerMap.get(siteId);
+
     if (marker && map) {
         map.panTo(marker.getLatLng(), { animate: true });
         marker.openPopup();
     }
+
     nextTick(() => {
         document
             .getElementById(`site-item-${siteId}`)
@@ -323,14 +399,30 @@ const activityTypeOptions = [
 
 function applyFilters(): void {
     const query: Record<string, string> = {};
-    if (projectId.value !== ALL) query.project_id = projectId.value;
-    if (activityType.value !== ALL) query.activity_type = activityType.value;
-    if (status.value !== ALL) query.status = status.value;
-    if (subcontractorId.value !== ALL)
+
+    if (projectId.value !== ALL) {
+        query.project_id = projectId.value;
+    }
+
+    if (activityType.value !== ALL) {
+        query.activity_type = activityType.value;
+    }
+
+    if (status.value !== ALL) {
+        query.status = status.value;
+    }
+
+    if (subcontractorId.value !== ALL) {
         query.subcontractor_id = subcontractorId.value;
-    if (machineTypeId.value !== ALL)
+    }
+
+    if (machineTypeId.value !== ALL) {
         query.machine_type_id = machineTypeId.value;
-    if (province.value !== ALL) query.province = province.value;
+    }
+
+    if (province.value !== ALL) {
+        query.province = province.value;
+    }
 
     selectedSiteId.value = null;
     router.get(Actions.index().url, query, {
@@ -391,7 +483,10 @@ watch(
 
 // Completion label helper
 function completionLabel(site: MapSite): string {
-    if (site.total_assignments === 0) return '–';
+    if (site.total_assignments === 0) {
+        return '–';
+    }
+
     return `${site.completed_count}/${site.total_assignments}`;
 }
 </script>
@@ -435,7 +530,7 @@ function completionLabel(site: MapSite): string {
             <!-- Left sidebar toggle button (visible when sidebar hidden) -->
             <button
                 v-if="!showLeftSidebar"
-                class="absolute left-0 top-1/2 z-[1000] flex -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 bg-background p-2 shadow-md transition-colors hover:bg-accent"
+                class="absolute top-1/2 left-0 z-[1000] flex -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 bg-background p-2 shadow-md transition-colors hover:bg-accent"
                 @click="showLeftSidebar = true"
             >
                 <ChevronRight class="size-4" />
@@ -463,7 +558,10 @@ function completionLabel(site: MapSite): string {
                 <div
                     class="flex shrink-0 flex-col gap-2 border-b border-sidebar-border/70 p-3"
                 >
-                    <Select v-model="projectId" @update:model-value="applyFilters">
+                    <Select
+                        v-model="projectId"
+                        @update:model-value="applyFilters"
+                    >
                         <SelectTrigger class="h-8 text-xs">
                             <SelectValue placeholder="All Projects" />
                         </SelectTrigger>
@@ -487,7 +585,9 @@ function completionLabel(site: MapSite): string {
                             <SelectValue placeholder="All Activity Types" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem :value="ALL">All Activity Types</SelectItem>
+                            <SelectItem :value="ALL"
+                                >All Activity Types</SelectItem
+                            >
                             <SelectItem
                                 v-for="a in activityTypeOptions"
                                 :key="a.value"
@@ -522,7 +622,9 @@ function completionLabel(site: MapSite): string {
                             <SelectValue placeholder="All Subcontractors" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem :value="ALL">All Subcontractors</SelectItem>
+                            <SelectItem :value="ALL"
+                                >All Subcontractors</SelectItem
+                            >
                             <SelectItem
                                 v-for="s in subcontractors"
                                 :key="s.id"
@@ -541,7 +643,9 @@ function completionLabel(site: MapSite): string {
                             <SelectValue placeholder="All Machine Types" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem :value="ALL">All Machine Types</SelectItem>
+                            <SelectItem :value="ALL"
+                                >All Machine Types</SelectItem
+                            >
                             <SelectItem
                                 v-for="m in machineTypes"
                                 :key="m.id"
@@ -552,7 +656,10 @@ function completionLabel(site: MapSite): string {
                         </SelectContent>
                     </Select>
 
-                    <Select v-model="province" @update:model-value="applyFilters">
+                    <Select
+                        v-model="province"
+                        @update:model-value="applyFilters"
+                    >
                         <SelectTrigger class="h-8 text-xs">
                             <SelectValue placeholder="All Provinces" />
                         </SelectTrigger>
@@ -607,11 +714,15 @@ function completionLabel(site: MapSite): string {
                         ></span>
 
                         <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-2">
+                            <div
+                                class="flex items-center justify-between gap-2"
+                            >
                                 <span class="truncate text-sm font-medium">{{
                                     site.site_code
                                 }}</span>
-                                <span class="shrink-0 text-xs text-muted-foreground">
+                                <span
+                                    class="shrink-0 text-xs text-muted-foreground"
+                                >
                                     {{ completionLabel(site) }}
                                 </span>
                             </div>
@@ -632,25 +743,41 @@ function completionLabel(site: MapSite): string {
 
                 <!-- Legend -->
                 <div
-                    class="absolute bottom-4 right-4 z-[999] rounded-lg border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm"
+                    class="absolute right-4 bottom-4 z-[999] rounded-lg border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm"
                 >
-                    <div class="mb-1.5 font-semibold text-foreground">Legend</div>
+                    <div class="mb-1.5 font-semibold text-foreground">
+                        Legend
+                    </div>
                     <div class="flex flex-col gap-1.5">
                         <div class="flex items-center gap-2">
-                            <span class="size-2.5 rounded-full bg-green-500"></span>
+                            <span
+                                class="size-2.5 rounded-full bg-green-500"
+                            ></span>
                             <span class="text-muted-foreground">Complete</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="size-2.5 rounded-full bg-orange-500"></span>
-                            <span class="text-muted-foreground">In Progress</span>
+                            <span
+                                class="size-2.5 rounded-full bg-orange-500"
+                            ></span>
+                            <span class="text-muted-foreground"
+                                >In Progress</span
+                            >
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="size-2.5 rounded-full bg-red-500"></span>
-                            <span class="text-muted-foreground">Needs Revision</span>
+                            <span
+                                class="size-2.5 rounded-full bg-red-500"
+                            ></span>
+                            <span class="text-muted-foreground"
+                                >Needs Revision</span
+                            >
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="size-2.5 rounded-full bg-gray-400"></span>
-                            <span class="text-muted-foreground">Not Started</span>
+                            <span
+                                class="size-2.5 rounded-full bg-gray-400"
+                            ></span>
+                            <span class="text-muted-foreground"
+                                >Not Started</span
+                            >
                         </div>
                     </div>
                 </div>
@@ -666,7 +793,7 @@ function completionLabel(site: MapSite): string {
                     class="flex shrink-0 items-start justify-between border-b border-sidebar-border/70 px-4 py-3"
                 >
                     <div class="min-w-0 flex-1 pr-2">
-                        <div class="text-sm font-semibold leading-tight">
+                        <div class="text-sm leading-tight font-semibold">
                             {{ selectedSite.site_code }}
                         </div>
                         <div
@@ -689,7 +816,9 @@ function completionLabel(site: MapSite): string {
                     <div
                         class="mb-4 rounded-xl border border-sidebar-border/70 bg-muted/30 p-3"
                     >
-                        <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div
+                            class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
                             Site Details
                         </div>
                         <dl class="space-y-1.5 text-sm">
@@ -718,14 +847,23 @@ function completionLabel(site: MapSite): string {
                                 </dd>
                             </div>
                             <div
-                                v-if="selectedSite.city || selectedSite.province"
+                                v-if="
+                                    selectedSite.city || selectedSite.province
+                                "
                                 class="flex gap-2"
                             >
                                 <dt class="w-24 shrink-0 text-muted-foreground">
                                     Location
                                 </dt>
                                 <dd class="text-muted-foreground">
-                                    {{ [selectedSite.city, selectedSite.province].filter(Boolean).join(', ') }}
+                                    {{
+                                        [
+                                            selectedSite.city,
+                                            selectedSite.province,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(', ')
+                                    }}
                                 </dd>
                             </div>
                             <div v-if="selectedSite.address" class="flex gap-2">
@@ -767,11 +905,13 @@ function completionLabel(site: MapSite): string {
                     </div>
 
                     <!-- Activity cards -->
-                    <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div
+                        class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
                         Activities
                         <span
                             v-if="activityType !== ALL"
-                            class="ml-1 font-normal normal-case text-foreground"
+                            class="ml-1 font-normal text-foreground normal-case"
                         >
                             (filtered)
                         </span>
@@ -790,7 +930,9 @@ function completionLabel(site: MapSite): string {
                             :key="assignment.id"
                             class="rounded-xl border border-sidebar-border/70 bg-background p-3"
                         >
-                            <div class="mb-2 flex items-center justify-between gap-2">
+                            <div
+                                class="mb-2 flex items-center justify-between gap-2"
+                            >
                                 <ActivityTypeBadge
                                     :activity-type="assignment.activity_type"
                                 />
@@ -816,11 +958,13 @@ function completionLabel(site: MapSite): string {
                 </div>
 
                 <!-- Panel footer -->
-                <div
-                    class="shrink-0 border-t border-sidebar-border/70 p-3"
-                >
+                <div class="shrink-0 border-t border-sidebar-border/70 p-3">
                     <Button as-child variant="default" size="sm" class="w-full">
-                        <Link :href="SiteActions.edit({ site: selectedSite.id }).url">
+                        <Link
+                            :href="
+                                SiteActions.edit({ site: selectedSite.id }).url
+                            "
+                        >
                             Edit Site
                         </Link>
                     </Button>

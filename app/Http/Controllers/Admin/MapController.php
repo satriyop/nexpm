@@ -7,6 +7,8 @@ use App\Models\MachineType;
 use App\Models\Project;
 use App\Models\Site;
 use App\Models\Subcontractor;
+use App\Support\GoogleMapsCoordinates;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -26,16 +28,14 @@ class MapController extends Controller
 
         $provinces = Site::query()
             ->whereNotNull('province')
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
+            ->where(fn ($query) => $this->whereHasMapCoordinates($query))
             ->whereHas('project', fn ($q) => $q->whereScopedToMainContractor())
             ->distinct()
             ->orderBy('province')
             ->pluck('province');
 
         $query = Site::query()
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
+            ->where(fn ($query) => $this->whereHasMapCoordinates($query))
             ->whereHas('project', fn ($q) => $q->whereScopedToMainContractor());
 
         if ($request->filled('project_id')) {
@@ -72,7 +72,7 @@ class MapController extends Controller
                 'assignments:id,site_id,activity_type,status,subcontractor_id',
                 'assignments.subcontractor:id,name',
             ])
-            ->get(['id', 'site_code', 'location_name', 'address', 'city', 'province', 'latitude', 'longitude', 'project_id', 'machine_type_id']);
+            ->get(['id', 'site_code', 'location_name', 'address', 'city', 'province', 'google_map_url', 'latitude', 'longitude', 'project_id', 'machine_type_id']);
 
         $assignmentIds = $sites->flatMap(fn ($s) => $s->assignments->pluck('id'))->unique();
 
@@ -124,7 +124,13 @@ class MapController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $mapSites = $sites->map(function (Site $site) use ($surveyPhotos, $constructionDataByAssignment, $constructionPhotos, $plnPhotos, $bastDataByAssignment, $bastPhotos): array {
+        $mapSites = $sites->map(function (Site $site) use ($surveyPhotos, $constructionDataByAssignment, $constructionPhotos, $plnPhotos, $bastDataByAssignment, $bastPhotos): ?array {
+            $coordinates = $this->siteCoordinates($site);
+
+            if ($coordinates === null) {
+                return null;
+            }
+
             $activeAssignments = $site->assignments->filter(fn ($a) => $a->status->value !== 'DROP');
             $totalAssignments = $activeAssignments->count();
             $completedCount = $activeAssignments
@@ -152,8 +158,8 @@ class MapController extends Controller
                 'address' => $site->address,
                 'city' => $site->city,
                 'province' => $site->province,
-                'latitude' => (float) $site->latitude,
-                'longitude' => (float) $site->longitude,
+                'latitude' => (float) $coordinates['latitude'],
+                'longitude' => (float) $coordinates['longitude'],
                 'project' => $site->project ? ['id' => $site->project->id, 'name' => $site->project->name] : null,
                 'machine_type' => $site->machineType ? ['id' => $site->machineType->id, 'name' => $site->machineType->name] : null,
                 'total_assignments' => $totalAssignments,
@@ -162,7 +168,7 @@ class MapController extends Controller
                 'photos' => $photos,
                 'assignments' => $assignments,
             ];
-        })->values()->all();
+        })->filter()->values()->all();
 
         $siteCollection = collect($mapSites);
 
@@ -182,6 +188,34 @@ class MapController extends Controller
             'stats' => $stats,
             'filters' => $request->only(['project_id', 'activity_type', 'status', 'subcontractor_id', 'machine_type_id', 'province']),
         ]);
+    }
+
+    /**
+     * @param  Builder<Site>  $query
+     */
+    private function whereHasMapCoordinates(Builder $query): void
+    {
+        $query
+            ->where(fn ($q) => $q->whereNotNull('latitude')->whereNotNull('longitude'))
+            ->orWhere(fn ($q) => $q
+                ->whereNotNull('google_map_url')
+                ->where('google_map_url', '!=', '')
+            );
+    }
+
+    /**
+     * @return array{latitude: string, longitude: string}|null
+     */
+    private function siteCoordinates(Site $site): ?array
+    {
+        if ($site->latitude !== null && $site->longitude !== null) {
+            return [
+                'latitude' => (string) $site->latitude,
+                'longitude' => (string) $site->longitude,
+            ];
+        }
+
+        return GoogleMapsCoordinates::fromUrl($site->google_map_url);
     }
 
     /**

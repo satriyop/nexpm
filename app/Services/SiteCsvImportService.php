@@ -6,6 +6,7 @@ use App\Imports\SiteMasterDataImport;
 use App\Models\MachineType;
 use App\Models\Site;
 use App\Models\SiteType;
+use App\Support\GoogleMapsCoordinates;
 
 class SiteCsvImportService
 {
@@ -80,6 +81,8 @@ class SiteCsvImportService
                 $approvedBudgetProvided = true;
             }
 
+            $coordinates = GoogleMapsCoordinates::fromUrl($row['google_map_url'] ?? '');
+
             $attributes = [
                 'project_id' => $projectId,
                 'location_name' => $row['location_name'],
@@ -87,8 +90,8 @@ class SiteCsvImportService
                 'province' => $row['province'] ?: null,
                 'city' => $row['city'] ?: null,
                 'google_map_url' => $row['google_map_url'] ?: null,
-                'latitude' => $row['latitude'] !== '' ? $row['latitude'] : null,
-                'longitude' => $row['longitude'] !== '' ? $row['longitude'] : null,
+                'latitude' => $row['latitude'] !== '' ? $row['latitude'] : ($coordinates['latitude'] ?? null),
+                'longitude' => $row['longitude'] !== '' ? $row['longitude'] : ($coordinates['longitude'] ?? null),
                 'site_type_id' => $siteTypeId,
                 'machine_type_id' => $machineTypeId,
                 'bd_pic' => $row['bd_pic'] ?: null,

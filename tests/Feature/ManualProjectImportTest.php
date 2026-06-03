@@ -182,6 +182,7 @@ test('store creates a new project, site, and assignment at reported status', fun
         'address' => 'Jl. Merdeka 1',
         'province' => 'Jawa Barat',
         'city' => 'Bandung',
+        'google_map_url' => 'https://maps.google.com/?q=-6.917464,107.619123',
         'activity_type' => 'SURVEY',
         'subcontractor_code' => 'SUB-001',
         'status' => 'REPORTED',
@@ -199,7 +200,10 @@ test('store creates a new project, site, and assignment at reported status', fun
         ->and($project->client_id)->toBe($client->id)
         ->and($project->main_contractor_id)->toBe($mc->id);
 
-    expect(Site::where('site_code', 'SITE-001')->exists())->toBeTrue();
+    $site = Site::where('site_code', 'SITE-001')->first();
+    expect($site)->not->toBeNull()
+        ->and($site->latitude)->toBe('-6.9174640')
+        ->and($site->longitude)->toBe('107.6191230');
 
     $assignment = Assignment::where('activity_type', ActivityType::Survey)->first();
     expect($assignment)->not->toBeNull()

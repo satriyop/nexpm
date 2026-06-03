@@ -68,6 +68,25 @@ test('imports approved_budget and auto-calculates DPP amounts', function () {
     File::delete($path);
 });
 
+test('imports coordinates from google map url when latitude and longitude are empty', function () {
+    $contractor = MainContractor::factory()->create();
+    $project = Project::factory()->for($contractor, 'mainContractor')->create();
+
+    $csv = "site_code,location_name,address,province,city,google_map_url,latitude,longitude,site_type,machine_type,bd_pic,ss_wo_number,cable_length_to_panel,charging_station_count\n";
+    $csv .= "SITE-MAP,Map Site,Jl. Map,DKI Jakarta,Jakarta,\"https://www.google.com/maps/place/Test/@-6.200000,106.816666,17z\",,,,,,,,\n";
+
+    $path = makeSiteCsv($csv);
+    $result = (new SiteCsvImportService)->import($path, $project->id);
+
+    expect($result['created'])->toBe(1)->and($result['errors'])->toBe([]);
+
+    $site = Site::query()->where('site_code', 'SITE-MAP')->first();
+    expect($site->latitude)->toBe('-6.2000000')
+        ->and($site->longitude)->toBe('106.8166660');
+
+    File::delete($path);
+});
+
 test('does not wipe approved_budget when CSV omits the column', function () {
     $contractor = MainContractor::factory()->create();
     $project = Project::factory()->for($contractor, 'mainContractor')->create();
