@@ -207,20 +207,24 @@ const simCheckpoints = computed<Checkpoint[]>(() => [
 ]);
 
 const groundingCheckpoints: Checkpoint[] = [
-    { key: 'grounding_rod_connection', label: 'Grounding Rod Connection' },
+    { key: 'grounding_rod_connection', label: 'GROUNDING ROD CONNECTION' },
+    {
+        key: 'grounding_connected_to_device',
+        label: 'GROUNDING CONNECTED TO EV CHARGER',
+    },
     {
         key: 'grounding_rod_to_earth_1',
-        label: 'Grounding Rod to Earth',
+        label: 'GROUNDING ROD TO EARTH',
     },
     {
         key: 'grounding_busbar_panel',
-        label: 'Grounding Rod Busbar (in Cable Route)',
+        label: 'GROUNDING BUSBAR IN PANEL AC',
     },
     {
         key: 'grounding_cable_route',
         label: 'GROUNDING CABLE ROUTE',
     },
-    { key: 'grounding_test_ac_panel', label: 'Grounding Test AC Panel' },
+    { key: 'grounding_test_ac_panel', label: 'GROUNDING TEST (OHM)' },
 ];
 
 const fireExtCheckpoints: Checkpoint[] = [

@@ -190,6 +190,7 @@ test('bast report grounding photos match the excel grounding layout', function (
 
         foreach ([
             'grounding_rod_connection',
+            'grounding_connected_to_device',
             'grounding_rod_to_earth_1',
             'grounding_rod_to_earth_2',
             'grounding_busbar_panel',
@@ -211,7 +212,7 @@ test('bast report grounding photos match the excel grounding layout', function (
             ->values()
             ->all();
 
-        expect($coordinates)->toBe(['B3', 'B4', 'F4', 'B5', 'F5']);
+        expect($coordinates)->toBe(['B3', 'F3', 'B4', 'F4', 'B5', 'F5']);
     } finally {
         if (file_exists($absolutePhotoPath)) {
             unlink($absolutePhotoPath);
@@ -224,5 +225,10 @@ test('bast grounding form has one grounding rod to earth field and excel cable r
 
     expect($component)->toContain("key: 'grounding_rod_to_earth_1'")
         ->and($component)->not->toContain("key: 'grounding_rod_to_earth_2'")
-        ->and($component)->toContain("label: 'GROUNDING CABLE ROUTE'");
+        ->and($component)->toContain("label: 'GROUNDING ROD CONNECTION'")
+        ->and($component)->toContain("label: 'GROUNDING CONNECTED TO EV CHARGER'")
+        ->and($component)->toContain("label: 'GROUNDING ROD TO EARTH'")
+        ->and($component)->toContain("label: 'GROUNDING BUSBAR IN PANEL AC'")
+        ->and($component)->toContain("label: 'GROUNDING CABLE ROUTE'")
+        ->and($component)->toContain("label: 'GROUNDING TEST (OHM)'");
 });
