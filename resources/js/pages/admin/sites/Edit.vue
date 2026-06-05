@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { AlertTriangle, ArrowLeft, Check, Clipboard, ExternalLink, LockKeyhole } from 'lucide-vue-next';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Check,
+    Clipboard,
+    ExternalLink,
+    LockKeyhole,
+} from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import * as ProjectActions from '@/actions/App/Http/Controllers/Admin/ProjectController';
@@ -178,13 +185,24 @@ const form = useForm({
     invoice_url: props.site.invoice_url ?? '',
 });
 
+const isSubmittingSiteForm = ref(false);
+
 function submit(): void {
+    isSubmittingSiteForm.value = true;
+
     form.transform((data) => ({
         ...data,
         site_type_id: data.site_type_id === NONE ? null : data.site_type_id,
         machine_type_id:
             data.machine_type_id === NONE ? null : data.machine_type_id,
-    })).patch(SiteActions.update(props.site).url);
+    })).patch(SiteActions.update(props.site).url, {
+        onSuccess: () => {
+            form.defaults();
+        },
+        onFinish: () => {
+            isSubmittingSiteForm.value = false;
+        },
+    });
 }
 
 // Auto-calculate DPP amounts from approved budget
@@ -193,7 +211,7 @@ watch(
     (budget) => {
         const b = Number(budget) || 0;
         form.dp_35_dpp_amount = b > 0 ? String(Math.round(b * 0.35)) : '';
-        form.invoice_60_dpp_amount = b > 0 ? String(Math.round(b * 0.60)) : '';
+        form.invoice_60_dpp_amount = b > 0 ? String(Math.round(b * 0.6)) : '';
         form.invoice_5_dpp_amount = b > 0 ? String(Math.round(b * 0.05)) : '';
     },
 );
@@ -250,6 +268,7 @@ function handleBeforeUnload(e: BeforeUnloadEvent): void {
 
 const removeNavGuard = router.on('before', (e) => {
     if (
+        !isSubmittingSiteForm.value &&
         form.isDirty &&
         !window.confirm('You have unsaved changes. Leave anyway?')
     ) {
@@ -624,7 +643,9 @@ function removeAssignment(assignment: Assignment): void {
                     <div class="grid gap-1.5">
                         <Label>Power / Daya (kVA)</Label>
                         <Select v-model="form.power_kva">
-                            <SelectTrigger><SelectValue placeholder="Select power" /></SelectTrigger>
+                            <SelectTrigger
+                                ><SelectValue placeholder="Select power"
+                            /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="7.7kVA">7.7 kVA</SelectItem>
                                 <SelectItem value="11kVA">11 kVA</SelectItem>
@@ -713,8 +734,10 @@ function removeAssignment(assignment: Assignment): void {
                     <h2 class="text-base font-semibold">Budget</h2>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid gap-1.5 max-w-xs">
-                        <Label for="approved_budget">Approved Budget (Rp)</Label>
+                    <div class="grid max-w-xs gap-1.5">
+                        <Label for="approved_budget"
+                            >Approved Budget (Rp)</Label
+                        >
                         <Input
                             id="approved_budget"
                             v-model="form.approved_budget"
@@ -737,18 +760,28 @@ function removeAssignment(assignment: Assignment): void {
                 <CardContent class="space-y-6">
                     <!-- 35% tier -->
                     <div>
-                        <p class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        <p
+                            class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
                             35% (Down Payment)
                         </p>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div
+                            class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
+                        >
                             <div class="grid gap-1.5">
-                                <Label for="invoice_submission_date">35% Submission Date</Label>
+                                <Label for="invoice_submission_date"
+                                    >35% Submission Date</Label
+                                >
                                 <Input
                                     id="invoice_submission_date"
                                     v-model="form.invoice_submission_date"
                                     type="date"
                                 />
-                                <InputError :message="form.errors.invoice_submission_date" />
+                                <InputError
+                                    :message="
+                                        form.errors.invoice_submission_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
                                 <Label for="dp_35_date">35% DP Date</Label>
@@ -760,16 +793,22 @@ function removeAssignment(assignment: Assignment): void {
                                 <InputError :message="form.errors.dp_35_date" />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="dp_35_inv_number">35% Inv Number</Label>
+                                <Label for="dp_35_inv_number"
+                                    >35% Inv Number</Label
+                                >
                                 <Input
                                     id="dp_35_inv_number"
                                     v-model="form.dp_35_inv_number"
                                     placeholder="Invoice number"
                                 />
-                                <InputError :message="form.errors.dp_35_inv_number" />
+                                <InputError
+                                    :message="form.errors.dp_35_inv_number"
+                                />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="dp_35_dpp_amount">35% DPP Amount</Label>
+                                <Label for="dp_35_dpp_amount"
+                                    >35% DPP Amount</Label
+                                >
                                 <div class="relative">
                                     <Input
                                         id="dp_35_dpp_amount"
@@ -782,54 +821,88 @@ function removeAssignment(assignment: Assignment): void {
                                     />
                                     <button
                                         type="button"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        :title="copiedField === 'dp_35' ? 'Copied!' : 'Copy'"
-                                        @click="copyToClipboard(form.dp_35_dpp_amount, 'dp_35')"
+                                        class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        :title="
+                                            copiedField === 'dp_35'
+                                                ? 'Copied!'
+                                                : 'Copy'
+                                        "
+                                        @click="
+                                            copyToClipboard(
+                                                form.dp_35_dpp_amount,
+                                                'dp_35',
+                                            )
+                                        "
                                     >
-                                        <Check v-if="copiedField === 'dp_35'" class="h-4 w-4 text-green-500" />
+                                        <Check
+                                            v-if="copiedField === 'dp_35'"
+                                            class="h-4 w-4 text-green-500"
+                                        />
                                         <Clipboard v-else class="h-4 w-4" />
                                     </button>
                                 </div>
-                                <InputError :message="form.errors.dp_35_dpp_amount" />
+                                <InputError
+                                    :message="form.errors.dp_35_dpp_amount"
+                                />
                             </div>
                         </div>
                     </div>
 
                     <!-- 60% tier -->
                     <div>
-                        <p class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        <p
+                            class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
                             60%
                         </p>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div
+                            class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
+                        >
                             <div class="grid gap-1.5">
-                                <Label for="invoice_60_submission_date">60% Submission Date</Label>
+                                <Label for="invoice_60_submission_date"
+                                    >60% Submission Date</Label
+                                >
                                 <Input
                                     id="invoice_60_submission_date"
                                     v-model="form.invoice_60_submission_date"
                                     type="date"
                                 />
-                                <InputError :message="form.errors.invoice_60_submission_date" />
+                                <InputError
+                                    :message="
+                                        form.errors.invoice_60_submission_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="payment_60_date">60% Payment Date</Label>
+                                <Label for="payment_60_date"
+                                    >60% Payment Date</Label
+                                >
                                 <Input
                                     id="payment_60_date"
                                     v-model="form.payment_60_date"
                                     type="date"
                                 />
-                                <InputError :message="form.errors.payment_60_date" />
+                                <InputError
+                                    :message="form.errors.payment_60_date"
+                                />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="invoice_60_inv_number">60% Inv Number</Label>
+                                <Label for="invoice_60_inv_number"
+                                    >60% Inv Number</Label
+                                >
                                 <Input
                                     id="invoice_60_inv_number"
                                     v-model="form.invoice_60_inv_number"
                                     placeholder="Invoice number"
                                 />
-                                <InputError :message="form.errors.invoice_60_inv_number" />
+                                <InputError
+                                    :message="form.errors.invoice_60_inv_number"
+                                />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="invoice_60_dpp_amount">60% DPP Amount</Label>
+                                <Label for="invoice_60_dpp_amount"
+                                    >60% DPP Amount</Label
+                                >
                                 <div class="relative">
                                     <Input
                                         id="invoice_60_dpp_amount"
@@ -842,54 +915,88 @@ function removeAssignment(assignment: Assignment): void {
                                     />
                                     <button
                                         type="button"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        :title="copiedField === 'inv_60' ? 'Copied!' : 'Copy'"
-                                        @click="copyToClipboard(form.invoice_60_dpp_amount, 'inv_60')"
+                                        class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        :title="
+                                            copiedField === 'inv_60'
+                                                ? 'Copied!'
+                                                : 'Copy'
+                                        "
+                                        @click="
+                                            copyToClipboard(
+                                                form.invoice_60_dpp_amount,
+                                                'inv_60',
+                                            )
+                                        "
                                     >
-                                        <Check v-if="copiedField === 'inv_60'" class="h-4 w-4 text-green-500" />
+                                        <Check
+                                            v-if="copiedField === 'inv_60'"
+                                            class="h-4 w-4 text-green-500"
+                                        />
                                         <Clipboard v-else class="h-4 w-4" />
                                     </button>
                                 </div>
-                                <InputError :message="form.errors.invoice_60_dpp_amount" />
+                                <InputError
+                                    :message="form.errors.invoice_60_dpp_amount"
+                                />
                             </div>
                         </div>
                     </div>
 
                     <!-- 5% tier -->
                     <div>
-                        <p class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        <p
+                            class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                        >
                             5% (Retention)
                         </p>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div
+                            class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
+                        >
                             <div class="grid gap-1.5">
-                                <Label for="invoice_5_submission_date">5% Submission Date</Label>
+                                <Label for="invoice_5_submission_date"
+                                    >5% Submission Date</Label
+                                >
                                 <Input
                                     id="invoice_5_submission_date"
                                     v-model="form.invoice_5_submission_date"
                                     type="date"
                                 />
-                                <InputError :message="form.errors.invoice_5_submission_date" />
+                                <InputError
+                                    :message="
+                                        form.errors.invoice_5_submission_date
+                                    "
+                                />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="payment_5_date">5% Payment Date</Label>
+                                <Label for="payment_5_date"
+                                    >5% Payment Date</Label
+                                >
                                 <Input
                                     id="payment_5_date"
                                     v-model="form.payment_5_date"
                                     type="date"
                                 />
-                                <InputError :message="form.errors.payment_5_date" />
+                                <InputError
+                                    :message="form.errors.payment_5_date"
+                                />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="invoice_5_inv_number">5% Inv Number</Label>
+                                <Label for="invoice_5_inv_number"
+                                    >5% Inv Number</Label
+                                >
                                 <Input
                                     id="invoice_5_inv_number"
                                     v-model="form.invoice_5_inv_number"
                                     placeholder="Invoice number"
                                 />
-                                <InputError :message="form.errors.invoice_5_inv_number" />
+                                <InputError
+                                    :message="form.errors.invoice_5_inv_number"
+                                />
                             </div>
                             <div class="grid gap-1.5">
-                                <Label for="invoice_5_dpp_amount">5% DPP Amount</Label>
+                                <Label for="invoice_5_dpp_amount"
+                                    >5% DPP Amount</Label
+                                >
                                 <div class="relative">
                                     <Input
                                         id="invoice_5_dpp_amount"
@@ -902,15 +1009,29 @@ function removeAssignment(assignment: Assignment): void {
                                     />
                                     <button
                                         type="button"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        :title="copiedField === 'inv_5' ? 'Copied!' : 'Copy'"
-                                        @click="copyToClipboard(form.invoice_5_dpp_amount, 'inv_5')"
+                                        class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        :title="
+                                            copiedField === 'inv_5'
+                                                ? 'Copied!'
+                                                : 'Copy'
+                                        "
+                                        @click="
+                                            copyToClipboard(
+                                                form.invoice_5_dpp_amount,
+                                                'inv_5',
+                                            )
+                                        "
                                     >
-                                        <Check v-if="copiedField === 'inv_5'" class="h-4 w-4 text-green-500" />
+                                        <Check
+                                            v-if="copiedField === 'inv_5'"
+                                            class="h-4 w-4 text-green-500"
+                                        />
                                         <Clipboard v-else class="h-4 w-4" />
                                     </button>
                                 </div>
-                                <InputError :message="form.errors.invoice_5_dpp_amount" />
+                                <InputError
+                                    :message="form.errors.invoice_5_dpp_amount"
+                                />
                             </div>
                         </div>
                     </div>
@@ -1081,12 +1202,31 @@ function removeAssignment(assignment: Assignment): void {
                     </div>
                 </CardContent>
                 <CardFooter v-if="surveyAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                    <div
+                        class="flex w-full items-center justify-between gap-2 pt-3"
+                    >
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(surveyAssignment.survey_data?.updated_at ?? surveyAssignment.updated_at) }}
+                            Updated
+                            {{
+                                relativeTime(
+                                    surveyAssignment.survey_data?.updated_at ??
+                                        surveyAssignment.updated_at,
+                                )
+                            }}
                         </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(surveyAssignment.id).url">
+                        <Button
+                            as-child
+                            size="sm"
+                            variant="outline"
+                            class="h-7 gap-1.5 text-xs font-medium"
+                        >
+                            <Link
+                                :href="
+                                    AdminAssignmentActions.show(
+                                        surveyAssignment.id,
+                                    ).url
+                                "
+                            >
                                 <ExternalLink class="size-3" />
                                 Details
                             </Link>
@@ -1333,12 +1473,32 @@ function removeAssignment(assignment: Assignment): void {
                     </div>
                 </CardContent>
                 <CardFooter v-if="constructionAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                    <div
+                        class="flex w-full items-center justify-between gap-2 pt-3"
+                    >
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(constructionAssignment.construction_data?.updated_at ?? constructionAssignment.updated_at) }}
+                            Updated
+                            {{
+                                relativeTime(
+                                    constructionAssignment.construction_data
+                                        ?.updated_at ??
+                                        constructionAssignment.updated_at,
+                                )
+                            }}
                         </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(constructionAssignment.id).url">
+                        <Button
+                            as-child
+                            size="sm"
+                            variant="outline"
+                            class="h-7 gap-1.5 text-xs font-medium"
+                        >
+                            <Link
+                                :href="
+                                    AdminAssignmentActions.show(
+                                        constructionAssignment.id,
+                                    ).url
+                                "
+                            >
                                 <ExternalLink class="size-3" />
                                 Details
                             </Link>
@@ -1484,12 +1644,31 @@ function removeAssignment(assignment: Assignment): void {
                     </div>
                 </CardContent>
                 <CardFooter v-if="plnAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                    <div
+                        class="flex w-full items-center justify-between gap-2 pt-3"
+                    >
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(plnAssignment.pln_data?.updated_at ?? plnAssignment.updated_at) }}
+                            Updated
+                            {{
+                                relativeTime(
+                                    plnAssignment.pln_data?.updated_at ??
+                                        plnAssignment.updated_at,
+                                )
+                            }}
                         </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(plnAssignment.id).url">
+                        <Button
+                            as-child
+                            size="sm"
+                            variant="outline"
+                            class="h-7 gap-1.5 text-xs font-medium"
+                        >
+                            <Link
+                                :href="
+                                    AdminAssignmentActions.show(
+                                        plnAssignment.id,
+                                    ).url
+                                "
+                            >
                                 <ExternalLink class="size-3" />
                                 Details
                             </Link>
@@ -1635,12 +1814,31 @@ function removeAssignment(assignment: Assignment): void {
                     </div>
                 </CardContent>
                 <CardFooter v-if="bastAssignment" class="border-t pt-0">
-                    <div class="flex w-full items-center justify-between gap-2 pt-3">
+                    <div
+                        class="flex w-full items-center justify-between gap-2 pt-3"
+                    >
                         <span class="text-xs text-muted-foreground">
-                            Updated {{ relativeTime(bastAssignment.bast_data?.updated_at ?? bastAssignment.updated_at) }}
+                            Updated
+                            {{
+                                relativeTime(
+                                    bastAssignment.bast_data?.updated_at ??
+                                        bastAssignment.updated_at,
+                                )
+                            }}
                         </span>
-                        <Button as-child size="sm" variant="outline" class="h-7 gap-1.5 text-xs font-medium">
-                            <Link :href="AdminAssignmentActions.show(bastAssignment.id).url">
+                        <Button
+                            as-child
+                            size="sm"
+                            variant="outline"
+                            class="h-7 gap-1.5 text-xs font-medium"
+                        >
+                            <Link
+                                :href="
+                                    AdminAssignmentActions.show(
+                                        bastAssignment.id,
+                                    ).url
+                                "
+                            >
                                 <ExternalLink class="size-3" />
                                 Details
                             </Link>
