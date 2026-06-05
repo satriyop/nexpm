@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { AlertTriangle, Eye, PencilLine, Search, X } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import * as SubAssignmentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import PaginationLinks from '@/components/PaginationLinks.vue';
@@ -50,17 +50,29 @@ const status = ref<string>(props.filters.status ?? ALL);
 const activityType = ref<string>(props.filters.activity_type ?? ALL);
 const projectId = ref<string>(props.filters.project_id ?? ALL);
 const machineTypeId = ref<string>(props.filters.machine_type_id ?? ALL);
+const isSearchFocused = ref(false);
+let searchTimeout: number | null = null;
 
 watch(
     () => props.filters,
     (next) => {
-        search.value = next.search ?? '';
+        if (!isSearchFocused.value) {
+            search.value = next.search ?? '';
+        }
+
         status.value = next.status ?? ALL;
         activityType.value = next.activity_type ?? ALL;
         projectId.value = next.project_id ?? ALL;
         machineTypeId.value = next.machine_type_id ?? ALL;
     },
 );
+
+function cancelScheduledSearch(): void {
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+}
 
 const statusOptions: { value: AssignmentStatus; label: string }[] = [
     { value: 'PENDING', label: 'Pending' },
@@ -91,6 +103,8 @@ const hasActiveFilters = computed(
 );
 
 function applyFilters(): void {
+    cancelScheduledSearch();
+
     const query: Record<string, string> = {};
 
     if (search.value.trim()) {
@@ -113,6 +127,7 @@ function applyFilters(): void {
         query.machine_type_id = machineTypeId.value;
     }
 
+    router.cancelAll();
     router.get(SubAssignmentActions.index().url, query, {
         preserveState: true,
         preserveScroll: true,
@@ -129,16 +144,17 @@ function resetFilters(): void {
     applyFilters();
 }
 
-let searchTimeout: number | null = null;
-function onSearchInput() {
-    if (searchTimeout) {
-        clearTimeout(searchTimeout);
-    }
-
+function onSearchInput(): void {
+    cancelScheduledSearch();
     searchTimeout = window.setTimeout(() => {
         applyFilters();
-    }, 300);
+    }, 400);
 }
+
+onBeforeUnmount(() => {
+    cancelScheduledSearch();
+    router.cancelAll();
+});
 
 function isFillable(s: AssignmentStatus): boolean {
     return !['VERIFIED', 'REPORTED', 'DROP'].includes(s);
@@ -239,6 +255,8 @@ function daysStalled(assignment: Assignment): number | null {
                             type="search"
                             placeholder="Site code, location..."
                             class="pl-9"
+                            @focus="isSearchFocused = true"
+                            @blur="isSearchFocused = false"
                             @input="onSearchInput"
                         />
                     </div>

@@ -8,8 +8,7 @@ import {
     Search,
     X,
 } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
-import { usePermissions } from '@/composables/usePermissions';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import PaginationLinks from '@/components/PaginationLinks.vue';
 import { Button } from '@/components/ui/button';
@@ -22,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { usePermissions } from '@/composables/usePermissions';
 import { dashboard } from '@/routes';
 import type {
     ActivityType,
@@ -101,12 +101,17 @@ const subcontractorId = ref<string>(ALL);
 const mainContractorId = ref<string>(ALL);
 const projectId = ref<string>(ALL);
 const machineTypeId = ref<string>(ALL);
+const isSearchFocused = ref(false);
+let searchTimeout: number | null = null;
 
 watch(
     () => props.filters,
     (next) => {
         if (next && typeof next === 'object') {
-            search.value = (next as any).search ?? '';
+            if (!isSearchFocused.value) {
+                search.value = (next as any).search ?? '';
+            }
+
             status.value = (next as any).status ?? ALL;
             activityType.value = (next as any).activity_type ?? ALL;
             subcontractorId.value =
@@ -117,7 +122,10 @@ watch(
             machineTypeId.value =
                 (next as any).machine_type_id?.toString() ?? ALL;
         } else {
-            search.value = '';
+            if (!isSearchFocused.value) {
+                search.value = '';
+            }
+
             status.value = ALL;
             activityType.value = ALL;
             subcontractorId.value = ALL;
@@ -128,6 +136,13 @@ watch(
     },
     { immediate: true },
 );
+
+function cancelScheduledSearch(): void {
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+}
 
 const statusOptions: { value: AssignmentStatus; label: string }[] = [
     { value: 'PENDING', label: 'Pending' },
@@ -165,6 +180,8 @@ const hasActiveFilters = computed(
 );
 
 function applyFilters(): void {
+    cancelScheduledSearch();
+
     const query: Record<string, string> = {};
 
     if (search.value.trim()) {
@@ -195,6 +212,7 @@ function applyFilters(): void {
         query.machine_type_id = machineTypeId.value;
     }
 
+    router.cancelAll();
     router.get('/admin/assignments', query, {
         preserveState: true,
         preserveScroll: true,
@@ -219,16 +237,17 @@ function resetFilters(): void {
     applyFilters();
 }
 
-let searchTimeout: number | null = null;
-function onSearchInput() {
-    if (searchTimeout) {
-        clearTimeout(searchTimeout);
-    }
-
+function onSearchInput(): void {
+    cancelScheduledSearch();
     searchTimeout = window.setTimeout(() => {
         applyFilters();
-    }, 300);
+    }, 400);
 }
+
+onBeforeUnmount(() => {
+    cancelScheduledSearch();
+    router.cancelAll();
+});
 
 function getAssignment(assignments: any, activityType: string): any | null {
     if (!assignments) {
@@ -406,6 +425,8 @@ function exportSelected(): void {
                             type="search"
                             placeholder="Site code, location..."
                             class="pl-9"
+                            @focus="isSearchFocused = true"
+                            @blur="isSearchFocused = false"
                             @input="onSearchInput"
                         />
                     </div>
