@@ -66,12 +66,12 @@ class Site extends Model
             'cable_length_panel_to_charger' => 'decimal:2',
             'charging_station_count' => 'integer',
             'approved_budget' => 'integer',
-            'invoice_submission_date' => 'date',
-            'dp_35_date' => 'date',
-            'invoice_60_submission_date' => 'date',
-            'payment_60_date' => 'date',
-            'invoice_5_submission_date' => 'date',
-            'payment_5_date' => 'date',
+            'invoice_submission_date' => 'date:Y-m-d',
+            'dp_35_date' => 'date:Y-m-d',
+            'invoice_60_submission_date' => 'date:Y-m-d',
+            'payment_60_date' => 'date:Y-m-d',
+            'invoice_5_submission_date' => 'date:Y-m-d',
+            'payment_5_date' => 'date:Y-m-d',
         ];
     }
 

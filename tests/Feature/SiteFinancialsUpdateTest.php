@@ -38,5 +38,11 @@ test('site financial date fields can be saved', function () {
         ->and($site->invoice_60_submission_date?->toDateString())->toBe('2026-07-05')
         ->and($site->payment_60_date?->toDateString())->toBe('2026-07-12')
         ->and($site->invoice_5_submission_date?->toDateString())->toBe('2026-08-05')
-        ->and($site->payment_5_date?->toDateString())->toBe('2026-08-12');
+        ->and($site->payment_5_date?->toDateString())->toBe('2026-08-12')
+        ->and($site->toArray()['invoice_submission_date'])->toBe('2026-06-05')
+        ->and($site->toArray()['dp_35_date'])->toBe('2026-06-05')
+        ->and($site->toArray()['invoice_60_submission_date'])->toBe('2026-07-05')
+        ->and($site->toArray()['payment_60_date'])->toBe('2026-07-12')
+        ->and($site->toArray()['invoice_5_submission_date'])->toBe('2026-08-05')
+        ->and($site->toArray()['payment_5_date'])->toBe('2026-08-12');
 });
