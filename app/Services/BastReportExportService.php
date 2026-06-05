@@ -166,6 +166,7 @@ class BastReportExportService
             ->first()?->constructionData;
 
         $this->fillCoverSheet($spreadsheet, $bastData, $assignment, $siblingConstruction);
+        $this->fillApprovalSheet($spreadsheet, $assignment);
         $this->fillMeasurements($spreadsheet, $bastData, $isBss);
         $this->embedPhotos($spreadsheet, $bastData, $isBss);
 
@@ -203,6 +204,20 @@ class BastReportExportService
         foreach ($values as $coordinate => $value) {
             $sheet->setCellValue($coordinate, $value ?? '');
         }
+    }
+
+    private function fillApprovalSheet(Spreadsheet $spreadsheet, Assignment $assignment): void
+    {
+        $sheet = $spreadsheet->getSheetByName('KWH,AC Panel, Cable');
+
+        if ($sheet === null) {
+            return;
+        }
+
+        $mainContractor = $assignment->site->project?->mainContractor;
+
+        $sheet->setCellValue('A30', 'Prepared By : '.($mainContractor?->pic ?? ''));
+        $sheet->setCellValue('E30', $mainContractor?->name ?? '');
     }
 
     private function fillMeasurements(Spreadsheet $spreadsheet, ?AssignmentBastData $bastData, bool $isBss): void

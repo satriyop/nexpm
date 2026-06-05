@@ -3,6 +3,8 @@
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentBastPhoto;
+use App\Models\MainContractor;
+use App\Models\Project;
 use App\Models\Site;
 use App\Models\SiteType;
 use App\Services\BastReportExportService;
@@ -63,4 +65,31 @@ test('bast report photos are fitted inside their intended template area', functi
             unlink($absolutePhotoPath);
         }
     }
+});
+
+test('bast report approval section uses main contractor details', function () {
+    $mainContractor = MainContractor::factory()->create([
+        'name' => 'CV Sigmatec',
+        'pic' => 'Topan Gilas',
+    ]);
+
+    $project = Project::factory()->create([
+        'main_contractor_id' => $mainContractor->id,
+    ]);
+
+    $assignment = Assignment::factory()
+        ->bast()
+        ->for(Site::factory()->state([
+            'project_id' => $project->id,
+            'site_type_id' => SiteType::factory()->create(['name' => 'EVCS'])->id,
+        ]))
+        ->create();
+
+    AssignmentBastData::factory()->create(['assignment_id' => $assignment->id]);
+
+    $spreadsheet = app(BastReportExportService::class)->generate($assignment);
+    $sheet = $spreadsheet->getSheetByName('KWH,AC Panel, Cable');
+
+    expect($sheet?->getCell('A30')->getValue())->toBe('Prepared By : Topan Gilas')
+        ->and($sheet?->getCell('E30')->getValue())->toBe('CV Sigmatec');
 });
