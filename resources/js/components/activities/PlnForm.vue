@@ -155,6 +155,9 @@ function currentDocumentUrl(key: PlnFileKey): string | null {
                         <Label>ID Pelanggan (ID PLN)</Label>
                         <Input
                             v-model="plnForm.id_pelanggan"
+                            type="text"
+                            inputmode="numeric"
+                            autocomplete="off"
                             :disabled="isReadOnly"
                             placeholder="ID Pelanggan"
                         />

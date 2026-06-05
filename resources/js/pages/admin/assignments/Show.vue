@@ -1606,7 +1606,12 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                             </div>
                             <div class="grid gap-1.5">
                                 <Label>ID Pelanggan</Label>
-                                <Input v-model="adminPlnForm.id_pelanggan" />
+                                <Input
+                                    v-model="adminPlnForm.id_pelanggan"
+                                    type="text"
+                                    inputmode="numeric"
+                                    autocomplete="off"
+                                />
                                 <InputError
                                     :message="adminPlnForm.errors.id_pelanggan"
                                 />

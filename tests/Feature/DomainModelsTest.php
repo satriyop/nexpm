@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Role;
+use App\Models\AssignmentPlnData;
 use App\Models\Client;
 use App\Models\MachineType;
 use App\Models\MainContractor;
@@ -83,6 +84,24 @@ test('subcontractor user can be linked to subcontractor and main contractor', fu
         ->and($user->subcontractor->is($subcontractor))->toBeTrue()
         ->and($subcontractor->mainContractors->first()->is($contractor))->toBeTrue()
         ->and($subcontractor->user->is($user))->toBeTrue();
+});
+
+test('pln customer id normalizes spreadsheet scientific notation', function () {
+    $commaNotation = AssignmentPlnData::factory()->create([
+        'id_pelanggan' => '5,25E+11',
+    ]);
+    $dotNotation = AssignmentPlnData::factory()->create([
+        'id_pelanggan' => '5.25E+11',
+    ]);
+    $plainIdentifier = AssignmentPlnData::factory()->create([
+        'id_pelanggan' => 'PLN-000123',
+    ]);
+
+    expect($commaNotation->id_pelanggan)->toBe('525000000000')
+        ->and($commaNotation->getRawOriginal('id_pelanggan'))->toBe('525000000000')
+        ->and($commaNotation->toArray()['id_pelanggan'])->toBe('525000000000')
+        ->and($dotNotation->id_pelanggan)->toBe('525000000000')
+        ->and($plainIdentifier->id_pelanggan)->toBe('PLN-000123');
 });
 
 test('role enum has expected cases', function () {

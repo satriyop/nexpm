@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Observers\AssignmentDataObserver;
 use Database\Factories\AssignmentPlnDataFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -67,6 +68,17 @@ class AssignmentPlnData extends Model
     }
 
     /**
+     * @return Attribute<?string, ?string>
+     */
+    protected function idPelanggan(): Attribute
+    {
+        return Attribute::make(
+            get: fn (mixed $value): ?string => self::normalizeIdPelanggan($value),
+            set: fn (mixed $value): ?string => self::normalizeIdPelanggan($value),
+        );
+    }
+
+    /**
      * @return BelongsTo<Assignment, $this>
      */
     public function assignment(): BelongsTo
@@ -85,5 +97,48 @@ class AssignmentPlnData extends Model
         }
 
         return true;
+    }
+
+    private static function normalizeIdPelanggan(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (! preg_match('/^([+-]?)(\d+)(?:[,.](\d+))?[eE]([+-]?\d+)$/', $value, $matches)) {
+            return $value;
+        }
+
+        $sign = $matches[1] === '-' ? '-' : '';
+        $whole = $matches[2];
+        $fraction = $matches[3] ?? '';
+        $exponent = (int) $matches[4];
+        $digits = ltrim($whole.$fraction, '0');
+
+        if ($digits === '') {
+            return '0';
+        }
+
+        $shift = $exponent - strlen($fraction);
+
+        if ($shift >= 0) {
+            return $sign.$digits.str_repeat('0', $shift);
+        }
+
+        $position = strlen($digits) + $shift;
+
+        if ($position <= 0) {
+            $normalized = '0.'.str_repeat('0', abs($position)).$digits;
+        } else {
+            $normalized = substr($digits, 0, $position).'.'.substr($digits, $position);
+        }
+
+        return $sign.rtrim(rtrim($normalized, '0'), '.');
     }
 }
