@@ -49,6 +49,7 @@ class BastReportExportService
         'grounding_rod_to_earth_1' => ['Grounding', 'B', 4],
         'grounding_busbar_panel' => ['Grounding', 'F', 4],
         'grounding_cable_route' => ['Grounding', 'B', 5],
+        'grounding_test_ac_panel' => ['Grounding', 'F', 5],
         // Fire extinguisher (EVCS only)
         'fire_ext_front_view' => ['Grounding', 'B', 10],
         'fire_ext_pressure' => ['Grounding', 'F', 10],
@@ -104,6 +105,7 @@ class BastReportExportService
         'grounding_rod_to_earth_1' => ['Grounding', 'B', 4],
         'grounding_busbar_panel' => ['Grounding', 'F', 4],
         'grounding_cable_route' => ['Grounding', 'B', 5],
+        'grounding_test_ac_panel' => ['Grounding', 'F', 5],
         // KWH, AC Panel, Cable (same layout as EVCS)
         'kwh_kwh_meter' => ['KWH,AC Panel, Cable', 'B', 3],
         'kwh_mcb_pln' => ['KWH,AC Panel, Cable', 'F', 3],

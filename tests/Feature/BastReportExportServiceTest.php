@@ -164,3 +164,65 @@ test('bast report includes measurement photos in the testing section', function 
         ['B14', 'F14', 'B16', 'F16', 'B18'],
     ],
 ]);
+
+test('bast report grounding photos match the excel grounding layout', function () {
+    $photoPath = 'bast/grounding-placement-test.png';
+    $absolutePhotoPath = storage_path('app/public/'.$photoPath);
+
+    if (! is_dir(dirname($absolutePhotoPath))) {
+        mkdir(dirname($absolutePhotoPath), 0755, true);
+    }
+
+    $image = imagecreatetruecolor(800, 450);
+    imagefilledrectangle($image, 0, 0, 799, 449, imagecolorallocate($image, 30, 180, 120));
+    imagepng($image, $absolutePhotoPath);
+    imagedestroy($image);
+
+    try {
+        $assignment = Assignment::factory()
+            ->bast()
+            ->for(Site::factory()->state([
+                'site_type_id' => SiteType::factory()->create(['name' => 'EVCS'])->id,
+            ]))
+            ->create();
+
+        $bastData = AssignmentBastData::factory()->create(['assignment_id' => $assignment->id]);
+
+        foreach ([
+            'grounding_rod_connection',
+            'grounding_rod_to_earth_1',
+            'grounding_rod_to_earth_2',
+            'grounding_busbar_panel',
+            'grounding_cable_route',
+            'grounding_test_ac_panel',
+        ] as $checkpointKey) {
+            AssignmentBastPhoto::query()->create([
+                'assignment_bast_data_id' => $bastData->id,
+                'section' => 'grounding',
+                'checkpoint_key' => $checkpointKey,
+                'photo_path' => $photoPath,
+            ]);
+        }
+
+        $spreadsheet = app(BastReportExportService::class)->generate($assignment);
+        $sheet = $spreadsheet->getSheetByName('Grounding');
+        $coordinates = collect($sheet?->getDrawingCollection() ?? [])
+            ->map(fn ($drawing) => $drawing->getCoordinates())
+            ->values()
+            ->all();
+
+        expect($coordinates)->toBe(['B3', 'B4', 'F4', 'B5', 'F5']);
+    } finally {
+        if (file_exists($absolutePhotoPath)) {
+            unlink($absolutePhotoPath);
+        }
+    }
+});
+
+test('bast grounding form has one grounding rod to earth field and excel cable route label', function () {
+    $component = file_get_contents(resource_path('js/components/activities/BastCheckpoints.vue'));
+
+    expect($component)->toContain("key: 'grounding_rod_to_earth_1'")
+        ->and($component)->not->toContain("key: 'grounding_rod_to_earth_2'")
+        ->and($component)->toContain("label: 'GROUNDING CABLE ROUTE'");
+});

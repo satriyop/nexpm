@@ -77,8 +77,7 @@ function uploadBastPhoto(section: string, checkpointKey: string, file: File) {
         photo: file,
     });
     const url =
-        props.storePhotoUrl ??
-        SubActions.storeBastPhoto(props.assignment).url;
+        props.storePhotoUrl ?? SubActions.storeBastPhoto(props.assignment).url;
     form.post(url, {
         forceFormData: true,
         onFinish: () => {
@@ -211,12 +210,7 @@ const groundingCheckpoints: Checkpoint[] = [
     { key: 'grounding_rod_connection', label: 'Grounding Rod Connection' },
     {
         key: 'grounding_rod_to_earth_1',
-        label: 'Grounding Rod to Earth — Spot 1 (Insert in Specific Spots)',
-    },
-    {
-        key: 'grounding_rod_to_earth_2',
-        label: 'Grounding Rod to Earth — Spot 2 (Insert in Specific Spots)',
-        optional: true,
+        label: 'Grounding Rod to Earth',
     },
     {
         key: 'grounding_busbar_panel',
@@ -224,7 +218,7 @@ const groundingCheckpoints: Checkpoint[] = [
     },
     {
         key: 'grounding_cable_route',
-        label: 'Grounding Test — Cable Route (OHM)',
+        label: 'GROUNDING CABLE ROUTE',
     },
     { key: 'grounding_test_ac_panel', label: 'Grounding Test AC Panel' },
 ];
@@ -378,7 +372,9 @@ const cableCheckpoints: Checkpoint[] = [
                         <dt class="font-medium text-muted-foreground">
                             Go LIVE Date (PLN Bypass)
                         </dt>
-                        <dd>{{ derivedFields.go_live_date_pln_pass || '—' }}</dd>
+                        <dd>
+                            {{ derivedFields.go_live_date_pln_pass || '—' }}
+                        </dd>
                     </div>
                     <div>
                         <dt class="font-medium text-muted-foreground">
