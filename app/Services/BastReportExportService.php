@@ -6,9 +6,12 @@ use App\Enums\ActivityType;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Drawing as SharedDrawing;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class BastReportExportService
 {
@@ -52,8 +55,8 @@ class BastReportExportService
         'fire_ext_placement' => ['Grounding', 'B', 11],
         'fire_ext_specification' => ['Grounding', 'F', 11],
         // KWH, AC Panel, Cable sheet
-        'kwh_kwh_meter' => ['KWH,AC Panel, Cable', 'B', 4],
-        'kwh_mcb_pln' => ['KWH,AC Panel, Cable', 'F', 4],
+        'kwh_kwh_meter' => ['KWH,AC Panel, Cable', 'B', 3],
+        'kwh_mcb_pln' => ['KWH,AC Panel, Cable', 'F', 3],
         'ac_front_view_open' => ['KWH,AC Panel, Cable', 'B', 8],
         'ac_safety_sign' => ['KWH,AC Panel, Cable', 'F', 8],
         'ac_front_view_close' => ['KWH,AC Panel, Cable', 'B', 9],
@@ -96,8 +99,8 @@ class BastReportExportService
         'grounding_busbar_panel' => ['Grounding', 'F', 4],
         'grounding_cable_route' => ['Grounding', 'B', 5],
         // KWH, AC Panel, Cable (same layout as EVCS)
-        'kwh_kwh_meter' => ['KWH,AC Panel, Cable', 'B', 4],
-        'kwh_mcb_pln' => ['KWH,AC Panel, Cable', 'F', 4],
+        'kwh_kwh_meter' => ['KWH,AC Panel, Cable', 'B', 3],
+        'kwh_mcb_pln' => ['KWH,AC Panel, Cable', 'F', 3],
         'ac_front_view_open' => ['KWH,AC Panel, Cable', 'B', 8],
         'ac_safety_sign' => ['KWH,AC Panel, Cable', 'F', 8],
         'ac_front_view_close' => ['KWH,AC Panel, Cable', 'B', 9],
@@ -116,6 +119,10 @@ class BastReportExportService
 
     /** Cell where grounding resistance Ω value is written. */
     private const GROUNDING_OHM_CELL = 'F6';
+
+    private const PHOTO_AREA_COLUMNS = 3;
+
+    private const PHOTO_MARGIN_PIXELS = 4;
 
     /** Measurement cells: [sheet, cell] keyed by measurement key. */
     private const EVCS_MEASUREMENT_CELLS = [
@@ -247,13 +254,94 @@ class BastReportExportService
 
             $drawing = new Drawing;
             $drawing->setPath($absolutePath);
-            $drawing->setCoordinates($col.$row);
-            $drawing->setOffsetX(2);
-            $drawing->setOffsetY(2);
-            // Width spans 3 columns (B-D or F-H); height fills the 140pt row
-            $drawing->setWidth(280);
-            $drawing->setHeight(170);
+
+            $this->fitDrawingInsidePhotoArea($drawing, $sheet, $col, $row);
+
             $drawing->setWorksheet($sheet);
         }
+    }
+
+    private function fitDrawingInsidePhotoArea(Drawing $drawing, Worksheet $sheet, string $column, int $row): void
+    {
+        [$width, $height] = $this->photoAreaSizeInPixels($sheet, $column, $row);
+
+        $availableWidth = max(1, $width - (self::PHOTO_MARGIN_PIXELS * 2));
+        $availableHeight = max(1, $height - (self::PHOTO_MARGIN_PIXELS * 2));
+
+        $drawing->setCoordinates($column.$row);
+        $drawing->setResizeProportional(true);
+        $drawing->setWidthAndHeight($availableWidth, $availableHeight);
+        $drawing->setOffsetX(self::PHOTO_MARGIN_PIXELS + (int) floor(($availableWidth - $drawing->getWidth()) / 2));
+        $drawing->setOffsetY(self::PHOTO_MARGIN_PIXELS + (int) floor(($availableHeight - $drawing->getHeight()) / 2));
+    }
+
+    /**
+     * @return array{int, int}
+     */
+    private function photoAreaSizeInPixels(Worksheet $sheet, string $column, int $row): array
+    {
+        $range = $this->photoAreaRange($sheet, $column, $row);
+        [$start, $end] = Coordinate::rangeBoundaries($range);
+
+        $width = 0;
+        for ($columnIndex = $start[0]; $columnIndex <= $end[0]; $columnIndex++) {
+            $width += $this->columnWidthInPixels($sheet, Coordinate::stringFromColumnIndex($columnIndex));
+        }
+
+        $height = 0;
+        for ($rowIndex = $start[1]; $rowIndex <= $end[1]; $rowIndex++) {
+            $height += $this->rowHeightInPixels($sheet, $rowIndex);
+        }
+
+        return [$width, $height];
+    }
+
+    private function photoAreaRange(Worksheet $sheet, string $column, int $row): string
+    {
+        $coordinate = $column.$row;
+
+        foreach ($sheet->getMergeCells() as $range) {
+            [$start, $end] = Coordinate::rangeBoundaries($range);
+            $startColumn = Coordinate::stringFromColumnIndex($start[0]);
+
+            if ($sheet->getCell($coordinate)->isInRange($range) && $startColumn === $column) {
+                return $range;
+            }
+        }
+
+        $startColumn = Coordinate::columnIndexFromString($column);
+        $endColumn = Coordinate::stringFromColumnIndex($startColumn + self::PHOTO_AREA_COLUMNS - 1);
+
+        return "{$column}{$row}:{$endColumn}{$row}";
+    }
+
+    private function columnWidthInPixels(Worksheet $sheet, string $column): int
+    {
+        $width = $sheet->getColumnDimension($column)->getWidth();
+
+        if ($width < 0) {
+            $width = $sheet->getDefaultColumnDimension()->getWidth();
+        }
+
+        if ($width < 0) {
+            return 64;
+        }
+
+        return SharedDrawing::cellDimensionToPixels($width, $sheet->getParentOrThrow()->getDefaultStyle()->getFont());
+    }
+
+    private function rowHeightInPixels(Worksheet $sheet, int $row): int
+    {
+        $height = $sheet->getRowDimension($row)->getRowHeight();
+
+        if ($height < 0) {
+            $height = $sheet->getDefaultRowDimension()->getRowHeight();
+        }
+
+        if ($height < 0) {
+            $height = 15;
+        }
+
+        return SharedDrawing::pointsToPixels($height);
     }
 }
