@@ -121,20 +121,20 @@ class ManualProjectCsvImportService
                     continue;
                 }
 
-                // Project: find-or-create by name (case-insensitive)
-                $projectKey = mb_strtolower(trim($row['project_name']));
+                // Project: find-or-create by (name, main_contractor) to avoid collisions across EPCs.
+                $projectNameLower = mb_strtolower(trim($row['project_name']));
+                $mainContractor = $lookups['mainContractorsByName'][mb_strtolower(trim($row['main_contractor_name']))] ?? null;
+                $projectKey = $projectNameLower.'|'.($mainContractor?->id ?? '');
+
                 if (! isset($projectCache[$projectKey])) {
-                    $project = Project::query()
-                        ->whereRaw('LOWER(name) = ?', [$projectKey])
-                        ->first();
+                    $projectQuery = Project::query()->whereRaw('LOWER(name) = ?', [$projectNameLower]);
+                    if ($mainContractor !== null) {
+                        $projectQuery->where('main_contractor_id', $mainContractor->id);
+                    }
+                    $project = $projectQuery->first();
 
                     if ($project === null) {
-                        $mainContractor = $lookups['mainContractors']->first(
-                            fn ($mc) => mb_strtolower($mc->name) === mb_strtolower(trim($row['main_contractor_name']))
-                        );
-                        $client = $lookups['clients']->first(
-                            fn ($c) => mb_strtolower($c->name) === mb_strtolower(trim($row['client_name']))
-                        );
+                        $client = $lookups['clientsByName'][mb_strtolower(trim($row['client_name']))] ?? null;
 
                         $project = Project::query()->create([
                             'name' => trim($row['project_name']),
@@ -267,8 +267,16 @@ class ManualProjectCsvImportService
             ];
         }
 
-        $projectKey = mb_strtolower(trim($row['project_name']));
-        $isNewProject = ! $existingProjectKeys->has($projectKey);
+        $projectNameLower = mb_strtolower(trim($row['project_name']));
+        $mcNameLower = mb_strtolower(trim($row['main_contractor_name'] ?? ''));
+        $mainContractorForKey = $mcNameLower !== ''
+            ? ($lookups['mainContractorsByName'][$mcNameLower] ?? null)
+            : null;
+
+        // Use composite key when contractor is known to distinguish same-name projects across EPCs.
+        $isNewProject = $mainContractorForKey !== null
+            ? ! $existingProjectKeys->has($projectNameLower.'|'.$mainContractorForKey->id)
+            : ! $existingProjectKeys->has($projectNameLower);
 
         if ($isNewProject) {
             if (($row['main_contractor_name'] ?? '') === '') {
@@ -289,10 +297,7 @@ class ManualProjectCsvImportService
         }
 
         if (($row['main_contractor_name'] ?? '') !== '') {
-            $mcExists = $lookups['mainContractors']->contains(
-                fn ($mc) => mb_strtolower($mc->name) === mb_strtolower(trim($row['main_contractor_name']))
-            );
-            if (! $mcExists) {
+            if (! isset($lookups['mainContractorsByName'][mb_strtolower(trim($row['main_contractor_name']))])) {
                 return [
                     ...$base,
                     'status' => 'error',
@@ -302,10 +307,7 @@ class ManualProjectCsvImportService
         }
 
         if (($row['client_name'] ?? '') !== '') {
-            $clientExists = $lookups['clients']->contains(
-                fn ($c) => mb_strtolower($c->name) === mb_strtolower(trim($row['client_name']))
-            );
-            if (! $clientExists) {
+            if (! isset($lookups['clientsByName'][mb_strtolower(trim($row['client_name']))])) {
                 return [
                     ...$base,
                     'status' => 'error',
@@ -512,10 +514,16 @@ class ManualProjectCsvImportService
         $siteTypes = SiteType::query()->pluck('id', 'name');
         $machineTypes = MachineType::query()->pluck('id', 'name');
 
+        // Pre-index by lowercase name for O(1) lookups in the per-row hot path.
+        $mainContractorsByName = $mainContractors->keyBy(fn ($mc) => mb_strtolower($mc->name));
+        $clientsByName = $clients->keyBy(fn ($c) => mb_strtolower($c->name));
+
         return [
             [
                 'mainContractors' => $mainContractors,
+                'mainContractorsByName' => $mainContractorsByName,
                 'clients' => $clients,
+                'clientsByName' => $clientsByName,
                 'subcontractors' => $subcontractors,
                 'siteTypes' => $siteTypes,
                 'machineTypes' => $machineTypes,
@@ -527,8 +535,12 @@ class ManualProjectCsvImportService
     /**
      * Query which of the CSV's project names already exist in the database.
      *
+     * Returns a Collection keyed by both:
+     *   - lowercase project name (for rows with unknown/blank contractor)
+     *   - "name|main_contractor_id" (for precise per-EPC disambiguation)
+     *
      * @param  array<int, array<string, string>>  $rawRows
-     * @return Collection<string, true> keyed by lowercase project name
+     * @return Collection<string, true>
      */
     private function preloadExistingProjectKeys(array $rawRows): Collection
     {
@@ -544,11 +556,17 @@ class ManualProjectCsvImportService
             return collect();
         }
 
-        return Project::query()
+        $keys = [];
+        Project::query()
             ->whereRaw('LOWER(name) IN ('.implode(',', array_fill(0, count($names), '?')).')', $names)
-            ->pluck('name')
-            ->map(fn ($n) => mb_strtolower($n))
-            ->flip();
+            ->get(['name', 'main_contractor_id'])
+            ->each(function ($p) use (&$keys): void {
+                $lower = mb_strtolower($p->name);
+                $keys[$lower] = true;
+                $keys[$lower.'|'.$p->main_contractor_id] = true;
+            });
+
+        return collect($keys);
     }
 
     /**

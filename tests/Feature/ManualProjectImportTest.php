@@ -611,3 +611,57 @@ test('store accepts YYYY-MM-DD date format and stores correctly', function () {
     expect($data->kwh_meter_installation_date->format('Y-m-d'))->toBe('2025-03-15')
         ->and($data->nidi_slo_date_acquired->format('Y-m-d'))->toBe('2025-02-28');
 });
+
+test('same project name under different EPCs creates separate projects', function () {
+    Storage::fake('local');
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $mcA = MainContractor::factory()->create(['name' => 'PT EPC Alpha']);
+    $mcB = MainContractor::factory()->create(['name' => 'PT EPC Beta']);
+    Client::factory()->create(['name' => 'PLN']);
+    $sub = Subcontractor::factory()->create(['code' => 'SUB-001']);
+    $sub->mainContractors()->attach([$mcA->id, $mcB->id]);
+
+    $csv = buildCsv([
+        [
+            'project_name' => 'Proyek Sama',
+            'client_name' => 'PLN',
+            'main_contractor_name' => 'PT EPC Alpha',
+            'site_code' => 'SITE-A01',
+            'location_name' => 'Lokasi Alpha',
+            'activity_type' => 'SURVEY',
+            'subcontractor_code' => 'SUB-001',
+            'status' => 'REPORTED',
+        ],
+        [
+            'project_name' => 'Proyek Sama',
+            'client_name' => 'PLN',
+            'main_contractor_name' => 'PT EPC Beta',
+            'site_code' => 'SITE-B01',
+            'location_name' => 'Lokasi Beta',
+            'activity_type' => 'SURVEY',
+            'subcontractor_code' => 'SUB-001',
+            'status' => 'REPORTED',
+        ],
+    ]);
+
+    $tempPath = 'temp/manual-import/same-name-diff-epc.csv';
+    Storage::disk('local')->put($tempPath, $csv);
+
+    $this->actingAs($superAdmin)
+        ->post(route('admin.manual-import.store'), ['temp_path' => $tempPath]);
+
+    // Two separate projects must be created, one per EPC.
+    expect(Project::count())->toBe(2);
+
+    $projectAlpha = Project::where('main_contractor_id', $mcA->id)->first();
+    $projectBeta = Project::where('main_contractor_id', $mcB->id)->first();
+
+    expect($projectAlpha)->not->toBeNull()
+        ->and($projectBeta)->not->toBeNull()
+        ->and($projectAlpha->id)->not->toBe($projectBeta->id);
+
+    // Each site belongs to its own EPC's project.
+    expect(Site::where('site_code', 'SITE-A01')->first()->project_id)->toBe($projectAlpha->id)
+        ->and(Site::where('site_code', 'SITE-B01')->first()->project_id)->toBe($projectBeta->id);
+});

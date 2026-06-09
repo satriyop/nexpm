@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -49,6 +49,11 @@ interface Project {
     client: { name: string } | null;
     main_contractor: { name: string } | null;
 }
+interface ProjectOption {
+    id: number;
+    name: string;
+    main_contractor: { name: string } | null;
+}
 interface Subcontractor {
     id: number;
     name: string;
@@ -96,6 +101,7 @@ const props = defineProps<{
     machineTypes: MachineType[];
     assignments: Assignment[];
     subcontractors: Subcontractor[];
+    projects: ProjectOption[];
 }>();
 
 defineOptions({
@@ -215,6 +221,20 @@ watch(
         form.invoice_5_dpp_amount = b > 0 ? String(Math.round(b * 0.05)) : '';
     },
 );
+
+// Superadmin role check
+const page = usePage();
+const isSuperAdmin = computed(
+    () => (page.props.auth as any)?.user?.role === 'super_admin',
+);
+
+// Reassign project form (superadmin only)
+const reassignForm = useForm({
+    project_id: String(props.site.project.id),
+});
+function submitReassign(): void {
+    reassignForm.patch(SiteActions.reassignProject(props.site).url);
+}
 
 // Copy to clipboard with brief ✓ feedback
 const copiedField = ref<string | null>(null);
@@ -721,6 +741,51 @@ function removeAssignment(assignment: Assignment): void {
                 </Button>
             </div>
         </form>
+
+        <!-- ── Superadmin: Reassign Project ── -->
+        <Card
+            v-if="isSuperAdmin && projects.length > 0"
+            class="mt-6 border-amber-200 dark:border-amber-800"
+        >
+            <CardHeader class="pb-2">
+                <h2 class="text-base font-semibold">Reassign to Project</h2>
+                <p class="text-sm text-muted-foreground">
+                    Superadmin only — moves this site (and all its assignments) to a different project.
+                </p>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                    Current project: <span class="font-medium">{{ site.project.name }}</span>
+                    <span v-if="site.project.main_contractor" class="text-muted-foreground"> ({{ site.project.main_contractor.name }})</span>
+                </div>
+                <div class="grid max-w-sm gap-1.5">
+                    <Label for="reassign-project">Move to Project</Label>
+                    <Select v-model="reassignForm.project_id">
+                        <SelectTrigger id="reassign-project">
+                            <SelectValue placeholder="Select a project…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="p in projects"
+                                :key="p.id"
+                                :value="String(p.id)"
+                            >
+                                {{ p.name }}
+                                <span v-if="p.main_contractor" class="text-muted-foreground"> · {{ p.main_contractor.name }}</span>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="reassignForm.errors.project_id" />
+                </div>
+                <Button
+                    variant="outline"
+                    :disabled="reassignForm.processing || reassignForm.project_id === String(site.project.id)"
+                    @click="submitReassign"
+                >
+                    {{ reassignForm.processing ? 'Reassigning…' : 'Reassign Site' }}
+                </Button>
+            </CardContent>
+        </Card>
 
         <!-- ── Tab 2: Financials ── -->
         <form

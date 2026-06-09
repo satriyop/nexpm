@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Assignment;
 use App\Models\AssignmentSurveyData;
 use App\Models\MachineType;
+use App\Models\Project;
 use App\Models\Site;
 use App\Models\SiteType;
 use App\Models\Subcontractor;
@@ -27,6 +28,10 @@ class SiteController extends Controller
             ->with(['subcontractor', 'surveyData', 'plnData', 'constructionData', 'bastData'])
             ->get();
 
+        $projects = $this->currentUser()->isSuperAdmin()
+            ? Project::query()->with(['mainContractor' => fn ($q) => $q->select(['id', 'name'])])->orderBy('name')->get(['id', 'name', 'main_contractor_id'])
+            : collect();
+
         return Inertia::render('admin/sites/Edit', [
             'site' => $site,
             'siteTypes' => SiteType::orderBy('name')->get(['id', 'name']),
@@ -36,6 +41,7 @@ class SiteController extends Controller
                 ->whereHas('mainContractors', fn ($query) => $query->whereKey($site->project->main_contractor_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
+            'projects' => $projects,
         ]);
     }
 
@@ -92,5 +98,20 @@ class SiteController extends Controller
         }
 
         return redirect()->route('admin.sites.edit', $site)->with('success', 'Site updated.');
+    }
+
+    public function reassignProject(Request $request, Site $site): RedirectResponse
+    {
+        abort_unless($this->currentUser()->isSuperAdmin(), 403);
+
+        $validated = $request->validate([
+            'project_id' => ['required', 'exists:projects,id'],
+        ]);
+
+        $site->project_id = $validated['project_id'];
+        $site->save();
+
+        return redirect()->route('admin.sites.edit', $site)
+            ->with('success', 'Site reassigned to new project.');
     }
 }

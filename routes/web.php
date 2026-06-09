@@ -75,6 +75,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin,project_manager',
 
     Route::get('sites/{site}/edit', [Admin\SiteController::class, 'edit'])->name('sites.edit');
     Route::patch('sites/{site}', [Admin\SiteController::class, 'update'])->name('sites.update');
+    Route::patch('sites/{site}/reassign-project', [Admin\SiteController::class, 'reassignProject'])->name('sites.reassign-project');
 
     Route::match(['post', 'patch'], 'assignments/{assignment}/admin-survey', [Admin\AssignmentController::class, 'updateSurveyData'])->name('assignments.admin-survey');
     Route::patch('assignments/{assignment}/admin-pln', [Admin\AssignmentController::class, 'updatePlnData'])->name('assignments.admin-pln');
