@@ -229,11 +229,11 @@ const isSuperAdmin = computed(
 );
 
 // Reassign project form (superadmin only)
-const reassignForm = useForm({
+const reassignProjectForm = useForm({
     project_id: String(props.site.project.id),
 });
-function submitReassign(): void {
-    reassignForm.patch(SiteActions.reassignProject(props.site).url);
+function submitReassignProject(): void {
+    reassignProjectForm.patch(SiteActions.reassignProject(props.site).url);
 }
 
 // Copy to clipboard with brief ✓ feedback
@@ -760,7 +760,7 @@ function removeAssignment(assignment: Assignment): void {
                 </div>
                 <div class="grid max-w-sm gap-1.5">
                     <Label for="reassign-project">Move to Project</Label>
-                    <Select v-model="reassignForm.project_id">
+                    <Select v-model="reassignProjectForm.project_id">
                         <SelectTrigger id="reassign-project">
                             <SelectValue placeholder="Select a project…" />
                         </SelectTrigger>
@@ -775,14 +775,14 @@ function removeAssignment(assignment: Assignment): void {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="reassignForm.errors.project_id" />
+                    <InputError :message="reassignProjectForm.errors.project_id" />
                 </div>
                 <Button
                     variant="outline"
-                    :disabled="reassignForm.processing || reassignForm.project_id === String(site.project.id)"
-                    @click="submitReassign"
+                    :disabled="reassignProjectForm.processing || reassignProjectForm.project_id === String(site.project.id)"
+                    @click="submitReassignProject"
                 >
-                    {{ reassignForm.processing ? 'Reassigning…' : 'Reassign Site' }}
+                    {{ reassignProjectForm.processing ? 'Reassigning…' : 'Reassign Site' }}
                 </Button>
             </CardContent>
         </Card>
