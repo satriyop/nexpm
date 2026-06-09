@@ -180,9 +180,25 @@ class AssignmentController extends Controller
                 ->first()?->constructionData
             : null;
 
+        $generatedReports = DB::table('reports')
+            ->join('report_assignments', 'reports.id', '=', 'report_assignments.report_id')
+            ->where('report_assignments.assignment_id', $assignment->id)
+            ->select('reports.id', 'reports.name', 'reports.report_type', 'reports.created_at')
+            ->orderByDesc('reports.created_at')
+            ->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'name' => $r->name,
+                'report_type' => $r->report_type,
+                'created_at' => $r->created_at,
+                'download_url' => route('admin.reports.download', $r->id),
+            ])
+            ->all();
+
         return Inertia::render('admin/assignments/Show', [
             'assignment' => $assignment,
             'siblingConstruction' => $siblingConstruction,
+            'generatedReports' => $generatedReports,
             'subcontractors' => Subcontractor::query()
                 ->whereHas('mainContractors', fn ($query) => $query->whereKey($mainContractorId))
                 ->orderBy('name')
@@ -943,5 +959,41 @@ class AssignmentController extends Controller
         $legacyReport->delete();
 
         return back()->with('success', 'Legacy report removed.');
+    }
+
+    public function generateReport(Assignment $assignment): RedirectResponse
+    {
+        $this->ensureCanAccessAssignment($assignment);
+
+        abort_unless($assignment->status === AssignmentStatus::Verified, 422, 'Assignment must be Verified to generate a report.');
+
+        $reportType = match ($assignment->activity_type) {
+            ActivityType::Survey => 'SSR',
+            ActivityType::Bast => 'BAST',
+            default => abort(422, 'No report type for this assignment type.'),
+        };
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        $typeLabel = $reportType === 'SSR' ? 'SSR Report' : 'BAST Report';
+
+        $report = Report::create([
+            'name' => $typeLabel.' '.now()->format('Y-m-d H:i'),
+            'report_type' => $reportType,
+            'exported_by' => $user->id,
+        ]);
+
+        $report->assignments()->attach($assignment->id);
+        $assignment->markReported();
+
+        if ($reportType === 'SSR') {
+            AssignmentSurveyData::where('assignment_id', $assignment->id)
+                ->update(['ss_report_submission_date' => today()]);
+        }
+
+        return redirect()->route('admin.assignments.show', $assignment)
+            ->with('success', $typeLabel.' generated successfully.')
+            ->with('download_url', route('admin.reports.download', $report));
     }
 }

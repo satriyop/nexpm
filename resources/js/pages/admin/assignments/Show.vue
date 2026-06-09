@@ -75,11 +75,20 @@ interface AuditLog {
     created_at: string | null;
 }
 
+interface GeneratedReport {
+    id: number;
+    name: string;
+    report_type: string;
+    created_at: string;
+    download_url: string;
+}
+
 const props = defineProps<{
     assignment: Assignment;
     subcontractors: SubcontractorOption[];
     auditLogs: AuditLog[] | null;
     siblingConstruction: AssignmentConstructionData | null;
+    generatedReports: GeneratedReport[];
 }>();
 
 defineOptions({
@@ -112,6 +121,23 @@ const pln = computed(() => props.assignment.pln_data);
 const construction = computed(() => props.assignment.construction_data);
 const bast = computed(() => props.assignment.bast_data);
 const legacyReports = computed(() => props.assignment.legacy_reports ?? []);
+
+const reportableType = computed<string | null>(() => {
+    if (props.assignment.activity_type === 'SURVEY') return 'SSR';
+    if (props.assignment.activity_type === 'BAST') return 'BAST';
+    return null;
+});
+const canGenerateReport = computed(
+    () => reportableType.value !== null && props.assignment.status === 'VERIFIED',
+);
+
+const generateReportForm = useForm({});
+function generateReport(): void {
+    generateReportForm.post(
+        AdminAssignmentActions.generateReport(props.assignment.id).url,
+        { preserveScroll: true },
+    );
+}
 const bastSummary = computed(() => ({
     plant_name: bast.value?.plant_name ?? props.assignment.site.location_name,
     customer:
@@ -2679,6 +2705,72 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                         </form>
                     </CardContent>
                 </Card>
+            </div>
+        </div>
+
+        <!-- Generated Reports -->
+        <div
+            v-if="reportableType !== null && (generatedReports.length > 0 || isAdminOrSuperAdmin)"
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div
+                class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+            >
+                <FileText class="size-4 text-muted-foreground" />
+                <h2 class="text-sm font-semibold">Generated Reports</h2>
+                <span class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    {{ reportableType }}
+                </span>
+                <div v-if="isAdminOrSuperAdmin && canGenerateReport" class="ml-auto">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        :disabled="generateReportForm.processing"
+                        @click="generateReport"
+                    >
+                        <RefreshCw
+                            class="mr-1.5 size-3.5"
+                            :class="{ 'animate-spin': generateReportForm.processing }"
+                        />
+                        {{ generateReportForm.processing ? 'Generating…' : 'Generate Report' }}
+                    </Button>
+                </div>
+            </div>
+
+            <div
+                v-if="generatedReports.length > 0"
+                class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
+            >
+                <div
+                    v-for="report in generatedReports"
+                    :key="report.id"
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm"
+                >
+                    <FileText class="size-4 shrink-0 text-muted-foreground" />
+                    <div class="min-w-0 flex-1">
+                        <span class="truncate font-medium">{{ report.name }}</span>
+                        <span class="ml-2 text-xs text-muted-foreground">
+                            {{
+                                new Date(report.created_at).toLocaleDateString('id-ID', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                })
+                            }}
+                        </span>
+                    </div>
+                    <a
+                        :href="report.download_url"
+                        class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                        <Download class="size-3" />Download
+                    </a>
+                </div>
+            </div>
+            <div v-else class="px-4 py-3 text-sm text-muted-foreground">
+                No reports generated yet.
             </div>
         </div>
 

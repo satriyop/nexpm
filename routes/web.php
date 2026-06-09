@@ -88,6 +88,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin,project_manager',
     Route::get('assignments/{assignment}/legacy-reports/{legacy_report}/download', [Admin\AssignmentController::class, 'downloadLegacyReport'])->name('assignments.legacy-reports.download');
     Route::post('assignments/{assignment}/legacy-reports', [Admin\AssignmentController::class, 'storeLegacyReport'])->name('assignments.legacy-reports.store');
     Route::delete('assignments/{assignment}/legacy-reports/{legacy_report}', [Admin\AssignmentController::class, 'destroyLegacyReport'])->name('assignments.legacy-reports.destroy');
+    Route::post('assignments/{assignment}/generate-report', [Admin\AssignmentController::class, 'generateReport'])->name('assignments.generate-report');
 
     Route::get('reports', [Admin\ReportController::class, 'index'])->name('reports.index');
     Route::post('reports', [Admin\ReportController::class, 'store'])->name('reports.store');
