@@ -45,7 +45,6 @@ class AssignmentController extends Controller
                 'assignments.subcontractor',
                 'assignments.constructionData',
             ])
-            ->whereHas('assignments')
             ->whereHas('project', fn ($q) => $q->whereScopedToMainContractor());
 
         if ($request->filled('search')) {
@@ -59,17 +58,20 @@ class AssignmentController extends Controller
         }
 
         $filteringByDrop = $request->input('status') === 'DROP';
+        $filteringByProject = $request->filled('project_id');
 
-        $query->whereHas('assignments', function ($q) use ($request, $filteringByDrop): void {
-            if ($request->filled('status')) {
-                $q->where('status', $request->string('status'));
-            } elseif (! $filteringByDrop) {
-                $q->where('status', '!=', 'DROP');
-            }
-            if ($request->filled('activity_type')) {
-                $q->where('activity_type', $request->string('activity_type'));
-            }
-        });
+        if (! $filteringByProject || $request->filled('status') || $request->filled('activity_type')) {
+            $query->whereHas('assignments', function ($q) use ($request, $filteringByDrop, $filteringByProject): void {
+                if ($request->filled('status')) {
+                    $q->where('status', $request->string('status'));
+                } elseif (! $filteringByDrop && ! $filteringByProject) {
+                    $q->where('status', '!=', 'DROP');
+                }
+                if ($request->filled('activity_type')) {
+                    $q->where('activity_type', $request->string('activity_type'));
+                }
+            });
+        }
 
         if ($request->filled('subcontractor_id')) {
             $query->whereHas('assignments', fn ($q) => $q->where('subcontractor_id', $request->integer('subcontractor_id')));
