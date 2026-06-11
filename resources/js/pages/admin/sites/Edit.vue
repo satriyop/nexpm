@@ -494,8 +494,8 @@ function removeAssignment(assignment: Assignment): void {
         </div>
 
         <!-- ── Tab 1: Site Details ── -->
+        <template v-if="activeTab === 'site'">
         <form
-            v-if="activeTab === 'site'"
             class="space-y-6"
             @submit.prevent="submit"
             novalidate
@@ -742,9 +742,55 @@ function removeAssignment(assignment: Assignment): void {
             </div>
         </form>
 
+        <!-- ── Superadmin: Reassign Project ── -->
+        <Card
+            v-if="isSuperAdmin && projects.length > 0"
+            class="mt-6 border-amber-200 dark:border-amber-800"
+        >
+            <CardHeader class="pb-2">
+                <h2 class="text-base font-semibold">Reassign to Project</h2>
+                <p class="text-sm text-muted-foreground">
+                    Superadmin only — moves this site (and all its assignments) to a different project.
+                </p>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                    Current project: <span class="font-medium">{{ site.project.name }}</span>
+                    <span v-if="site.project.main_contractor" class="text-muted-foreground"> ({{ site.project.main_contractor.name }})</span>
+                </div>
+                <div class="grid max-w-sm gap-1.5">
+                    <Label for="reassign-project">Move to Project</Label>
+                    <Select v-model="reassignProjectForm.project_id">
+                        <SelectTrigger id="reassign-project">
+                            <SelectValue placeholder="Select a project…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="p in projects"
+                                :key="p.id"
+                                :value="String(p.id)"
+                            >
+                                {{ p.name }}
+                                <span v-if="p.main_contractor" class="text-muted-foreground"> · {{ p.main_contractor.name }}</span>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="reassignProjectForm.errors.project_id" />
+                </div>
+                <Button
+                    variant="outline"
+                    :disabled="reassignProjectForm.processing || reassignProjectForm.project_id === String(site.project.id)"
+                    @click="submitReassignProject"
+                >
+                    {{ reassignProjectForm.processing ? 'Reassigning…' : 'Reassign Site' }}
+                </Button>
+            </CardContent>
+        </Card>
+        </template>
+
         <!-- ── Tab 2: Financials ── -->
-        <template v-else-if="activeTab === 'financials'">
         <form
+            v-else-if="activeTab === 'financials'"
             class="space-y-6"
             @submit.prevent="submit"
             novalidate
@@ -1080,52 +1126,6 @@ function removeAssignment(assignment: Assignment): void {
                 </Button>
             </div>
         </form>
-
-        <!-- ── Superadmin: Reassign Project ── -->
-        <Card
-            v-if="isSuperAdmin && projects.length > 0"
-            class="mt-6 border-amber-200 dark:border-amber-800"
-        >
-            <CardHeader class="pb-2">
-                <h2 class="text-base font-semibold">Reassign to Project</h2>
-                <p class="text-sm text-muted-foreground">
-                    Superadmin only — moves this site (and all its assignments) to a different project.
-                </p>
-            </CardHeader>
-            <CardContent class="space-y-4">
-                <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                    Current project: <span class="font-medium">{{ site.project.name }}</span>
-                    <span v-if="site.project.main_contractor" class="text-muted-foreground"> ({{ site.project.main_contractor.name }})</span>
-                </div>
-                <div class="grid max-w-sm gap-1.5">
-                    <Label for="reassign-project">Move to Project</Label>
-                    <Select v-model="reassignProjectForm.project_id">
-                        <SelectTrigger id="reassign-project">
-                            <SelectValue placeholder="Select a project…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="p in projects"
-                                :key="p.id"
-                                :value="String(p.id)"
-                            >
-                                {{ p.name }}
-                                <span v-if="p.main_contractor" class="text-muted-foreground"> · {{ p.main_contractor.name }}</span>
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <InputError :message="reassignProjectForm.errors.project_id" />
-                </div>
-                <Button
-                    variant="outline"
-                    :disabled="reassignProjectForm.processing || reassignProjectForm.project_id === String(site.project.id)"
-                    @click="submitReassignProject"
-                >
-                    {{ reassignProjectForm.processing ? 'Reassigning…' : 'Reassign Site' }}
-                </Button>
-            </CardContent>
-        </Card>
-        </template>
 
         <!-- ── Tab 3: Assignments ── -->
         <div
