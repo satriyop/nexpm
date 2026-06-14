@@ -25,6 +25,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, onUnmounted, ref } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
+import * as AdminReportActions from '@/actions/App/Http/Controllers/Admin/ReportController';
 import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import InputError from '@/components/InputError.vue';
@@ -136,6 +137,19 @@ function generateReport(): void {
     generateReportForm.post(
         AdminAssignmentActions.generateReport(props.assignment.id).url,
         { preserveScroll: true },
+    );
+}
+
+const regeneratingReportId = ref<number | null>(null);
+function regenerateReport(reportId: number): void {
+    regeneratingReportId.value = reportId;
+    router.post(
+        AdminReportActions.regenerate(reportId).url,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => { regeneratingReportId.value = null; },
+        },
     );
 }
 const bastSummary = computed(() => ({
@@ -2767,6 +2781,18 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                     >
                         <Download class="size-3" />Download
                     </a>
+                    <button
+                        v-if="isAdminOrSuperAdmin"
+                        class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        :disabled="regeneratingReportId === report.id"
+                        @click="regenerateReport(report.id)"
+                    >
+                        <RefreshCw
+                            class="size-3"
+                            :class="{ 'animate-spin': regeneratingReportId === report.id }"
+                        />
+                        {{ regeneratingReportId === report.id ? 'Regenerating…' : 'Regenerate' }}
+                    </button>
                 </div>
             </div>
             <div v-else class="px-4 py-3 text-sm text-muted-foreground">

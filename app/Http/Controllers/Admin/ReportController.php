@@ -219,7 +219,7 @@ class ReportController extends Controller
 
         $newReport->assignments()->attach($assignmentIds);
 
-        return redirect()->route('admin.reports.index')
+        return redirect()->back()
             ->with('success', $typeLabel.' regenerated successfully.')
             ->with('download_url', route('admin.reports.download', $newReport));
     }
