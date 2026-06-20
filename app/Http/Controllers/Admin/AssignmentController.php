@@ -319,9 +319,9 @@ class AssignmentController extends Controller
         $this->ensureCanAccessAssignment($assignment);
 
         abort_unless(
-            ! in_array($assignment->status, [AssignmentStatus::Drop, AssignmentStatus::Reported], true),
+            $assignment->status !== AssignmentStatus::Drop,
             422,
-            'Assignment cannot be dropped in its current state.',
+            'Assignment is already dropped.',
         );
 
         $assignment->markDropped();
@@ -827,18 +827,18 @@ class AssignmentController extends Controller
             'Only pending assignments can be removed.'
         );
 
-        $assignment->surveyData?->delete();
-        $assignment->plnData?->delete();
-        $assignment->constructionData?->delete();
-        $assignment->bastData?->delete();
-        $assignment->delete();
-
         AssignmentAuditLog::create([
             'assignment_id' => $assignment->id,
             'user_id' => $this->currentUser()->id,
             'event' => 'deleted',
             'payload' => null,
         ]);
+
+        $assignment->surveyData?->delete();
+        $assignment->plnData?->delete();
+        $assignment->constructionData?->delete();
+        $assignment->bastData?->delete();
+        $assignment->delete();
 
         return back()->with('success', 'Assignment removed.');
     }
