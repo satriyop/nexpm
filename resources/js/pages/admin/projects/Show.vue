@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
     ArrowLeft,
@@ -8,10 +8,11 @@ import {
     Download,
     Eye,
     Pencil,
+    Search,
     Trash2,
     Upload,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import * as AssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
 import * as AssignmentImport from '@/actions/App/Http/Controllers/Admin/AssignmentImportController';
 import * as ProjectActions from '@/actions/App/Http/Controllers/Admin/ProjectController';
@@ -36,6 +37,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { dashboard } from '@/routes';
 import type { PaginatedData } from '@/types';
@@ -84,8 +86,53 @@ interface ImportResult {
 const props = defineProps<{
     project: Project;
     sites: PaginatedData<Site>;
+    filters: { site_search?: string };
     import: ImportResult | null;
 }>();
+const siteSearch = ref<string>('');
+const isSearchFocused = ref(false);
+let searchTimeout: number | null = null;
+
+watch(
+    () => props.filters,
+    (next) => {
+        if (!isSearchFocused.value) {
+            siteSearch.value = next?.site_search ?? '';
+        }
+    },
+    { immediate: true },
+);
+
+function cancelScheduledSearch(): void {
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+}
+
+function applyFilters(): void {
+    cancelScheduledSearch();
+    const query: Record<string, string> = {};
+    if (siteSearch.value.trim()) {
+        query.site_search = siteSearch.value.trim();
+    }
+    router.cancelAll();
+    router.get(ProjectActions.show(props.project).url, query, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
+
+function onSearchInput(): void {
+    cancelScheduledSearch();
+    searchTimeout = window.setTimeout(() => {
+        applyFilters();
+    }, 400);
+}
+
+onBeforeUnmount(() => cancelScheduledSearch());
+
 const importResult = computed(() => props.import);
 const importWarnings = computed(() => importResult.value?.warnings ?? []);
 const skippedImportRows = computed(() => importResult.value?.skipped ?? 0);
@@ -581,9 +628,21 @@ function confirmDelete(): void {
 
         <!-- Sites table -->
         <Card>
-            <CardHeader
-                ><CardTitle>Sites ({{ sites.total }})</CardTitle></CardHeader
-            >
+            <CardHeader class="space-y-3">
+                <CardTitle>Sites ({{ sites.total }})</CardTitle>
+                <div class="relative max-w-xs">
+                    <Search class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        v-model="siteSearch"
+                        type="search"
+                        placeholder="Site code, location, city…"
+                        class="pl-9"
+                        @focus="isSearchFocused = true"
+                        @blur="isSearchFocused = false"
+                        @input="onSearchInput"
+                    />
+                </div>
+            </CardHeader>
             <CardContent class="p-0">
                 <table class="w-full text-sm">
                     <thead class="border-b bg-muted/50">

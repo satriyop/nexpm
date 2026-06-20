@@ -20,9 +20,22 @@ class ProjectController extends Controller
         $perPage = (int) $request->input('per_page', 15);
         $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 15;
 
+        $search = $request->string('search');
+
         return Inertia::render('admin/projects/Index', [
-            'projects' => Project::query()->whereScopedToMainContractor()->with(['mainContractor', 'client'])->latest('id')->paginate($perPage)->withQueryString(),
+            'projects' => Project::query()
+                ->whereScopedToMainContractor()
+                ->with(['mainContractor', 'client'])
+                ->when($request->filled('search'), fn ($q) => $q->where(function ($inner) use ($search): void {
+                    $inner->where('projects.name', 'like', "%{$search}%")
+                        ->orWhereHas('mainContractor', fn ($r) => $r->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('client', fn ($r) => $r->where('name', 'like', "%{$search}%"));
+                }))
+                ->latest('id')
+                ->paginate($perPage)
+                ->withQueryString(),
             'per_page' => $perPage,
+            'filters' => (object) $request->only(['search']),
             'mainContractors' => MainContractor::query()
                 ->when(! $this->currentUser()->isGlobalAdmin(), fn ($query) => $query->whereKey($this->currentUser()->main_contractor_id))
                 ->orderBy('name')
@@ -60,9 +73,22 @@ class ProjectController extends Controller
 
         $project->load(['mainContractor', 'client']);
 
+        $siteSearch = $request->string('site_search');
+
         return Inertia::render('admin/projects/Show', [
             'project' => $project,
-            'sites' => $project->sites()->with('siteType')->latest('id')->paginate(25),
+            'sites' => $project->sites()
+                ->with('siteType')
+                ->when($request->filled('site_search'), fn ($q) => $q->where(function ($inner) use ($siteSearch): void {
+                    $inner->where('site_code', 'like', "%{$siteSearch}%")
+                        ->orWhere('location_name', 'like', "%{$siteSearch}%")
+                        ->orWhere('city', 'like', "%{$siteSearch}%")
+                        ->orWhere('province', 'like', "%{$siteSearch}%");
+                }))
+                ->latest('id')
+                ->paginate(25)
+                ->withQueryString(),
+            'filters' => (object) $request->only(['site_search']),
             'import' => session('import'),
         ]);
     }

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { Eye, FileSpreadsheet, FolderKanban, Plus } from 'lucide-vue-next';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Eye, FileSpreadsheet, FolderKanban, Plus, Search } from 'lucide-vue-next';
 import type { AcceptableValue } from 'reka-ui';
-import { ref } from 'vue';
+import { onBeforeUnmount, ref, watch } from 'vue';
 import { usePermissions } from '@/composables/usePermissions';
 import * as ImportActions from '@/actions/App/Http/Controllers/Admin/ManualProjectImportController';
 import * as Actions from '@/actions/App/Http/Controllers/Admin/ProjectController';
@@ -53,6 +53,7 @@ const props = defineProps<{
     mainContractors: MainContractor[];
     clients: Client[];
     per_page: number;
+    filters: { search?: string };
 }>();
 
 defineOptions({
@@ -65,6 +66,50 @@ defineOptions({
 });
 
 const { canEdit } = usePermissions();
+
+const search = ref<string>('');
+const isSearchFocused = ref(false);
+let searchTimeout: number | null = null;
+
+watch(
+    () => props.filters,
+    (next) => {
+        if (!isSearchFocused.value) {
+            search.value = next?.search ?? '';
+        }
+    },
+    { immediate: true },
+);
+
+function cancelScheduledSearch(): void {
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+}
+
+function applyFilters(): void {
+    cancelScheduledSearch();
+    const query: Record<string, string> = {};
+    if (search.value.trim()) {
+        query.search = search.value.trim();
+    }
+    router.cancelAll();
+    router.get(Actions.index().url, query, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
+
+function onSearchInput(): void {
+    cancelScheduledSearch();
+    searchTimeout = window.setTimeout(() => {
+        applyFilters();
+    }, 400);
+}
+
+onBeforeUnmount(() => cancelScheduledSearch());
 
 const open = ref(false);
 
@@ -110,11 +155,21 @@ function submit() {
         </div>
 
         <Card>
-            <CardHeader
-                ><CardTitle
-                    >All Projects ({{ projects.total }})</CardTitle
-                ></CardHeader
-            >
+            <CardHeader class="space-y-3">
+                <CardTitle>All Projects ({{ projects.total }})</CardTitle>
+                <div class="relative max-w-xs">
+                    <Search class="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        v-model="search"
+                        type="search"
+                        placeholder="Name, contractor, client…"
+                        class="pl-9"
+                        @focus="isSearchFocused = true"
+                        @blur="isSearchFocused = false"
+                        @input="onSearchInput"
+                    />
+                </div>
+            </CardHeader>
             <CardContent class="p-0">
                 <table class="w-full text-sm">
                     <thead class="border-b bg-muted/50">
