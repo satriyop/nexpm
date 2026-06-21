@@ -7,9 +7,11 @@ use App\Ai\Tools\ContextualPageSummaryTool;
 use App\Ai\Tools\DetectWorkflowGapsTool;
 use App\Ai\Tools\FindBlockedAssignmentsTool;
 use App\Ai\Tools\GeneralHelpTool;
+use App\Ai\Tools\GenerateSubcontractorReminderTool;
 use App\Ai\Tools\ListUsersTool;
 use App\Ai\Tools\ProjectHealthBriefingTool;
 use App\Ai\Tools\QueryDatabaseTool;
+use App\Ai\Tools\QueryEntityStatsTool;
 use App\Ai\Tools\ResolveEntityContextTool;
 use App\Ai\Tools\SummarizeDashboardTool;
 use App\Ai\Tools\SummarizePriorityActionsTool;
@@ -84,6 +86,8 @@ PROMPT;
     public function tools(): iterable
     {
         return [
+            new QueryEntityStatsTool($this->assistantService, $this->context, $this->bag),
+            new GenerateSubcontractorReminderTool($this->assistantService, $this->context, $this->bag),
             new ProjectHealthBriefingTool($this->assistantService, $this->context, $this->bag),
             new WorkflowKnowledgeTool($this->assistantService, $this->context, $this->bag),
             new ResolveEntityContextTool($this->assistantService, $this->context, $this->bag),

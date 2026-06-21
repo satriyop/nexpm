@@ -24,6 +24,14 @@ class AiAssistantService
     {
         $normalized = Str::lower($message);
 
+        if (Str::contains($normalized, ['reminder', 'ingatkan', 'outstanding', 'tunggakan', 'belum selesai subcon', 'buatkan reminder', 'kirim reminder'])) {
+            return 'generate_subcontractor_reminder';
+        }
+
+        if (Str::contains($normalized, ['berapa lokasi', 'berapa site', 'berapa assignment', 'how many site', 'how many assign', 'jumlah lokasi', 'jumlah site', 'jumlah assignment', 'ada berapa'])) {
+            return 'query_entity_stats';
+        }
+
         if (Str::contains($normalized, ['user', 'users', 'pengguna', 'siapa saja', 'daftar user', 'daftar pengguna', 'akun', 'admin', 'superadmin', 'super admin'])) {
             return 'list_users';
         }
@@ -86,6 +94,8 @@ class AiAssistantService
             'project_health_briefing' => $this->projectHealthBriefing($context),
             'workflow_knowledge' => $this->workflowKnowledge(),
             'resolve_entity_context' => $this->resolveEntityContext($context['query'] ?? '', $context),
+            'query_entity_stats' => $this->queryEntityStats($context, $context),
+            'generate_subcontractor_reminder' => $this->generateSubcontractorReminder($context['query'] ?? '', $context),
             'summarize_priority_actions' => $this->summarizePriorityActions($context),
             'summarize_project_risks' => $this->summarizeProjectRisks($context),
             'summarize_subcontractor_blockers' => $this->summarizeSubcontractorBlockers($context),
@@ -153,6 +163,18 @@ class AiAssistantService
                 'Subcontractor blockers: %d subcontractors have blockers across %d assignments.',
                 (int) $toolPayload['total_subcontractors_with_blockers'],
                 (int) $toolPayload['total_blocked_assignments'],
+            ),
+            'query_entity_stats' => sprintf(
+                'Entity stats: %d %s found%s.',
+                (int) ($toolPayload['total_count'] ?? 0),
+                $toolPayload['count_target'] ?? 'records',
+                isset($toolPayload['filter_project']) ? ' for project '.$toolPayload['filter_project'] : ''
+            ),
+            'generate_subcontractor_reminder' => sprintf(
+                'Subcontractor reminder: %s has %d outstanding assignments across %d projects.',
+                $toolPayload['subcontractor'] ?? 'Unknown',
+                (int) ($toolPayload['outstanding_count'] ?? 0),
+                (int) ($toolPayload['projects_count'] ?? 0),
             ),
             'check_report_readiness' => sprintf(
                 'Report readiness: %d assignments are currently in report-ready statuses. Top activity split: %s.',
@@ -835,6 +857,219 @@ class AiAssistantService
      * @param  array<string, mixed>  $context
      * @return Collection<int, Assignment>
      */
+    /**
+     * Count sites or assignments for a named entity with optional activity/status filters.
+     *
+     * @param  array{count_target?: string, project_name?: string, subcontractor_name?: string, activity_type?: string, status?: string}  $filters
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    public function queryEntityStats(array $filters, array $context): array
+    {
+        $countTarget = $filters['count_target'] ?? 'assignments';
+        $projectName = isset($filters['project_name']) ? trim((string) $filters['project_name']) : null;
+        $subcontractorName = isset($filters['subcontractor_name']) ? trim((string) $filters['subcontractor_name']) : null;
+        $activityType = isset($filters['activity_type']) ? strtoupper(trim((string) $filters['activity_type'])) : null;
+        $status = isset($filters['status']) ? strtoupper(trim((string) $filters['status'])) : null;
+
+        if ($countTarget === 'sites') {
+            return $this->countSitesForEntity($projectName, $context);
+        }
+
+        return $this->countAssignmentsForEntity($projectName, $subcontractorName, $activityType, $status, $context);
+    }
+
+    /** @param  array<string, mixed>  $context */
+    private function countSitesForEntity(?string $projectName, array $context): array
+    {
+        $query = DB::table('sites')
+            ->join('projects', 'sites.project_id', '=', 'projects.id');
+
+        $matchedProject = null;
+        if ($projectName !== null && $projectName !== '') {
+            $matchedProject = DB::table('projects')
+                ->where('name', 'LIKE', "%{$projectName}%")
+                ->first(['id', 'name']);
+
+            if ($matchedProject === null) {
+                return [
+                    'count_target' => 'sites',
+                    'filter_project' => $projectName,
+                    'total_count' => 0,
+                    'error' => "Tidak ada project yang cocok dengan nama '{$projectName}'.",
+                ];
+            }
+
+            $query->where('sites.project_id', $matchedProject->id);
+        } elseif ($projectId = $this->contextProjectId($context)) {
+            $matchedProject = DB::table('projects')->find($projectId, ['id', 'name']);
+            $query->where('sites.project_id', $projectId);
+        }
+
+        $total = $query->count();
+
+        $breakdown = DB::table('sites')
+            ->join('projects', 'sites.project_id', '=', 'projects.id')
+            ->when($matchedProject !== null, fn ($q) => $q->where('sites.project_id', $matchedProject->id))
+            ->selectRaw('COUNT(*) as total')
+            ->value('total') ?? 0;
+
+        return [
+            'count_target' => 'sites',
+            'filter_project' => $matchedProject?->name ?? $projectName,
+            'total_count' => $total,
+            'matched_project' => $matchedProject ? ['id' => $matchedProject->id, 'name' => $matchedProject->name] : null,
+            'generated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /** @param  array<string, mixed>  $context */
+    private function countAssignmentsForEntity(
+        ?string $projectName,
+        ?string $subcontractorName,
+        ?string $activityType,
+        ?string $status,
+        array $context,
+    ): array {
+        $matchedSubcon = null;
+        if ($subcontractorName !== null && $subcontractorName !== '') {
+            $matchedSubcon = DB::table('subcontractors')
+                ->where('name', 'LIKE', "%{$subcontractorName}%")
+                ->first(['id', 'name']);
+
+            if ($matchedSubcon === null) {
+                return [
+                    'count_target' => 'assignments',
+                    'filter_subcontractor' => $subcontractorName,
+                    'total_count' => 0,
+                    'error' => "Tidak ada subkontraktor yang cocok dengan nama '{$subcontractorName}'.",
+                ];
+            }
+        }
+
+        $matchedProject = null;
+        if ($projectName !== null && $projectName !== '') {
+            $matchedProject = DB::table('projects')
+                ->where('name', 'LIKE', "%{$projectName}%")
+                ->first(['id', 'name']);
+        }
+
+        $baseQuery = fn () => DB::table('assignments')
+            ->join('sites', 'assignments.site_id', '=', 'sites.id')
+            ->join('projects', 'sites.project_id', '=', 'projects.id')
+            ->when($matchedSubcon !== null, fn ($q) => $q->where('assignments.subcontractor_id', $matchedSubcon->id))
+            ->when($matchedProject !== null, fn ($q) => $q->where('sites.project_id', $matchedProject->id))
+            ->when($activityType !== null, fn ($q) => $q->where('assignments.activity_type', $activityType))
+            ->when($status !== null, fn ($q) => $q->where('assignments.status', $status));
+
+        $total = $baseQuery()->count();
+
+        $statusBreakdown = [];
+        if ($status === null) {
+            $statusBreakdown = $baseQuery()
+                ->selectRaw('assignments.status, COUNT(*) as total')
+                ->groupBy('assignments.status')
+                ->pluck('total', 'status')
+                ->all();
+        }
+
+        $activityBreakdown = [];
+        if ($activityType === null) {
+            $activityBreakdown = $baseQuery()
+                ->selectRaw('assignments.activity_type, COUNT(*) as total')
+                ->groupBy('assignments.activity_type')
+                ->pluck('total', 'activity_type')
+                ->all();
+        }
+
+        return [
+            'count_target' => 'assignments',
+            'filter_project' => $matchedProject?->name ?? $projectName,
+            'filter_subcontractor' => $matchedSubcon?->name ?? $subcontractorName,
+            'filter_activity_type' => $activityType,
+            'filter_status' => $status,
+            'total_count' => $total,
+            'matched_subcontractor' => $matchedSubcon ? ['id' => $matchedSubcon->id, 'name' => $matchedSubcon->name] : null,
+            'matched_project' => $matchedProject ? ['id' => $matchedProject->id, 'name' => $matchedProject->name] : null,
+            'status_breakdown' => $statusBreakdown,
+            'activity_breakdown' => $activityBreakdown,
+            'generated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Generate outstanding assignment data for a specific subcontractor (for reminder use).
+     *
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    public function generateSubcontractorReminder(string $subcontractorName, array $context): array
+    {
+        $subcon = DB::table('subcontractors')
+            ->where('name', 'LIKE', "%{$subcontractorName}%")
+            ->first(['id', 'name', 'phone']);
+
+        if ($subcon === null) {
+            return [
+                'error' => "Tidak ada subkontraktor yang cocok dengan nama '{$subcontractorName}'.",
+                'subcontractor_name' => $subcontractorName,
+            ];
+        }
+
+        $terminalStatuses = [
+            AssignmentStatus::Verified->value,
+            AssignmentStatus::Reported->value,
+            AssignmentStatus::Drop->value,
+        ];
+
+        $outstanding = DB::table('assignments')
+            ->join('sites', 'assignments.site_id', '=', 'sites.id')
+            ->join('projects', 'sites.project_id', '=', 'projects.id')
+            ->where('assignments.subcontractor_id', $subcon->id)
+            ->whereNotIn('assignments.status', $terminalStatuses)
+            ->select([
+                'assignments.id',
+                'assignments.activity_type',
+                'assignments.status',
+                'assignments.updated_at',
+                'sites.site_code',
+                'sites.location_name',
+                'projects.name as project_name',
+            ])
+            ->orderBy('assignments.updated_at')
+            ->limit(50)
+            ->get();
+
+        $grouped = $outstanding
+            ->groupBy('project_name')
+            ->map(fn ($items, $projectName) => [
+                'project' => $projectName,
+                'items' => $items->map(fn ($row) => [
+                    'id' => $row->id,
+                    'site_code' => $row->site_code,
+                    'site_name' => $row->location_name,
+                    'activity_type' => $row->activity_type,
+                    'status' => $row->status,
+                    'age_days' => (int) now()->diffInDays($row->updated_at),
+                    'url' => route('admin.assignments.show', $row->id),
+                ])->values()->all(),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'subcontractor' => $subcon->name,
+            'subcontractor_id' => $subcon->id,
+            'subcontractor_phone' => $subcon->phone,
+            'outstanding_count' => $outstanding->count(),
+            'projects_count' => count($grouped),
+            'grouped_by_project' => $grouped,
+            'status_counts' => $outstanding->groupBy('status')->map->count()->all(),
+            'activity_counts' => $outstanding->groupBy('activity_type')->map->count()->all(),
+            'generated_at' => now()->toIso8601String(),
+        ];
+    }
+
     public function riskCandidateAssignments(array $context = []): Collection
     {
         $slowThreshold = now()->subDays(7);
@@ -1212,6 +1447,8 @@ class AiAssistantService
             'workflow_knowledge' => ['NexPM workflow rules', 'Application implementation'],
             'query_database' => ['Live database query'],
             'resolve_entity_context' => ['Projects', 'Sites', 'Subcontractors'],
+            'query_entity_stats' => ['Assignments', 'Sites', 'Projects', 'Subcontractors'],
+            'generate_subcontractor_reminder' => ['Assignments', 'Subcontractors', 'Sites', 'Projects'],
             'list_users' => ['Users'],
             default => ['Assignments', 'Sites', 'Projects'],
         };
@@ -1248,6 +1485,16 @@ class AiAssistantService
             'resolve_entity_context' => [
                 'Bahas project yang paling berisiko',
                 'Cek assignment telat untuk project itu',
+            ],
+            'query_entity_stats' => [
+                'Buatkan reminder untuk subkon tersebut',
+                'Apa assignment yang masih pending di project ini?',
+                'Cek blocker subkon ini',
+            ],
+            'generate_subcontractor_reminder' => [
+                'Berapa total assignment subkon ini?',
+                'Cek blocker subkon ini',
+                'Apa prioritas tindakan saya hari ini?',
             ],
             default => [
                 'Briefing proyek hari ini',
@@ -1359,6 +1606,18 @@ class AiAssistantService
                 'Blocker subcon: %d subcon memiliki blocker dari total %d assignment.',
                 (int) $toolPayload['total_subcontractors_with_blockers'],
                 (int) $toolPayload['total_blocked_assignments'],
+            ),
+            'query_entity_stats' => sprintf(
+                'Statistik entitas: ditemukan %d %s%s.',
+                (int) ($toolPayload['total_count'] ?? 0),
+                $toolPayload['count_target'] === 'sites' ? 'lokasi' : 'assignment',
+                isset($toolPayload['filter_project']) ? ' untuk project '.$toolPayload['filter_project'] : ''
+            ),
+            'generate_subcontractor_reminder' => sprintf(
+                'Reminder subkon: %s memiliki %d assignment outstanding di %d proyek.',
+                $toolPayload['subcontractor'] ?? 'Tidak diketahui',
+                (int) ($toolPayload['outstanding_count'] ?? 0),
+                (int) ($toolPayload['projects_count'] ?? 0),
             ),
             'check_report_readiness' => sprintf(
                 'Kesiapan laporan: %d assignment sedang berada pada status siap laporan. Pembagian activity: %s.',

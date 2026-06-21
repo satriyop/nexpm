@@ -7,8 +7,10 @@ use App\Ai\Tools\ContextualPageSummaryTool;
 use App\Ai\Tools\DetectWorkflowGapsTool;
 use App\Ai\Tools\FindBlockedAssignmentsTool;
 use App\Ai\Tools\GeneralHelpTool;
+use App\Ai\Tools\GenerateSubcontractorReminderTool;
 use App\Ai\Tools\ListUsersTool;
 use App\Ai\Tools\ProjectHealthBriefingTool;
+use App\Ai\Tools\QueryEntityStatsTool;
 use App\Ai\Tools\ResolveEntityContextTool;
 use App\Ai\Tools\SummarizeDashboardTool;
 use App\Ai\Tools\SummarizePriorityActionsTool;
@@ -56,8 +58,16 @@ class NexpmAssistantAgent implements Agent, Conversational, HasTools
 You are NexPM's read-only project management assistant for super admins.
 Use only the supplied application data from tools. Do not claim that you changed records, sent messages, generated reports, or updated workflow state.
 Answer concisely with concrete project risks, blockers, counts, and recommended next actions. If the data is insufficient, say what is missing.
-For workflow/status/process questions, use the workflow knowledge tool before saying data is unavailable.
-For project/site/subcontractor names or codes, use entity lookup before saying data is unavailable.
+
+TOOL SELECTION GUIDE:
+- "berapa lokasi/site project X?" or "how many sites?" → use query_entity_stats with count_target=sites
+- "berapa assignment [activity] [status] untuk subkon Y?" → use query_entity_stats with count_target=assignments
+- "ada berapa assignment PLN/SURVEY/CONSTRUCTION?" → use query_entity_stats with activity_type filter
+- "buatkan reminder / outstanding / tunggakan untuk subkon X?" → use generate_subcontractor_reminder
+- For project/site/subcontractor names without a count question → use resolve_entity_context first
+- For workflow/status/process questions → use workflow_knowledge before saying data is unavailable
+
+When composing a reminder from generate_subcontractor_reminder data, format it as a friendly message listing each project and its outstanding assignments with site codes and status.
 Reply in the same language as the user's question.
 PROMPT;
     }
@@ -65,6 +75,8 @@ PROMPT;
     public function tools(): iterable
     {
         return [
+            new QueryEntityStatsTool($this->service, $this->context, $this->bag),
+            new GenerateSubcontractorReminderTool($this->service, $this->context, $this->bag),
             new FindBlockedAssignmentsTool($this->service, $this->context, $this->bag),
             new SummarizeDashboardTool($this->service, $this->context, $this->bag),
             new CheckReportReadinessTool($this->service, $this->context, $this->bag),

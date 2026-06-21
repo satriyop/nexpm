@@ -46,6 +46,8 @@ const quickPrompts = [
     'Cek gap workflow',
     'Apa yang siap dibuat laporan?',
     'Apa prioritas tindakan saya hari ini?',
+    'Project [nama] ada berapa lokasi?',
+    'Buatkan reminder untuk subkon [nama]',
 ];
 
 const csrfToken = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
@@ -54,8 +56,10 @@ const toolLabels: Record<string, string> = {
     check_report_readiness: 'Kesiapan laporan',
     find_blocked_assignments: 'Assignment telat',
     general_help: 'Bantuan',
+    generate_subcontractor_reminder: 'Reminder subkon',
     list_users: 'Daftar user',
     query_database: 'Query database',
+    query_entity_stats: 'Statistik entitas',
     resolve_entity_context: 'Pencarian konteks',
     workflow_knowledge: 'Pengetahuan workflow',
     contextual_page_summary: 'Ringkasan halaman',
