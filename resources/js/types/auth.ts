@@ -6,7 +6,7 @@ export type User = {
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;
-    role?: 'super_admin' | 'admin' | 'subcontractor';
+    role?: 'super_admin' | 'admin' | 'subcontractor' | 'drafter' | 'project_manager';
     [key: string]: unknown;
 };
 

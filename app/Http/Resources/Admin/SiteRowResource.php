@@ -40,6 +40,19 @@ class SiteRowResource extends JsonResource
                 'construction_data' => $a->constructionData ? [
                     'cons_wo_number' => $a->constructionData->cons_wo_number,
                 ] : null,
+                'latest_comment' => $a->latestComment ? [
+                    'id' => $a->latestComment->id,
+                    'assignment_id' => $a->latestComment->assignment_id,
+                    'user_id' => $a->latestComment->user_id,
+                    'body' => $a->latestComment->body,
+                    'created_at' => $a->latestComment->created_at?->toISOString(),
+                    'updated_at' => $a->latestComment->updated_at?->toISOString(),
+                    'user' => $a->latestComment->user ? [
+                        'id' => $a->latestComment->user->id,
+                        'name' => $a->latestComment->user->name,
+                        'role' => $a->latestComment->user->role?->value,
+                    ] : null,
+                ] : null,
             ]),
         ];
     }

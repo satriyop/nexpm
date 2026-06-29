@@ -89,6 +89,7 @@ class AssignmentController extends Controller
             'plnData',
             'constructionData.constructionPhotos',
             'bastData.bastPhotos',
+            'comments.user:id,name,role',
         ]);
 
         $siblingConstruction = $assignment->activity_type === ActivityType::Bast

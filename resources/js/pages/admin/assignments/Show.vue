@@ -25,9 +25,11 @@ import {
 } from 'lucide-vue-next';
 import { computed, onUnmounted, ref } from 'vue';
 import * as AdminAssignmentActions from '@/actions/App/Http/Controllers/Admin/AssignmentController';
+import * as AdminAssignmentCommentActions from '@/actions/App/Http/Controllers/Admin/AssignmentCommentController';
 import * as AdminReportActions from '@/actions/App/Http/Controllers/Admin/ReportController';
 import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
+import AssignmentNotes from '@/components/AssignmentNotes.vue';
 import InputError from '@/components/InputError.vue';
 import PhotoUpload from '@/components/PhotoUpload.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
@@ -129,7 +131,8 @@ const reportableType = computed<string | null>(() => {
     return null;
 });
 const canGenerateReport = computed(
-    () => reportableType.value !== null && props.assignment.status === 'VERIFIED',
+    () =>
+        reportableType.value !== null && props.assignment.status === 'VERIFIED',
 );
 
 const generateReportForm = useForm({});
@@ -148,7 +151,9 @@ function regenerateReport(reportId: number): void {
         {},
         {
             preserveScroll: true,
-            onFinish: () => { regeneratingReportId.value = null; },
+            onFinish: () => {
+                regeneratingReportId.value = null;
+            },
         },
     );
 }
@@ -157,11 +162,9 @@ const bastSummary = computed(() => ({
     customer:
         bast.value?.customer ?? props.assignment.site.project?.client?.name,
     charger_type:
-        bast.value?.charger_type ??
-        props.assignment.site.machine_type?.name,
+        bast.value?.charger_type ?? props.assignment.site.machine_type?.name,
     sn_unit:
-        bast.value?.sn_unit ??
-        props.siblingConstruction?.machine_serial_number,
+        bast.value?.sn_unit ?? props.siblingConstruction?.machine_serial_number,
     id_pln: bast.value?.id_pln ?? pln.value?.id_pelanggan,
     sim_provider: bast.value?.sim_provider,
     installation_date:
@@ -260,13 +263,16 @@ function openUnverifyDialog(): void {
 }
 
 function submitUnverify(): void {
-    unverifyForm.post(AdminAssignmentActions.unverify(props.assignment.id).url, {
-        preserveScroll: true,
-        onSuccess: () => {
-            unverifyOpen.value = false;
-            unverifyForm.reset();
+    unverifyForm.post(
+        AdminAssignmentActions.unverify(props.assignment.id).url,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                unverifyOpen.value = false;
+                unverifyForm.reset();
+            },
         },
-    });
+    );
 }
 
 // --- Drop / Restore ---
@@ -445,13 +451,16 @@ function onAdminConstructionPhotoSelected(file: File | null): void {
 
     const uploadForm = useForm({ photo: file });
     constructionUploadingPhoto.value = true;
-    uploadForm.post(AdminAssignmentActions.storeConstructionPhoto(props.assignment).url, {
-        forceFormData: true,
-        onFinish: () => {
-            constructionUploadingPhoto.value = false;
-            constructionUploadKey.value++;
+    uploadForm.post(
+        AdminAssignmentActions.storeConstructionPhoto(props.assignment).url,
+        {
+            forceFormData: true,
+            onFinish: () => {
+                constructionUploadingPhoto.value = false;
+                constructionUploadKey.value++;
+            },
         },
-    });
+    );
 }
 
 function deleteAdminConstructionPhoto(photoId: number): void {
@@ -662,28 +671,52 @@ function deleteLegacyReport(report: AssignmentLegacyReport): void {
 
 // ── Audit log helpers ──────────────────────────────────────────────────────
 const auditKeyLabels: Record<string, string> = {
-    surveyor_name: 'Surveyor Name', pic_location_name: 'PIC Location',
-    pic_location_phone: 'PIC Phone', charger_type: 'Charger Type',
-    ss_schedule_date: 'Schedule Date', cable_pulling_type: 'Cable Type',
-    pln_network_type: 'PLN Network', parking_slot: 'Parking Slot',
-    additional_info: 'Additional Info', ss_report_submission_date: 'Report Date',
-    power_kva: 'Power (kVA)', photo_overall_site: 'Photo (Overall)',
-    photo_parking_evcs: 'Photo (Parking)', photo_access_route: 'Photo (Access)',
-    photo_pln_network: 'Photo (PLN)', photo_satellite_gmaps: 'Photo (Satellite)',
-    file_mockup_3d: 'File (3D Mockup)', file_site_plan: 'File (Site Plan)',
-    file_ba_survey: 'File (BA Survey)', file_boq: 'File (BoQ)',
-    pln_status: 'PLN Status', nidi_slo_date_acquired: 'NIDI/SLO Date',
-    type_rate: 'Type Rate', kwh_meter_installation_date: 'KWH Install Date',
-    id_pelanggan: 'ID Pelanggan', catatan_progres: 'Progress Notes',
-    email_bpujl_req_date: 'BPUJL Request Date', bpujl_acquired_date: 'BPUJL Acquired',
-    file_slo: 'File (SLO)', file_nidi: 'File (NIDI)', file_reg: 'File (REG)',
-    file_pk: 'File (PK)', foto_kwh: 'Photo (KWH)', cons_actual_start_date: 'Start Date',
-    cons_actual_done_date: 'Done Date', machine_serial_number: 'Serial Number',
-    foto_machine_sn: 'Photo (Machine)', go_live_date_pln: 'Go Live (PLN)',
-    go_live_date_pln_pass: 'Go Live Pass', sim_provider: 'SIM Provider',
-    nomor_simcard: 'SIM Number', commissioning_date: 'Commissioning Date',
-    measurements: 'Measurements', unverify_reason: 'Reason',
-    revision_comment: 'Comment', new_subcontractor_id: 'Subcontractor ID',
+    surveyor_name: 'Surveyor Name',
+    pic_location_name: 'PIC Location',
+    pic_location_phone: 'PIC Phone',
+    charger_type: 'Charger Type',
+    ss_schedule_date: 'Schedule Date',
+    cable_pulling_type: 'Cable Type',
+    pln_network_type: 'PLN Network',
+    parking_slot: 'Parking Slot',
+    additional_info: 'Additional Info',
+    ss_report_submission_date: 'Report Date',
+    power_kva: 'Power (kVA)',
+    photo_overall_site: 'Photo (Overall)',
+    photo_parking_evcs: 'Photo (Parking)',
+    photo_access_route: 'Photo (Access)',
+    photo_pln_network: 'Photo (PLN)',
+    photo_satellite_gmaps: 'Photo (Satellite)',
+    file_mockup_3d: 'File (3D Mockup)',
+    file_site_plan: 'File (Site Plan)',
+    file_ba_survey: 'File (BA Survey)',
+    file_boq: 'File (BoQ)',
+    pln_status: 'PLN Status',
+    nidi_slo_date_acquired: 'NIDI/SLO Date',
+    type_rate: 'Type Rate',
+    kwh_meter_installation_date: 'KWH Install Date',
+    id_pelanggan: 'ID Pelanggan',
+    catatan_progres: 'Progress Notes',
+    email_bpujl_req_date: 'BPUJL Request Date',
+    bpujl_acquired_date: 'BPUJL Acquired',
+    file_slo: 'File (SLO)',
+    file_nidi: 'File (NIDI)',
+    file_reg: 'File (REG)',
+    file_pk: 'File (PK)',
+    foto_kwh: 'Photo (KWH)',
+    cons_actual_start_date: 'Start Date',
+    cons_actual_done_date: 'Done Date',
+    machine_serial_number: 'Serial Number',
+    foto_machine_sn: 'Photo (Machine)',
+    go_live_date_pln: 'Go Live (PLN)',
+    go_live_date_pln_pass: 'Go Live Pass',
+    sim_provider: 'SIM Provider',
+    nomor_simcard: 'SIM Number',
+    commissioning_date: 'Commissioning Date',
+    measurements: 'Measurements',
+    unverify_reason: 'Reason',
+    revision_comment: 'Comment',
+    new_subcontractor_id: 'Subcontractor ID',
     subcontractor_id: 'Subcontractor ID',
 };
 
@@ -725,7 +758,13 @@ function formatAuditValue(val: unknown): string {
 }
 
 function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
-    return typeof val === 'object' && val !== null && !Array.isArray(val) && 'old' in val && 'new' in val;
+    return (
+        typeof val === 'object' &&
+        val !== null &&
+        !Array.isArray(val) &&
+        'old' in val &&
+        'new' in val
+    );
 }
 </script>
 
@@ -1058,7 +1097,9 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                 <div class="flex flex-wrap gap-2">
                                     <a
                                         v-if="survey.file_mockup_3d"
-                                        :href="storageUrl(survey.file_mockup_3d)"
+                                        :href="
+                                            storageUrl(survey.file_mockup_3d)
+                                        "
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
@@ -1068,7 +1109,9 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                     </a>
                                     <a
                                         v-if="survey.file_site_plan"
-                                        :href="storageUrl(survey.file_site_plan)"
+                                        :href="
+                                            storageUrl(survey.file_site_plan)
+                                        "
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
@@ -1078,7 +1121,9 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                     </a>
                                     <a
                                         v-if="survey.file_ba_survey"
-                                        :href="storageUrl(survey.file_ba_survey)"
+                                        :href="
+                                            storageUrl(survey.file_ba_survey)
+                                        "
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs hover:bg-accent"
@@ -1345,9 +1390,21 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                 <div class="grid gap-3 sm:grid-cols-2">
                                     <div
                                         v-for="[key, label, accept] in [
-                                            ['file_mockup_3d', '3D Mockup', 'image/*'],
-                                            ['file_site_plan', 'Site Plan', 'image/*'],
-                                            ['file_ba_survey', 'BA Survey', 'image/*'],
+                                            [
+                                                'file_mockup_3d',
+                                                '3D Mockup',
+                                                'image/*',
+                                            ],
+                                            [
+                                                'file_site_plan',
+                                                'Site Plan',
+                                                'image/*',
+                                            ],
+                                            [
+                                                'file_ba_survey',
+                                                'BA Survey',
+                                                'image/*',
+                                            ],
                                         ] as const"
                                         :key="key"
                                         class="grid gap-1"
@@ -1388,7 +1445,9 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         v-if="isAdminOrSuperAdmin"
                                         class="grid gap-1"
                                     >
-                                        <span class="text-xs font-medium">BoQ</span>
+                                        <span class="text-xs font-medium"
+                                            >BoQ</span
+                                        >
                                         <a
                                             v-if="survey?.file_boq"
                                             :href="storageUrl(survey.file_boq)"
@@ -1406,12 +1465,16 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                                     const f = (
                                                         e.target as HTMLInputElement
                                                     ).files?.[0];
-                                                    if (f) adminSurveyForm.file_boq = f;
+                                                    if (f)
+                                                        adminSurveyForm.file_boq =
+                                                            f;
                                                 }
                                             "
                                         />
                                         <InputError
-                                            :message="adminSurveyForm.errors.file_boq"
+                                            :message="
+                                                adminSurveyForm.errors.file_boq
+                                            "
                                         />
                                     </div>
                                 </div>
@@ -1562,11 +1625,10 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                         No files uploaded.
                                     </span>
                                 </div>
-                                <div
-                                    v-if="pln.foto_kwh"
-                                    class="mt-3"
-                                >
-                                    <p class="mb-1 text-xs text-muted-foreground">
+                                <div v-if="pln.foto_kwh" class="mt-3">
+                                    <p
+                                        class="mb-1 text-xs text-muted-foreground"
+                                    >
                                         KWH Meter Photo
                                     </p>
                                     <a
@@ -1927,7 +1989,10 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                     Progress Photos
                                 </h3>
                                 <div
-                                    v-if="construction.construction_photos.length === 0"
+                                    v-if="
+                                        construction.construction_photos
+                                            .length === 0
+                                    "
                                     class="mb-3 text-sm text-muted-foreground"
                                 >
                                     No progress photos uploaded.
@@ -1956,7 +2021,11 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                             type="button"
                                             class="absolute top-1 right-1 hidden size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground group-hover:flex"
                                             title="Remove photo"
-                                            @click="deleteAdminConstructionPhoto(photo.id)"
+                                            @click="
+                                                deleteAdminConstructionPhoto(
+                                                    photo.id,
+                                                )
+                                            "
                                         >
                                             <X class="size-3" />
                                         </button>
@@ -1970,12 +2039,11 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                     :key="constructionUploadKey"
                                     :model-value="null"
                                     :readonly="false"
-                                    @update:model-value="onAdminConstructionPhotoSelected"
+                                    @update:model-value="
+                                        onAdminConstructionPhotoSelected
+                                    "
                                 />
-                                <p
-                                    v-else
-                                    class="text-xs text-muted-foreground"
-                                >
+                                <p v-else class="text-xs text-muted-foreground">
                                     Maximum of 2 progress photos reached.
                                 </p>
                             </div>
@@ -2281,10 +2349,12 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                                 "
                                 :delete-photo-url-fn="
                                     (id) =>
-                                        AdminAssignmentActions.destroyBastPhoto({
-                                            assignment: assignment.id,
-                                            photo: id,
-                                        }).url
+                                        AdminAssignmentActions.destroyBastPhoto(
+                                            {
+                                                assignment: assignment.id,
+                                                photo: id,
+                                            },
+                                        ).url
                                 "
                             />
                         </div>
@@ -2478,9 +2548,7 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
             </div>
 
             <!-- Right column: Admin actions and prerequisite -->
-            <div
-                class="flex flex-col gap-6 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto"
-            >
+            <div class="flex flex-col gap-6 lg:sticky lg:top-4 lg:self-start">
                 <Card>
                     <CardHeader>
                         <CardTitle>Verification</CardTitle>
@@ -2719,254 +2787,384 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                         </form>
                     </CardContent>
                 </Card>
+
+                <AssignmentNotes
+                    compact
+                    :max-comments="5"
+                    :comments="assignment.comments ?? []"
+                    :store-url="
+                        AdminAssignmentCommentActions.store(assignment).url
+                    "
+                />
             </div>
         </div>
 
-        <!-- Generated Reports -->
-        <div
-            v-if="reportableType !== null && (generatedReports.length > 0 || isAdminOrSuperAdmin)"
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
-        >
-            <div
-                class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
-            >
-                <FileText class="size-4 text-muted-foreground" />
-                <h2 class="text-sm font-semibold">Generated Reports</h2>
-                <span class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                    {{ reportableType }}
-                </span>
-                <div v-if="isAdminOrSuperAdmin && canGenerateReport" class="ml-auto">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        :disabled="generateReportForm.processing"
-                        @click="generateReport"
-                    >
-                        <RefreshCw
-                            class="mr-1.5 size-3.5"
-                            :class="{ 'animate-spin': generateReportForm.processing }"
-                        />
-                        {{ generateReportForm.processing ? 'Generating…' : 'Generate Report' }}
-                    </Button>
-                </div>
-            </div>
-
-            <div
-                v-if="generatedReports.length > 0"
-                class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
-            >
+        <div class="grid gap-6 lg:grid-cols-3">
+            <div class="flex flex-col gap-6 lg:col-span-2">
+                <!-- Generated Reports -->
                 <div
-                    v-for="report in generatedReports"
-                    :key="report.id"
-                    class="flex items-center gap-3 px-4 py-2.5 text-sm"
+                    v-if="
+                        reportableType !== null &&
+                        (generatedReports.length > 0 || isAdminOrSuperAdmin)
+                    "
+                    class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
                 >
-                    <FileText class="size-4 shrink-0 text-muted-foreground" />
-                    <div class="min-w-0 flex-1">
-                        <span class="truncate font-medium">{{ report.name }}</span>
-                        <span class="ml-2 text-xs text-muted-foreground">
-                            {{
-                                new Date(report.created_at).toLocaleDateString('id-ID', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                })
-                            }}
-                        </span>
-                    </div>
-                    <a
-                        :href="report.download_url"
-                        class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    <div
+                        class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
                     >
-                        <Download class="size-3" />Download
-                    </a>
-                    <button
-                        v-if="isAdminOrSuperAdmin"
-                        class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-                        :disabled="regeneratingReportId === report.id"
-                        @click="regenerateReport(report.id)"
-                    >
-                        <RefreshCw
-                            class="size-3"
-                            :class="{ 'animate-spin': regeneratingReportId === report.id }"
-                        />
-                        {{ regeneratingReportId === report.id ? 'Regenerating…' : 'Regenerate' }}
-                    </button>
-                </div>
-            </div>
-            <div v-else class="px-4 py-3 text-sm text-muted-foreground">
-                No reports generated yet.
-            </div>
-        </div>
-
-        <!-- Legacy Reports (download: all roles; upload/delete: superadmin only) -->
-        <div
-            v-if="legacyReports.length > 0 || isSuperAdmin"
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
-        >
-            <div
-                class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
-            >
-                <FileArchive class="size-4 text-muted-foreground" />
-                <h2 class="text-sm font-semibold">Legacy Reports</h2>
-                <span v-if="isSuperAdmin" class="ml-auto text-xs text-muted-foreground">Superadmin only</span>
-            </div>
-
-            <!-- Existing reports list -->
-            <div v-if="legacyReports.length > 0" class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                <div
-                    v-for="report in legacyReports"
-                    :key="report.id"
-                    class="flex items-center gap-3 px-4 py-2.5 text-sm"
-                >
-                    <FileText class="size-4 shrink-0 text-muted-foreground" />
-                    <div class="min-w-0 flex-1">
-                        <span class="truncate font-medium">{{ report.original_filename }}</span>
-                        <span class="ml-2 text-xs text-muted-foreground">{{ report.report_type }}</span>
-                    </div>
-                    <a
-                        :href="report.download_url"
-                        class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                        <Download class="size-3" />Download
-                    </a>
-                    <button
-                        v-if="isSuperAdmin"
-                        class="ml-1 text-muted-foreground hover:text-destructive"
-                        @click="deleteLegacyReport(report)"
-                    >
-                        <Trash2 class="size-4" />
-                    </button>
-                </div>
-            </div>
-            <div v-else class="px-4 py-3 text-sm text-muted-foreground">
-                No legacy reports uploaded yet.
-            </div>
-
-            <!-- Upload form (superadmin only) -->
-            <div v-if="isSuperAdmin" class="border-t border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
-                <form class="flex flex-wrap items-end gap-3" @submit.prevent="submitLegacyReport">
-                    <div class="space-y-1">
-                        <label class="text-xs font-medium text-muted-foreground">Report Type</label>
-                        <select
-                            v-model="legacyReportForm.report_type"
-                            class="flex h-8 rounded-md border border-input bg-background px-2 text-sm"
-                        >
-                            <option value="SSR">SSR</option>
-                            <option value="BAST">BAST</option>
-                            <option value="CONSTRUCTION">Construction</option>
-                        </select>
-                    </div>
-                    <div class="flex-1 space-y-1">
-                        <label class="text-xs font-medium text-muted-foreground">File (PDF, XLSX, Image)</label>
-                        <input
-                            ref="legacyReportFileRef"
-                            type="file"
-                            accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"
-                            class="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm file:border-0 file:bg-transparent file:text-xs file:font-medium"
-                        />
-                    </div>
-                    <Button type="submit" size="sm" :disabled="legacyReportForm.processing">
-                        <Upload class="mr-1 size-3.5" />
-                        {{ legacyReportForm.processing ? 'Uploading…' : 'Upload' }}
-                    </Button>
-                </form>
-                <InputError :message="legacyReportForm.errors.file" class="mt-1" />
-            </div>
-        </div>
-
-        <!-- Audit Log -->
-        <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
-        >
-            <div
-                class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
-            >
-                <ClipboardList class="size-4 text-muted-foreground" />
-                <h2 class="text-sm font-semibold">Audit Log</h2>
-                <span
-                    v-if="auditLogs"
-                    class="ml-auto text-xs text-muted-foreground"
-                    >{{ auditLogs.length }} event(s)</span
-                >
-            </div>
-
-            <template v-if="auditLogs != null">
-                <div
-                    v-if="auditLogs.length === 0"
-                    class="px-4 py-8 text-center text-sm text-muted-foreground"
-                >
-                    No audit events recorded.
-                </div>
-                <ul
-                    v-else
-                    class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
-                >
-                    <li
-                        v-for="log in auditLogs"
-                        :key="log.id"
-                        class="flex items-start gap-3 px-4 py-3 text-sm"
-                    >
+                        <FileText class="size-4 text-muted-foreground" />
+                        <h2 class="text-sm font-semibold">Generated Reports</h2>
                         <span
-                            class="mt-0.5 size-2 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-muted/30"
-                        />
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="font-medium capitalize">{{
-                                    log.event.replace(/_/g, ' ')
+                            class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
+                        >
+                            {{ reportableType }}
+                        </span>
+                        <div
+                            v-if="isAdminOrSuperAdmin && canGenerateReport"
+                            class="ml-auto"
+                        >
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                :disabled="generateReportForm.processing"
+                                @click="generateReport"
+                            >
+                                <RefreshCw
+                                    class="mr-1.5 size-3.5"
+                                    :class="{
+                                        'animate-spin':
+                                            generateReportForm.processing,
+                                    }"
+                                />
+                                {{
+                                    generateReportForm.processing
+                                        ? 'Generating…'
+                                        : 'Generate Report'
+                                }}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="generatedReports.length > 0"
+                        class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
+                    >
+                        <div
+                            v-for="report in generatedReports"
+                            :key="report.id"
+                            class="flex items-center gap-3 px-4 py-2.5 text-sm"
+                        >
+                            <FileText
+                                class="size-4 shrink-0 text-muted-foreground"
+                            />
+                            <div class="min-w-0 flex-1">
+                                <span class="truncate font-medium">{{
+                                    report.name
                                 }}</span>
                                 <span
-                                    v-if="log.user"
-                                    class="text-muted-foreground"
-                                    >by {{ log.user.name }}</span
+                                    class="ml-2 text-xs text-muted-foreground"
+                                >
+                                    {{
+                                        new Date(
+                                            report.created_at,
+                                        ).toLocaleDateString('id-ID', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                        })
+                                    }}
+                                </span>
+                            </div>
+                            <a
+                                :href="report.download_url"
+                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                                <Download class="size-3" />Download
+                            </a>
+                            <button
+                                v-if="isAdminOrSuperAdmin"
+                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                :disabled="regeneratingReportId === report.id"
+                                @click="regenerateReport(report.id)"
+                            >
+                                <RefreshCw
+                                    class="size-3"
+                                    :class="{
+                                        'animate-spin':
+                                            regeneratingReportId === report.id,
+                                    }"
+                                />
+                                {{
+                                    regeneratingReportId === report.id
+                                        ? 'Regenerating…'
+                                        : 'Regenerate'
+                                }}
+                            </button>
+                        </div>
+                    </div>
+                    <div v-else class="px-4 py-3 text-sm text-muted-foreground">
+                        No reports generated yet.
+                    </div>
+                </div>
+
+                <!-- Legacy Reports (download: all roles; upload/delete: superadmin only) -->
+                <div
+                    v-if="legacyReports.length > 0 || isSuperAdmin"
+                    class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+                >
+                    <div
+                        class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+                    >
+                        <FileArchive class="size-4 text-muted-foreground" />
+                        <h2 class="text-sm font-semibold">Legacy Reports</h2>
+                        <span
+                            v-if="isSuperAdmin"
+                            class="ml-auto text-xs text-muted-foreground"
+                            >Superadmin only</span
+                        >
+                    </div>
+
+                    <!-- Existing reports list -->
+                    <div
+                        v-if="legacyReports.length > 0"
+                        class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
+                    >
+                        <div
+                            v-for="report in legacyReports"
+                            :key="report.id"
+                            class="flex items-center gap-3 px-4 py-2.5 text-sm"
+                        >
+                            <FileText
+                                class="size-4 shrink-0 text-muted-foreground"
+                            />
+                            <div class="min-w-0 flex-1">
+                                <span class="truncate font-medium">{{
+                                    report.original_filename
+                                }}</span>
+                                <span
+                                    class="ml-2 text-xs text-muted-foreground"
+                                    >{{ report.report_type }}</span
                                 >
                             </div>
-                            <dl
-                                v-if="log.payload && Object.keys(log.payload).length"
-                                class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs"
+                            <a
+                                :href="report.download_url"
+                                class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                             >
-                                <template v-for="(val, key) in log.payload" :key="String(key)">
-                                    <template v-if="!isDiffEntry(val) && val !== null">
-                                        <dt class="whitespace-nowrap font-medium text-muted-foreground">
-                                            {{ formatAuditKey(String(key)) }}
-                                        </dt>
-                                        <dd class="font-mono">{{ formatAuditValue(val) }}</dd>
-                                    </template>
-                                    <template v-else-if="isDiffEntry(val)">
-                                        <dt class="whitespace-nowrap font-medium text-muted-foreground">
-                                            {{ formatAuditKey(String(key)) }}
-                                        </dt>
-                                        <dd class="flex items-center gap-1.5">
-                                            <span class="font-mono text-muted-foreground line-through">{{
-                                                formatAuditValue(val.old)
-                                            }}</span>
-                                            <span class="text-muted-foreground">→</span>
-                                            <span class="font-mono">{{ formatAuditValue(val.new) }}</span>
-                                        </dd>
-                                    </template>
-                                </template>
-                            </dl>
+                                <Download class="size-3" />Download
+                            </a>
+                            <button
+                                v-if="isSuperAdmin"
+                                class="ml-1 text-muted-foreground hover:text-destructive"
+                                @click="deleteLegacyReport(report)"
+                            >
+                                <Trash2 class="size-4" />
+                            </button>
                         </div>
-                        <span class="shrink-0 text-xs text-muted-foreground">
-                            {{
-                                log.created_at
-                                    ? new Date(log.created_at).toLocaleString()
-                                    : '—'
-                            }}
-                        </span>
-                    </li>
-                </ul>
-            </template>
-            <template v-else>
-                <div class="flex flex-col gap-2 p-4">
+                    </div>
+                    <div v-else class="px-4 py-3 text-sm text-muted-foreground">
+                        No legacy reports uploaded yet.
+                    </div>
+
+                    <!-- Upload form (superadmin only) -->
                     <div
-                        v-for="n in 3"
-                        :key="n"
-                        class="h-10 animate-pulse rounded bg-muted"
-                    />
+                        v-if="isSuperAdmin"
+                        class="border-t border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+                    >
+                        <form
+                            class="flex flex-wrap items-end gap-3"
+                            @submit.prevent="submitLegacyReport"
+                        >
+                            <div class="space-y-1">
+                                <label
+                                    class="text-xs font-medium text-muted-foreground"
+                                    >Report Type</label
+                                >
+                                <select
+                                    v-model="legacyReportForm.report_type"
+                                    class="flex h-8 rounded-md border border-input bg-background px-2 text-sm"
+                                >
+                                    <option value="SSR">SSR</option>
+                                    <option value="BAST">BAST</option>
+                                    <option value="CONSTRUCTION">
+                                        Construction
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="flex-1 space-y-1">
+                                <label
+                                    class="text-xs font-medium text-muted-foreground"
+                                    >File (PDF, XLSX, Image)</label
+                                >
+                                <input
+                                    ref="legacyReportFileRef"
+                                    type="file"
+                                    accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png"
+                                    class="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm file:border-0 file:bg-transparent file:text-xs file:font-medium"
+                                />
+                            </div>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                :disabled="legacyReportForm.processing"
+                            >
+                                <Upload class="mr-1 size-3.5" />
+                                {{
+                                    legacyReportForm.processing
+                                        ? 'Uploading…'
+                                        : 'Upload'
+                                }}
+                            </Button>
+                        </form>
+                        <InputError
+                            :message="legacyReportForm.errors.file"
+                            class="mt-1"
+                        />
+                    </div>
                 </div>
-            </template>
+
+                <!-- Audit Log -->
+                <div
+                    class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+                >
+                    <div
+                        class="flex items-center gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+                    >
+                        <ClipboardList class="size-4 text-muted-foreground" />
+                        <h2 class="text-sm font-semibold">Audit Log</h2>
+                        <span
+                            v-if="auditLogs"
+                            class="ml-auto text-xs text-muted-foreground"
+                            >{{ auditLogs.length }} event(s)</span
+                        >
+                    </div>
+
+                    <template v-if="auditLogs != null">
+                        <div
+                            v-if="auditLogs.length === 0"
+                            class="px-4 py-8 text-center text-sm text-muted-foreground"
+                        >
+                            No audit events recorded.
+                        </div>
+                        <ul
+                            v-else
+                            class="divide-y divide-sidebar-border/70 dark:divide-sidebar-border"
+                        >
+                            <li
+                                v-for="log in auditLogs"
+                                :key="log.id"
+                                class="flex items-start gap-3 px-4 py-3 text-sm"
+                            >
+                                <span
+                                    class="mt-0.5 size-2 shrink-0 rounded-full bg-muted-foreground/40 ring-4 ring-muted/30"
+                                />
+                                <div class="min-w-0 flex-1">
+                                    <div
+                                        class="flex flex-wrap items-center gap-1.5"
+                                    >
+                                        <span class="font-medium capitalize">{{
+                                            log.event.replace(/_/g, ' ')
+                                        }}</span>
+                                        <span
+                                            v-if="log.user"
+                                            class="text-muted-foreground"
+                                            >by {{ log.user.name }}</span
+                                        >
+                                    </div>
+                                    <dl
+                                        v-if="
+                                            log.payload &&
+                                            Object.keys(log.payload).length
+                                        "
+                                        class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs"
+                                    >
+                                        <template
+                                            v-for="(val, key) in log.payload"
+                                            :key="String(key)"
+                                        >
+                                            <template
+                                                v-if="
+                                                    !isDiffEntry(val) &&
+                                                    val !== null
+                                                "
+                                            >
+                                                <dt
+                                                    class="font-medium whitespace-nowrap text-muted-foreground"
+                                                >
+                                                    {{
+                                                        formatAuditKey(
+                                                            String(key),
+                                                        )
+                                                    }}
+                                                </dt>
+                                                <dd class="font-mono">
+                                                    {{ formatAuditValue(val) }}
+                                                </dd>
+                                            </template>
+                                            <template
+                                                v-else-if="isDiffEntry(val)"
+                                            >
+                                                <dt
+                                                    class="font-medium whitespace-nowrap text-muted-foreground"
+                                                >
+                                                    {{
+                                                        formatAuditKey(
+                                                            String(key),
+                                                        )
+                                                    }}
+                                                </dt>
+                                                <dd
+                                                    class="flex items-center gap-1.5"
+                                                >
+                                                    <span
+                                                        class="font-mono text-muted-foreground line-through"
+                                                        >{{
+                                                            formatAuditValue(
+                                                                val.old,
+                                                            )
+                                                        }}</span
+                                                    >
+                                                    <span
+                                                        class="text-muted-foreground"
+                                                        >→</span
+                                                    >
+                                                    <span class="font-mono">{{
+                                                        formatAuditValue(
+                                                            val.new,
+                                                        )
+                                                    }}</span>
+                                                </dd>
+                                            </template>
+                                        </template>
+                                    </dl>
+                                </div>
+                                <span
+                                    class="shrink-0 text-xs text-muted-foreground"
+                                >
+                                    {{
+                                        log.created_at
+                                            ? new Date(
+                                                  log.created_at,
+                                              ).toLocaleString()
+                                            : '—'
+                                    }}
+                                </span>
+                            </li>
+                        </ul>
+                    </template>
+                    <template v-else>
+                        <div class="flex flex-col gap-2 p-4">
+                            <div
+                                v-for="n in 3"
+                                :key="n"
+                                class="h-10 animate-pulse rounded bg-muted"
+                            />
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div class="hidden lg:block" />
         </div>
 
         <!-- Verify Dialog -->
@@ -3049,12 +3247,15 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                 <DialogHeader>
                     <DialogTitle>Unverify Assignment?</DialogTitle>
                     <DialogDescription>
-                        The assignment will be reverted to its previous state and the
-                        subcontractor will be able to edit it again. Please provide
-                        a reason.
+                        The assignment will be reverted to its previous state
+                        and the subcontractor will be able to edit it again.
+                        Please provide a reason.
                     </DialogDescription>
                 </DialogHeader>
-                <form class="flex flex-col gap-3" @submit.prevent="submitUnverify">
+                <form
+                    class="flex flex-col gap-3"
+                    @submit.prevent="submitUnverify"
+                >
                     <div class="grid gap-1.5">
                         <Label for="unverify_reason">Reason</Label>
                         <textarea
@@ -3065,7 +3266,9 @@ function isDiffEntry(val: unknown): val is { old: unknown; new: unknown } {
                             placeholder="e.g. Client rejected — wrong charger type"
                             required
                         />
-                        <InputError :message="unverifyForm.errors.unverify_reason" />
+                        <InputError
+                            :message="unverifyForm.errors.unverify_reason"
+                        />
                     </div>
                     <DialogFooter>
                         <Button

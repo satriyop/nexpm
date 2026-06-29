@@ -44,6 +44,7 @@ class AssignmentController extends Controller
                 'project',
                 'assignments.subcontractor',
                 'assignments.constructionData',
+                'assignments.latestComment.user:id,name,role',
             ])
             ->whereHas('project', fn ($q) => $q->whereScopedToMainContractor());
 
@@ -172,6 +173,7 @@ class AssignmentController extends Controller
             'constructionData.constructionPhotos',
             'bastData.bastPhotos',
             'legacyReports',
+            'comments.user:id,name,role',
         ]);
 
         $mainContractorId = $assignment->site->project->main_contractor_id;

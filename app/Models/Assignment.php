@@ -125,6 +125,22 @@ class Assignment extends Model
     }
 
     /**
+     * @return HasMany<AssignmentComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(AssignmentComment::class)->latest();
+    }
+
+    /**
+     * @return HasOne<AssignmentComment, $this>
+     */
+    public function latestComment(): HasOne
+    {
+        return $this->hasOne(AssignmentComment::class)->latestOfMany();
+    }
+
+    /**
      * Construction assignment is locked for sub-con until the
      * admin fills the WO number prerequisite.
      */

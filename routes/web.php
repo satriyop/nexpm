@@ -60,6 +60,9 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin,project_manager',
     Route::post('assignments/sites/{site}/assign', [Admin\AssignmentController::class, 'storeForSite'])->name('assignments.site-assign');
     Route::delete('assignments/{assignment}', [Admin\AssignmentController::class, 'destroy'])->name('assignments.destroy');
     Route::get('assignments/{assignment}', [Admin\AssignmentController::class, 'show'])->name('assignments.show');
+    Route::post('assignments/{assignment}/comments', [Admin\AssignmentCommentController::class, 'store'])
+        ->withoutMiddleware('readonly:project_manager')
+        ->name('assignments.comments.store');
     Route::post('assignments/{assignment}/verify', [Admin\AssignmentController::class, 'verify'])->name('assignments.verify');
     Route::post('assignments/{assignment}/unverify', [Admin\AssignmentController::class, 'unverify'])->name('assignments.unverify');
     Route::post('assignments/{assignment}/submit', [Admin\AssignmentController::class, 'submitForReview'])->name('assignments.submit');
@@ -110,6 +113,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,admin,project_manager',
 Route::middleware(['auth', 'verified', 'role:subcontractor'])->prefix('subcontractor')->name('subcontractor.')->group(function () {
     Route::get('assignments', [Subcontractor\AssignmentController::class, 'index'])->name('assignments.index');
     Route::get('assignments/{assignment}', [Subcontractor\AssignmentController::class, 'show'])->name('assignments.show');
+    Route::post('assignments/{assignment}/comments', [Subcontractor\AssignmentCommentController::class, 'store'])->name('assignments.comments.store');
     Route::match(['post', 'patch'], 'assignments/{assignment}/survey', [Subcontractor\AssignmentController::class, 'updateSurveyData'])->name('assignments.survey');
     Route::patch('assignments/{assignment}/pln', [Subcontractor\AssignmentController::class, 'updatePlnData'])->name('assignments.pln');
     Route::match(['post', 'patch'], 'assignments/{assignment}/construction', [Subcontractor\AssignmentController::class, 'updateConstructionData'])->name('assignments.construction');

@@ -5,6 +5,7 @@ import {
     ArrowRight,
     Download,
     LockKeyhole,
+    MessageSquare,
     Search,
     X,
 } from 'lucide-vue-next';
@@ -320,6 +321,23 @@ function daysStalled(assignment: Assignment): number | null {
     return Math.floor(
         (Date.now() - new Date(assignment.updated_at).getTime()) / 86_400_000,
     );
+}
+
+function formatLatestNoteDate(value: string | null | undefined): string {
+    if (!value) {
+        return '—';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    return date.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+    });
 }
 
 // --- Bulk selection ---
@@ -843,6 +861,43 @@ function exportSelected(): void {
                                                         daysStalled(assignment)
                                                     }}d
                                                 </span>
+                                                <div
+                                                    v-if="assignment.latest_comment"
+                                                    class="mt-1.5 flex max-w-48 gap-1.5 rounded-md border bg-muted/30 px-2 py-1 text-[11px] leading-snug text-muted-foreground"
+                                                    :title="assignment.latest_comment.body"
+                                                >
+                                                    <MessageSquare class="mt-0.5 size-3 shrink-0" />
+                                                    <div class="min-w-0">
+                                                        <div class="flex items-center gap-1">
+                                                            <span class="truncate font-medium text-foreground/80">
+                                                                {{
+                                                                    assignment
+                                                                        .latest_comment
+                                                                        .user
+                                                                        ?.name ??
+                                                                    'Deleted user'
+                                                                }}
+                                                            </span>
+                                                            <span class="shrink-0">
+                                                                ·
+                                                                {{
+                                                                    formatLatestNoteDate(
+                                                                        assignment
+                                                                            .latest_comment
+                                                                            .created_at,
+                                                                    )
+                                                                }}
+                                                            </span>
+                                                        </div>
+                                                        <p class="truncate">
+                                                            {{
+                                                                assignment
+                                                                    .latest_comment
+                                                                    .body
+                                                            }}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <span
                                                 v-else

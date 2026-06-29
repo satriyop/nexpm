@@ -96,6 +96,7 @@ export interface AssignmentSurveyData {
     file_mockup_3d: string | null;
     file_site_plan: string | null;
     file_ba_survey: string | null;
+    file_boq: string | null;
     parking_slot: string | null;
     ss_report_submission_date: string | null;
 }
@@ -182,6 +183,16 @@ export interface AssignmentLegacyReport {
     created_at: string | null;
 }
 
+export interface AssignmentComment {
+    id: number;
+    assignment_id: number;
+    user_id: number | null;
+    body: string;
+    user: Pick<User, 'id' | 'name' | 'role'> | null;
+    created_at: string | null;
+    updated_at: string | null;
+}
+
 export interface Assignment {
     id: number;
     site_id: number;
@@ -201,6 +212,8 @@ export interface Assignment {
     construction_data: AssignmentConstructionData | null;
     bast_data: AssignmentBastData | null;
     legacy_reports: AssignmentLegacyReport[];
+    comments: AssignmentComment[];
+    latest_comment?: AssignmentComment | null;
 }
 
 export interface PaginationLink {

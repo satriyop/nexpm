@@ -3,11 +3,13 @@ import { useForm, Head } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle, Lock, MapPin, Send } from 'lucide-vue-next';
 import { computed } from 'vue';
 import * as SubAssignmentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
+import * as SubAssignmentCommentActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentCommentController';
 import BastCheckpoints from '@/components/activities/BastCheckpoints.vue';
 import ConstructionForm from '@/components/activities/ConstructionForm.vue';
 import PlnForm from '@/components/activities/PlnForm.vue';
 import SurveyForm from '@/components/activities/SurveyForm.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
+import AssignmentNotes from '@/components/AssignmentNotes.vue';
 import AssignmentStepper from '@/components/AssignmentStepper.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -176,5 +178,10 @@ function submitForReview() {
                 :sibling-construction="siblingConstruction"
             />
         </template>
+
+        <AssignmentNotes
+            :comments="assignment.comments ?? []"
+            :store-url="SubAssignmentCommentActions.store(assignment).url"
+        />
     </div>
 </template>

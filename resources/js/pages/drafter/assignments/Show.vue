@@ -3,11 +3,12 @@ import { Head } from '@inertiajs/vue3';
 import { ExternalLink, FileText, MapPin } from 'lucide-vue-next';
 import * as DrafterAssignmentActions from '@/actions/App/Http/Controllers/Drafter/AssignmentController';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
+import AssignmentNotes from '@/components/AssignmentNotes.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import { computed } from 'vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import type { Assignment } from '@/types';
+import type { Assignment, AssignmentSurveyData } from '@/types';
 
 const props = defineProps<{
     assignment: Assignment;
@@ -46,7 +47,7 @@ const mapsUrl = computed<string | null>(() => {
     return null;
 });
 
-const photoFields: { key: keyof typeof props.assignment.survey_data & string; label: string }[] = [
+const photoFields: { key: keyof AssignmentSurveyData; label: string }[] = [
     { key: 'photo_overall_site', label: 'Foto Tampak Keseluruhan Site' },
     { key: 'photo_parking_evcs', label: 'Foto Lahan Parkir EVCS / Lokasi BSS' },
     { key: 'photo_access_route', label: 'Foto Jalur Akses Menuju Lokasi' },
@@ -224,5 +225,7 @@ const photoFields: { key: keyof typeof props.assignment.survey_data & string; la
                 </div>
             </CardContent>
         </Card>
+
+        <AssignmentNotes :comments="assignment.comments ?? []" />
     </div>
 </template>

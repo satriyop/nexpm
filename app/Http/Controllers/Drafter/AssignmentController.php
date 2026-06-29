@@ -110,6 +110,7 @@ class AssignmentController extends Controller
             'site.project.client',
             'subcontractor',
             'surveyData',
+            'comments.user:id,name,role',
         ]);
 
         return Inertia::render('drafter/assignments/Show', [
