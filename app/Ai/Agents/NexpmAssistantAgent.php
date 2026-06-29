@@ -12,6 +12,7 @@ use App\Ai\Tools\ListUsersTool;
 use App\Ai\Tools\ProjectHealthBriefingTool;
 use App\Ai\Tools\QueryEntityStatsTool;
 use App\Ai\Tools\ResolveEntityContextTool;
+use App\Ai\Tools\SummarizeAssignmentOperationsTool;
 use App\Ai\Tools\SummarizeDashboardTool;
 use App\Ai\Tools\SummarizePriorityActionsTool;
 use App\Ai\Tools\SummarizeProjectRisksTool;
@@ -63,7 +64,10 @@ TOOL SELECTION GUIDE:
 - "berapa lokasi/site project X?" or "how many sites?" → use query_entity_stats with count_target=sites
 - "berapa assignment [activity] [status] untuk subkon Y?" → use query_entity_stats with count_target=assignments
 - "ada berapa assignment PLN/SURVEY/CONSTRUCTION?" → use query_entity_stats with activity_type filter
-- "buatkan reminder / outstanding / tunggakan untuk subkon X?" → use generate_subcontractor_reminder
+- "berapa assignment PLN by main contractor Sigmatec?" → use query_entity_stats with activity_type=PLN_CONNECTION and main_contractor_name
+- "summary/recap assignment survey untuk main con Vahana" → use summarize_assignment_operations with intent=survey_recap
+- "outstanding / tunggakan untuk subkon company/user X?" → use summarize_assignment_operations with intent=outstanding
+- "buatkan reminder / kirim reminder untuk subkon X?" → use generate_subcontractor_reminder
 - For project/site/subcontractor names without a count question → use resolve_entity_context first
 - For workflow/status/process questions → use workflow_knowledge before saying data is unavailable
 
@@ -76,6 +80,7 @@ PROMPT;
     {
         return [
             new QueryEntityStatsTool($this->service, $this->context, $this->bag),
+            new SummarizeAssignmentOperationsTool($this->service, $this->context, $this->bag),
             new GenerateSubcontractorReminderTool($this->service, $this->context, $this->bag),
             new FindBlockedAssignmentsTool($this->service, $this->context, $this->bag),
             new SummarizeDashboardTool($this->service, $this->context, $this->bag),

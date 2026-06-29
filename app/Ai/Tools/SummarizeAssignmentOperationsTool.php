@@ -7,7 +7,7 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 
-class QueryEntityStatsTool implements Tool
+class SummarizeAssignmentOperationsTool implements Tool
 {
     /** @param array<string, mixed> $context */
     public function __construct(
@@ -18,40 +18,40 @@ class QueryEntityStatsTool implements Tool
 
     public function name(): string
     {
-        return 'query_entity_stats';
+        return 'summarize_assignment_operations';
     }
 
     public function description(): string
     {
-        return 'Count sites (lokasi) or assignments for a named project, main contractor, subcontractor company, subcontractor user, machine type, or filtered by activity type and status. Use when the user asks "berapa lokasi project X", "berapa assignment survey pending untuk subkon Y", or "ada berapa assignment PLN by main contractor Sigmatec".';
+        return 'Summarize assignment operations with curated read-only analytics. Use for survey recaps by main contractor/project/subcon/machine type, outstanding assignments by subcontractor company or subcontractor user, and assignment breakdowns by project, activity, status, machine type, or subcon.';
     }
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'count_target' => $schema->string()
-                ->description('What to count: "sites" to count locations/sites, "assignments" to count assignments. Default: "assignments".')
-                ->nullable(),
-            'project_name' => $schema->string()
-                ->description('Optional: fuzzy project name to filter results, e.g. "planet ban".')
-                ->nullable(),
-            'subcontractor_name' => $schema->string()
-                ->description('Optional: fuzzy subcontractor company name to filter assignments.')
+            'intent' => $schema->string()
+                ->description('survey_recap, outstanding, or assignment_recap.')
                 ->nullable(),
             'main_contractor_name' => $schema->string()
-                ->description('Optional: fuzzy main contractor name, e.g. "sigmatec" or "vahana".')
+                ->description('Optional fuzzy main contractor name, e.g. "sigmatec" or "vahana".')
+                ->nullable(),
+            'project_name' => $schema->string()
+                ->description('Optional fuzzy project name.')
+                ->nullable(),
+            'subcontractor_name' => $schema->string()
+                ->description('Optional fuzzy subcontractor company name.')
                 ->nullable(),
             'subcontractor_user_name' => $schema->string()
-                ->description('Optional: fuzzy subcontractor user/person name; resolves through users.subcontractor_id.')
+                ->description('Optional fuzzy subcontractor user/person name; resolves through users.subcontractor_id.')
                 ->nullable(),
             'machine_type_name' => $schema->string()
-                ->description('Optional: fuzzy machine type name to filter through sites.machine_type_id.')
+                ->description('Optional fuzzy machine type name.')
                 ->nullable(),
             'activity_type' => $schema->string()
-                ->description('Optional: filter by activity type — SURVEY, PLN_CONNECTION, CONSTRUCTION, or BAST.')
+                ->description('Optional activity type: SURVEY, PLN_CONNECTION, CONSTRUCTION, or BAST.')
                 ->nullable(),
             'status' => $schema->string()
-                ->description('Optional: filter by assignment status — PENDING, REVISION, DOCUMENT, VERIFIED, REPORTED, DROP, etc.')
+                ->description('Optional assignment status, e.g. PENDING, DOCUMENT, VERIFIED, REPORTED, DROP.')
                 ->nullable(),
         ];
     }
@@ -59,17 +59,17 @@ class QueryEntityStatsTool implements Tool
     public function handle(Request $request): string
     {
         $filters = [
-            'count_target' => $request['count_target'] ?? 'assignments',
+            'intent' => $request['intent'] ?? 'assignment_recap',
+            'main_contractor_name' => $request['main_contractor_name'] ?? null,
             'project_name' => $request['project_name'] ?? null,
             'subcontractor_name' => $request['subcontractor_name'] ?? null,
-            'main_contractor_name' => $request['main_contractor_name'] ?? null,
             'subcontractor_user_name' => $request['subcontractor_user_name'] ?? null,
             'machine_type_name' => $request['machine_type_name'] ?? null,
             'activity_type' => $request['activity_type'] ?? null,
             'status' => $request['status'] ?? null,
         ];
 
-        $payload = $this->service->queryEntityStats($filters, $this->context);
+        $payload = $this->service->summarizeAssignmentOperations($filters, $this->context);
         $this->bag->toolName = $this->name();
         $this->bag->toolPayload = $this->service->decorateToolPayload($this->name(), $payload, $this->context);
 

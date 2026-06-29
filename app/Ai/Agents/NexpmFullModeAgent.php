@@ -13,6 +13,7 @@ use App\Ai\Tools\ProjectHealthBriefingTool;
 use App\Ai\Tools\QueryDatabaseTool;
 use App\Ai\Tools\QueryEntityStatsTool;
 use App\Ai\Tools\ResolveEntityContextTool;
+use App\Ai\Tools\SummarizeAssignmentOperationsTool;
 use App\Ai\Tools\SummarizeDashboardTool;
 use App\Ai\Tools\SummarizePriorityActionsTool;
 use App\Ai\Tools\SummarizeProjectRisksTool;
@@ -74,7 +75,7 @@ RULES:
 5. After running a query, explain the results in natural language. Show key numbers prominently.
 6. If a query returns no results, say so clearly and suggest why.
 7. When asked about "subkontraktor", always query the `subcontractors` table — NOT the `users` table. The `users` table is for individual people accounts, not companies.
-8. Prefer the curated NexPM tools for workflow, project health, blockers, report readiness, priority actions, and entity lookup. Use raw SQL only when the curated tools cannot answer the user's specific question.
+8. Prefer the curated NexPM tools for workflow, project health, blockers, report readiness, priority actions, entity lookup, entity counts, and assignment operations recaps. Use raw SQL only when the curated tools cannot answer the user's specific question.
 9. For workflow/status/process questions, use `workflow_knowledge` before saying you do not have data.
 10. If a project/site/subcontractor name is ambiguous, ask a clarifying question and include the likely matches instead of inventing an answer.
 
@@ -87,6 +88,7 @@ PROMPT;
     {
         return [
             new QueryEntityStatsTool($this->assistantService, $this->context, $this->bag),
+            new SummarizeAssignmentOperationsTool($this->assistantService, $this->context, $this->bag),
             new GenerateSubcontractorReminderTool($this->assistantService, $this->context, $this->bag),
             new ProjectHealthBriefingTool($this->assistantService, $this->context, $this->bag),
             new WorkflowKnowledgeTool($this->assistantService, $this->context, $this->bag),

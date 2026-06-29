@@ -145,6 +145,7 @@ class AiAssistantController extends Controller
 
     private function streamFallback(AiAssistantService $service, string $message, array $context, AiConversation $conversation, Throwable $exception): void
     {
+        $context = array_merge($context, ['query' => $message]);
         $toolName = $service->selectTool($message, $context);
         $toolPayload = $service->runTool($toolName, $context);
         $toolPayload = $service->decorateToolPayload($toolName, $toolPayload, $context);

@@ -11,6 +11,8 @@ use App\Models\Assignment;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
 use App\Models\AssignmentSurveyData;
+use App\Models\MachineType;
+use App\Models\MainContractor;
 use App\Models\Project;
 use App\Models\Site;
 use App\Models\Subcontractor;
@@ -424,4 +426,201 @@ test('assistant can resolve ambiguous natural language project and subcon refere
     expect($payload['needs_clarification'])->toBeTrue()
         ->and($payload['match_count'])->toBeGreaterThanOrEqual(2)
         ->and($payload['suggestions'])->not->toBeEmpty();
+});
+
+test('assistant counts locations for a named project through local fallback', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'Planet Ban Rollout']);
+    $otherProject = Project::factory()->create(['name' => 'Other Rollout']);
+
+    Site::factory()->count(2)->create(['project_id' => $project->id]);
+    Site::factory()->create(['project_id' => $otherProject->id]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Project Planet Ban, how many locations?'])
+        ->assertOk();
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($events['tool_data']['tool_payload']['count_target'])->toBe('sites')
+        ->and($events['tool_data']['tool_payload']['total_count'])->toBe(2);
+
+    Http::assertNothingSent();
+});
+
+test('assistant counts pending survey assignments by subcontractor company and user', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $subcontractor = Subcontractor::factory()->create(['name' => 'Acme Fiber']);
+    $otherSubcontractor = Subcontractor::factory()->create(['name' => 'Other Fiber']);
+    User::factory()->create(['name' => 'Budi Surveyor', 'role' => Role::Subcontractor, 'subcontractor_id' => $subcontractor->id]);
+
+    Assignment::factory()->count(2)->survey()->create([
+        'subcontractor_id' => $subcontractor->id,
+        'status' => AssignmentStatus::Pending,
+    ]);
+    Assignment::factory()->survey()->create([
+        'subcontractor_id' => $subcontractor->id,
+        'status' => AssignmentStatus::Document,
+    ]);
+    Assignment::factory()->survey()->create([
+        'subcontractor_id' => $otherSubcontractor->id,
+        'status' => AssignmentStatus::Pending,
+    ]);
+
+    $companyResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'How many survey assignment pending by subcon Acme Fiber?'])
+        ->assertOk();
+    $companyEvents = parseSseEvents($companyResponse->streamedContent());
+
+    expect($companyEvents['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($companyEvents['tool_data']['tool_payload']['total_count'])->toBe(2);
+
+    $userResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'How many survey assignment pending by subcon user Budi Surveyor?'])
+        ->assertOk();
+    $userEvents = parseSseEvents($userResponse->streamedContent());
+
+    expect($userEvents['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($userEvents['tool_data']['tool_payload']['total_count'])->toBe(2)
+        ->and($userEvents['tool_data']['tool_payload']['matched_entities']['subcontractor_user'][0]['subcontractor_name'])->toBe('Acme Fiber');
+
+    Http::assertNothingSent();
+});
+
+test('assistant counts pln assignments by main contractor', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $sigmatec = MainContractor::factory()->create(['name' => 'Sigmatec']);
+    $otherMainContractor = MainContractor::factory()->create(['name' => 'Other Maincon']);
+    $project = Project::factory()->create(['main_contractor_id' => $sigmatec->id]);
+    $otherProject = Project::factory()->create(['main_contractor_id' => $otherMainContractor->id]);
+    $sites = Site::factory()->count(2)->create(['project_id' => $project->id]);
+    $otherSite = Site::factory()->create(['project_id' => $otherProject->id]);
+
+    Assignment::factory()->plnConnection()->create(['site_id' => $sites[0]->id]);
+    Assignment::factory()->plnConnection()->create(['site_id' => $sites[1]->id]);
+    Assignment::factory()->plnConnection()->create(['site_id' => $otherSite->id]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'How many PLN assignment by main contractor Sigmatec?'])
+        ->assertOk();
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($events['tool_data']['tool_payload']['total_count'])->toBe(2)
+        ->and($events['tool_data']['tool_payload']['filters']['activity_type'])->toBe(ActivityType::PlnConnection->value)
+        ->and($events['tool_data']['tool_payload']['filters']['main_contractor_name'])->toBe('Sigmatec');
+
+    Http::assertNothingSent();
+});
+
+test('assistant returns survey recap for main contractor and outstanding by subcontractor company or user', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $vahana = MainContractor::factory()->create(['name' => 'Vahana']);
+    $project = Project::factory()->create(['name' => 'Vahana Survey Rollout', 'main_contractor_id' => $vahana->id]);
+    $sites = Site::factory()->count(3)->create(['project_id' => $project->id]);
+    $subcontractor = Subcontractor::factory()->create(['name' => 'Nusa Subcon']);
+    User::factory()->create(['name' => 'Citra Subcon', 'role' => Role::Subcontractor, 'subcontractor_id' => $subcontractor->id]);
+
+    Assignment::factory()->survey()->create(['site_id' => $sites[0]->id, 'subcontractor_id' => $subcontractor->id, 'status' => AssignmentStatus::Pending]);
+    Assignment::factory()->survey()->create(['site_id' => $sites[1]->id, 'subcontractor_id' => $subcontractor->id, 'status' => AssignmentStatus::Verified]);
+    Assignment::factory()->plnConnection()->create(['site_id' => $sites[2]->id, 'subcontractor_id' => $subcontractor->id, 'status' => AssignmentStatus::Pending]);
+
+    $recapResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Make a summary recap for assignment survey for main con Vahana.'])
+        ->assertOk();
+    $recapEvents = parseSseEvents($recapResponse->streamedContent());
+
+    expect($recapEvents['tool_data']['tool_name'])->toBe('summarize_assignment_operations')
+        ->and($recapEvents['tool_data']['tool_payload']['intent'])->toBe('survey_recap')
+        ->and($recapEvents['tool_data']['tool_payload']['total_count'])->toBe(2)
+        ->and($recapEvents['tool_data']['tool_payload']['activity_breakdown'])->toHaveKey(ActivityType::Survey->value);
+
+    $companyResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Outstanding for subcon Nusa Subcon?'])
+        ->assertOk();
+    $companyEvents = parseSseEvents($companyResponse->streamedContent());
+
+    expect($companyEvents['tool_data']['tool_name'])->toBe('summarize_assignment_operations')
+        ->and($companyEvents['tool_data']['tool_payload']['intent'])->toBe('outstanding')
+        ->and($companyEvents['tool_data']['tool_payload']['total_count'])->toBe(2);
+
+    $userResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Outstanding for subcon user Citra Subcon?'])
+        ->assertOk();
+    $userEvents = parseSseEvents($userResponse->streamedContent());
+
+    expect($userEvents['tool_data']['tool_name'])->toBe('summarize_assignment_operations')
+        ->and($userEvents['tool_data']['tool_payload']['intent'])->toBe('outstanding')
+        ->and($userEvents['tool_data']['tool_payload']['total_count'])->toBe(2)
+        ->and($userEvents['tool_data']['tool_payload']['status_breakdown'])->not->toHaveKeys([
+            AssignmentStatus::Verified->value,
+            AssignmentStatus::Reported->value,
+            AssignmentStatus::Drop->value,
+        ]);
+
+    Http::assertNothingSent();
+});
+
+test('assignment operation service supports combined filters and clarification', function () {
+    $service = app(AiAssistantService::class);
+    $mainContractor = MainContractor::factory()->create(['name' => 'Sigmatec']);
+    $machineType = MachineType::factory()->create(['name' => 'Delta 50kW']);
+    $project = Project::factory()->create(['name' => 'Planet Ban', 'main_contractor_id' => $mainContractor->id]);
+    $sites = Site::factory()->count(4)->create(['project_id' => $project->id, 'machine_type_id' => $machineType->id]);
+    $subcontractor = Subcontractor::factory()->create(['name' => 'Prima Subcon']);
+    User::factory()->create(['name' => 'Dewi Operator', 'role' => Role::Subcontractor, 'subcontractor_id' => $subcontractor->id]);
+
+    Assignment::factory()->plnConnection()->create(['site_id' => $sites[0]->id, 'subcontractor_id' => $subcontractor->id, 'status' => AssignmentStatus::Pending]);
+    Assignment::factory()->survey()->create(['site_id' => $sites[1]->id, 'subcontractor_id' => $subcontractor->id, 'status' => AssignmentStatus::Verified]);
+    Assignment::factory()->survey()->create(['site_id' => $sites[2]->id, 'subcontractor_id' => $subcontractor->id, 'status' => AssignmentStatus::Reported]);
+    Assignment::factory()->survey()->create(['site_id' => $sites[3]->id, 'subcontractor_id' => $subcontractor->id, 'status' => AssignmentStatus::Drop]);
+
+    $mainContractorPayload = $service->queryEntityStats([
+        'count_target' => 'assignments',
+        'main_contractor_name' => 'Sigmatec',
+        'activity_type' => 'PLN',
+    ], []);
+
+    expect($mainContractorPayload['total_count'])->toBe(1);
+
+    $projectMachinePayload = $service->queryEntityStats([
+        'count_target' => 'assignments',
+        'project_name' => 'Planet Ban',
+        'machine_type_name' => 'Delta',
+    ], []);
+
+    expect($projectMachinePayload['total_count'])->toBe(4);
+
+    $userPayload = $service->summarizeAssignmentOperations([
+        'intent' => 'outstanding',
+        'subcontractor_user_name' => 'Dewi Operator',
+    ], []);
+
+    expect($userPayload['total_count'])->toBe(1)
+        ->and($userPayload['matched_entities']['subcontractor_user'][0]['subcontractor_name'])->toBe('Prima Subcon');
+
+    Project::factory()->create(['name' => 'Alpha Rollout Barat']);
+    Project::factory()->create(['name' => 'Alpha Rollout Timur']);
+
+    $ambiguousPayload = $service->queryEntityStats([
+        'count_target' => 'assignments',
+        'project_name' => 'Alpha',
+    ], []);
+
+    expect($ambiguousPayload['needs_clarification'])->toBeTrue()
+        ->and($ambiguousPayload['clarification_suggestions'])->not->toBeEmpty();
 });

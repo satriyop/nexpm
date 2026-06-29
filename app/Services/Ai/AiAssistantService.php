@@ -24,11 +24,22 @@ class AiAssistantService
     {
         $normalized = Str::lower($message);
 
+        if (Str::contains($normalized, ['summary', 'summarize', 'ringkas', 'rangkum', 'recap', 'rekap', 'rekapan'])
+            && Str::contains($normalized, ['assignment', 'survey', 'pln', 'construction', 'bast', 'outstanding'])) {
+            return 'summarize_assignment_operations';
+        }
+
+        if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])
+            && Str::contains($normalized, ['subcon', 'subkon', 'subcontractor', 'vendor', 'user'])) {
+            return 'summarize_assignment_operations';
+        }
+
         if (Str::contains($normalized, ['reminder', 'ingatkan', 'outstanding', 'tunggakan', 'belum selesai subcon', 'buatkan reminder', 'kirim reminder'])) {
             return 'generate_subcontractor_reminder';
         }
 
-        if (Str::contains($normalized, ['berapa lokasi', 'berapa site', 'berapa assignment', 'how many site', 'how many assign', 'jumlah lokasi', 'jumlah site', 'jumlah assignment', 'ada berapa'])) {
+        if (Str::contains($normalized, ['berapa lokasi', 'berapa site', 'berapa assignment', 'how many location', 'how many site', 'how many assign', 'how many', 'jumlah lokasi', 'jumlah site', 'jumlah assignment', 'ada berapa'])
+            && Str::contains($normalized, ['lokasi', 'location', 'site', 'assignment', 'assign'])) {
             return 'query_entity_stats';
         }
 
@@ -94,7 +105,8 @@ class AiAssistantService
             'project_health_briefing' => $this->projectHealthBriefing($context),
             'workflow_knowledge' => $this->workflowKnowledge(),
             'resolve_entity_context' => $this->resolveEntityContext($context['query'] ?? '', $context),
-            'query_entity_stats' => $this->queryEntityStats($context, $context),
+            'query_entity_stats' => $this->queryEntityStats($this->statsFiltersFromContext($context), $context),
+            'summarize_assignment_operations' => $this->summarizeAssignmentOperations($this->operationFiltersFromContext($context), $context),
             'generate_subcontractor_reminder' => $this->generateSubcontractorReminder($context['query'] ?? '', $context),
             'summarize_priority_actions' => $this->summarizePriorityActions($context),
             'summarize_project_risks' => $this->summarizeProjectRisks($context),
@@ -128,10 +140,13 @@ class AiAssistantService
             'general_help' => 'I can help with project risks, late assignments, subcontractor blockers, report readiness, and PM priority actions.',
             'workflow_knowledge' => 'Workflow knowledge: survey completion moves eligible survey assignments to DOCUMENT, DOCUMENT assignments are ready for report preparation, VERIFIED means admin review is complete, and REPORTED means the assignment has been included in a generated report.',
             'resolve_entity_context' => sprintf(
-                'Entity lookup: %d project matches, %d site matches, and %d subcontractor matches found.',
+                'Entity lookup: %d project matches, %d site matches, %d subcontractor matches, %d subcontractor user matches, %d main contractor matches, and %d machine type matches found.',
                 count($toolPayload['projects'] ?? []),
                 count($toolPayload['sites'] ?? []),
                 count($toolPayload['subcontractors'] ?? []),
+                count($toolPayload['subcontractor_users'] ?? []),
+                count($toolPayload['main_contractors'] ?? []),
+                count($toolPayload['machine_types'] ?? []),
             ),
             'contextual_page_summary' => sprintf(
                 'Context summary: %d workflow gaps found for this page.',
@@ -169,6 +184,12 @@ class AiAssistantService
                 (int) ($toolPayload['total_count'] ?? 0),
                 $toolPayload['count_target'] ?? 'records',
                 isset($toolPayload['filter_project']) ? ' for project '.$toolPayload['filter_project'] : ''
+            ),
+            'summarize_assignment_operations' => sprintf(
+                'Assignment operations recap: %d assignments found. Status split: %s. Activity split: %s.',
+                (int) ($toolPayload['total_count'] ?? 0),
+                $this->formatCounts($toolPayload['status_breakdown'] ?? []),
+                $this->formatCounts($toolPayload['activity_breakdown'] ?? []),
             ),
             'generate_subcontractor_reminder' => sprintf(
                 'Subcontractor reminder: %s has %d outstanding assignments across %d projects.',
@@ -834,7 +855,58 @@ class AiAssistantService
             ])
             ->values();
 
-        $matches = $projects->concat($sites)->concat($subcontractors)->values();
+        $subcontractorUsers = User::query()
+            ->select(['id', 'name', 'subcontractor_id'])
+            ->with('subcontractor:id,name')
+            ->whereNotNull('subcontractor_id')
+            ->when($searchTerm !== '', fn ($query) => $query->where('name', 'like', "%{$searchTerm}%"))
+            ->limit(8)
+            ->get()
+            ->filter(fn (User $user): bool => $searchTerm !== '' || Str::contains($normalized, Str::lower($user->name)))
+            ->map(fn (User $user): array => [
+                'type' => 'subcontractor_user',
+                'id' => $user->id,
+                'label' => $user->name,
+                'subcontractor' => $user->subcontractor?->name,
+                'context' => ['type' => 'subcontractor_user', 'id' => $user->id, 'subcontractor_id' => $user->subcontractor_id, 'label' => $user->name],
+            ])
+            ->values();
+
+        $mainContractors = DB::table('main_contractors')
+            ->select(['id', 'name'])
+            ->when($searchTerm !== '', fn ($query) => $query->where('name', 'like', "%{$searchTerm}%"))
+            ->limit(8)
+            ->get()
+            ->filter(fn ($mainContractor): bool => $searchTerm !== '' || Str::contains($normalized, Str::lower((string) $mainContractor->name)))
+            ->map(fn ($mainContractor): array => [
+                'type' => 'main_contractor',
+                'id' => (int) $mainContractor->id,
+                'label' => $mainContractor->name,
+                'context' => ['type' => 'main_contractor', 'id' => (int) $mainContractor->id, 'label' => $mainContractor->name],
+            ])
+            ->values();
+
+        $machineTypes = DB::table('machine_types')
+            ->select(['id', 'name'])
+            ->when($searchTerm !== '', fn ($query) => $query->where('name', 'like', "%{$searchTerm}%"))
+            ->limit(8)
+            ->get()
+            ->filter(fn ($machineType): bool => $searchTerm !== '' || Str::contains($normalized, Str::lower((string) $machineType->name)))
+            ->map(fn ($machineType): array => [
+                'type' => 'machine_type',
+                'id' => (int) $machineType->id,
+                'label' => $machineType->name,
+                'context' => ['type' => 'machine_type', 'id' => (int) $machineType->id, 'label' => $machineType->name],
+            ])
+            ->values();
+
+        $matches = $projects
+            ->concat($sites)
+            ->concat($subcontractors)
+            ->concat($subcontractorUsers)
+            ->concat($mainContractors)
+            ->concat($machineTypes)
+            ->values();
 
         return [
             'generated_at' => now()->toIso8601String(),
@@ -846,6 +918,9 @@ class AiAssistantService
             'projects' => $projects->all(),
             'sites' => $sites->all(),
             'subcontractors' => $subcontractors->all(),
+            'subcontractor_users' => $subcontractorUsers->all(),
+            'main_contractors' => $mainContractors->all(),
+            'machine_types' => $machineTypes->all(),
             'suggestions' => $matches
                 ->take(5)
                 ->map(fn (array $match): string => "Bahas {$match['type']} {$match['label']}")
@@ -854,13 +929,9 @@ class AiAssistantService
     }
 
     /**
-     * @param  array<string, mixed>  $context
-     * @return Collection<int, Assignment>
-     */
-    /**
      * Count sites or assignments for a named entity with optional activity/status filters.
      *
-     * @param  array{count_target?: string, project_name?: string, subcontractor_name?: string, activity_type?: string, status?: string}  $filters
+     * @param  array{count_target?: string, project_name?: string, main_contractor_name?: string, subcontractor_name?: string, subcontractor_user_name?: string, machine_type_name?: string, activity_type?: string, status?: string}  $filters
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
@@ -868,133 +939,448 @@ class AiAssistantService
     {
         $countTarget = $filters['count_target'] ?? 'assignments';
         $projectName = isset($filters['project_name']) ? trim((string) $filters['project_name']) : null;
+        $mainContractorName = isset($filters['main_contractor_name']) ? trim((string) $filters['main_contractor_name']) : null;
         $subcontractorName = isset($filters['subcontractor_name']) ? trim((string) $filters['subcontractor_name']) : null;
-        $activityType = isset($filters['activity_type']) ? strtoupper(trim((string) $filters['activity_type'])) : null;
-        $status = isset($filters['status']) ? strtoupper(trim((string) $filters['status'])) : null;
+        $subcontractorUserName = isset($filters['subcontractor_user_name']) ? trim((string) $filters['subcontractor_user_name']) : null;
+        $machineTypeName = isset($filters['machine_type_name']) ? trim((string) $filters['machine_type_name']) : null;
+        $activityType = $this->normalizeActivityType($filters['activity_type'] ?? null);
+        $status = $this->normalizeAssignmentStatus($filters['status'] ?? null);
 
         if ($countTarget === 'sites') {
-            return $this->countSitesForEntity($projectName, $context);
+            return $this->countSitesForEntity($projectName, $mainContractorName, $machineTypeName, $context);
         }
 
-        return $this->countAssignmentsForEntity($projectName, $subcontractorName, $activityType, $status, $context);
+        return $this->assignmentOperationsPayload([
+            'intent' => 'assignment_recap',
+            'project_name' => $projectName,
+            'main_contractor_name' => $mainContractorName,
+            'subcontractor_name' => $subcontractorName,
+            'subcontractor_user_name' => $subcontractorUserName,
+            'machine_type_name' => $machineTypeName,
+            'activity_type' => $activityType,
+            'status' => $status,
+            'include_items' => false,
+        ], $context) + ['count_target' => 'assignments'];
     }
 
     /** @param  array<string, mixed>  $context */
-    private function countSitesForEntity(?string $projectName, array $context): array
+    private function countSitesForEntity(?string $projectName, ?string $mainContractorName, ?string $machineTypeName, array $context): array
     {
+        $resolved = $this->resolveOperationFilters([
+            'project_name' => $projectName,
+            'main_contractor_name' => $mainContractorName,
+            'machine_type_name' => $machineTypeName,
+        ]);
+
+        if ($resolved['needs_clarification']) {
+            return [
+                'count_target' => 'sites',
+                'total_count' => 0,
+                'filters' => $resolved['filters'],
+                'matched_entities' => $resolved['matched_entities'],
+                'needs_clarification' => true,
+                'clarification_suggestions' => $resolved['clarification_suggestions'],
+                'generated_at' => now()->toIso8601String(),
+            ];
+        }
+
         $query = DB::table('sites')
-            ->join('projects', 'sites.project_id', '=', 'projects.id');
+            ->join('projects', 'sites.project_id', '=', 'projects.id')
+            ->leftJoin('main_contractors', 'main_contractors.id', '=', 'projects.main_contractor_id')
+            ->leftJoin('machine_types', 'machine_types.id', '=', 'sites.machine_type_id');
 
-        $matchedProject = null;
-        if ($projectName !== null && $projectName !== '') {
-            $matchedProject = DB::table('projects')
-                ->where('name', 'LIKE', "%{$projectName}%")
-                ->first(['id', 'name']);
+        $this->applyResolvedSiteFilters($query, $resolved);
 
-            if ($matchedProject === null) {
-                return [
-                    'count_target' => 'sites',
-                    'filter_project' => $projectName,
-                    'total_count' => 0,
-                    'error' => "Tidak ada project yang cocok dengan nama '{$projectName}'.",
-                ];
-            }
-
-            $query->where('sites.project_id', $matchedProject->id);
-        } elseif ($projectId = $this->contextProjectId($context)) {
-            $matchedProject = DB::table('projects')->find($projectId, ['id', 'name']);
+        if ($projectId = $this->contextProjectId($context)) {
             $query->where('sites.project_id', $projectId);
         }
 
         $total = $query->count();
 
-        $breakdown = DB::table('sites')
-            ->join('projects', 'sites.project_id', '=', 'projects.id')
-            ->when($matchedProject !== null, fn ($q) => $q->where('sites.project_id', $matchedProject->id))
-            ->selectRaw('COUNT(*) as total')
-            ->value('total') ?? 0;
-
         return [
             'count_target' => 'sites',
-            'filter_project' => $matchedProject?->name ?? $projectName,
+            'filter_project' => $resolved['filters']['project_name'] ?? $projectName,
+            'filter_main_contractor' => $resolved['filters']['main_contractor_name'] ?? $mainContractorName,
+            'filter_machine_type' => $resolved['filters']['machine_type_name'] ?? $machineTypeName,
             'total_count' => $total,
-            'matched_project' => $matchedProject ? ['id' => $matchedProject->id, 'name' => $matchedProject->name] : null,
+            'filters' => $resolved['filters'],
+            'matched_entities' => $resolved['matched_entities'],
+            'needs_clarification' => false,
             'generated_at' => now()->toIso8601String(),
         ];
     }
 
-    /** @param  array<string, mixed>  $context */
-    private function countAssignmentsForEntity(
-        ?string $projectName,
-        ?string $subcontractorName,
-        ?string $activityType,
-        ?string $status,
-        array $context,
-    ): array {
-        $matchedSubcon = null;
-        if ($subcontractorName !== null && $subcontractorName !== '') {
-            $matchedSubcon = DB::table('subcontractors')
-                ->where('name', 'LIKE', "%{$subcontractorName}%")
-                ->first(['id', 'name']);
+    /**
+     * @param  array{intent?: string, project_name?: ?string, main_contractor_name?: ?string, subcontractor_name?: ?string, subcontractor_user_name?: ?string, machine_type_name?: ?string, activity_type?: ?string, status?: ?string}  $filters
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    public function summarizeAssignmentOperations(array $filters, array $context): array
+    {
+        $intent = (string) ($filters['intent'] ?? 'assignment_recap');
+        $activityType = $this->normalizeActivityType($filters['activity_type'] ?? null);
 
-            if ($matchedSubcon === null) {
-                return [
-                    'count_target' => 'assignments',
-                    'filter_subcontractor' => $subcontractorName,
-                    'total_count' => 0,
-                    'error' => "Tidak ada subkontraktor yang cocok dengan nama '{$subcontractorName}'.",
-                ];
+        if ($intent === 'survey_recap' && $activityType === null) {
+            $activityType = ActivityType::Survey->value;
+        }
+
+        return $this->assignmentOperationsPayload([
+            'intent' => $intent,
+            'project_name' => isset($filters['project_name']) ? trim((string) $filters['project_name']) : null,
+            'main_contractor_name' => isset($filters['main_contractor_name']) ? trim((string) $filters['main_contractor_name']) : null,
+            'subcontractor_name' => isset($filters['subcontractor_name']) ? trim((string) $filters['subcontractor_name']) : null,
+            'subcontractor_user_name' => isset($filters['subcontractor_user_name']) ? trim((string) $filters['subcontractor_user_name']) : null,
+            'machine_type_name' => isset($filters['machine_type_name']) ? trim((string) $filters['machine_type_name']) : null,
+            'activity_type' => $activityType,
+            'status' => $this->normalizeAssignmentStatus($filters['status'] ?? null),
+            'include_items' => true,
+        ], $context);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function assignmentOperationsPayload(array $filters, array $context): array
+    {
+        $resolved = $this->resolveOperationFilters($filters);
+
+        if ($resolved['needs_clarification']) {
+            return [
+                'generated_at' => now()->toIso8601String(),
+                'intent' => $filters['intent'] ?? 'assignment_recap',
+                'total_count' => 0,
+                'filters' => $resolved['filters'],
+                'matched_entities' => $resolved['matched_entities'],
+                'needs_clarification' => true,
+                'clarification_suggestions' => $resolved['clarification_suggestions'],
+                'status_breakdown' => [],
+                'activity_breakdown' => [],
+                'project_breakdown' => [],
+                'subcontractor_breakdown' => [],
+                'machine_type_breakdown' => [],
+                'items' => [],
+            ];
+        }
+
+        $baseQuery = fn () => $this->assignmentOperationsQuery($resolved, $filters, $context);
+        $total = $baseQuery()->count();
+
+        $payload = [
+            'generated_at' => now()->toIso8601String(),
+            'intent' => $filters['intent'] ?? 'assignment_recap',
+            'total_count' => $total,
+            'filters' => $resolved['filters'],
+            'matched_entities' => $resolved['matched_entities'],
+            'needs_clarification' => false,
+            'status_breakdown' => $this->breakdown($baseQuery(), 'assignments.status'),
+            'activity_breakdown' => $this->breakdown($baseQuery(), 'assignments.activity_type'),
+            'project_breakdown' => $this->namedBreakdown($baseQuery(), 'projects.name'),
+            'subcontractor_breakdown' => $this->namedBreakdown($baseQuery(), 'subcontractors.name'),
+            'machine_type_breakdown' => $this->namedBreakdown($baseQuery(), 'machine_types.name'),
+        ];
+
+        if (($filters['include_items'] ?? false) === true) {
+            $payload['items'] = $baseQuery()
+                ->select([
+                    'assignments.id',
+                    'assignments.activity_type',
+                    'assignments.status',
+                    'assignments.updated_at',
+                    'sites.site_code',
+                    'sites.location_name',
+                    'projects.name as project_name',
+                    'subcontractors.name as subcontractor_name',
+                    'machine_types.name as machine_type_name',
+                ])
+                ->orderBy('assignments.updated_at')
+                ->limit(50)
+                ->get()
+                ->map(fn ($row): array => [
+                    'id' => (int) $row->id,
+                    'site_code' => $row->site_code,
+                    'location' => $row->location_name,
+                    'project' => $row->project_name,
+                    'activity_type' => $row->activity_type,
+                    'status' => $row->status,
+                    'subcontractor' => $row->subcontractor_name,
+                    'machine_type' => $row->machine_type_name,
+                    'age_days' => (int) now()->diffInDays($row->updated_at),
+                    'url' => route('admin.assignments.show', $row->id),
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $resolved
+     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $context
+     */
+    private function assignmentOperationsQuery(array $resolved, array $filters, array $context)
+    {
+        $query = DB::table('assignments')
+            ->join('sites', 'assignments.site_id', '=', 'sites.id')
+            ->join('projects', 'sites.project_id', '=', 'projects.id')
+            ->leftJoin('main_contractors', 'main_contractors.id', '=', 'projects.main_contractor_id')
+            ->leftJoin('subcontractors', 'subcontractors.id', '=', 'assignments.subcontractor_id')
+            ->leftJoin('machine_types', 'machine_types.id', '=', 'sites.machine_type_id');
+
+        $this->applyResolvedAssignmentFilters($query, $resolved);
+
+        if ($activityType = $filters['activity_type'] ?? null) {
+            $query->where('assignments.activity_type', $activityType);
+        }
+
+        if ($status = $filters['status'] ?? null) {
+            $query->where('assignments.status', $status);
+        }
+
+        if (($filters['intent'] ?? null) === 'outstanding') {
+            $query->whereNotIn('assignments.status', [
+                AssignmentStatus::Verified->value,
+                AssignmentStatus::Reported->value,
+                AssignmentStatus::Drop->value,
+            ]);
+        }
+
+        if ($assignmentId = $this->contextAssignmentId($context)) {
+            $query->where('assignments.id', $assignmentId);
+        } elseif ($siteId = $this->contextSiteId($context)) {
+            $query->where('assignments.site_id', $siteId);
+        } elseif ($projectId = $this->contextProjectId($context)) {
+            $query->where('sites.project_id', $projectId);
+        }
+
+        return $query;
+    }
+
+    /** @param  array<string, mixed>  $resolved */
+    private function applyResolvedAssignmentFilters($query, array $resolved): void
+    {
+        $this->applyResolvedSiteFilters($query, $resolved);
+
+        if ($subcontractor = $resolved['selected']['subcontractor'] ?? null) {
+            $query->where('assignments.subcontractor_id', $subcontractor['id']);
+        }
+
+        if ($subcontractorUser = $resolved['selected']['subcontractor_user'] ?? null) {
+            $query->where('assignments.subcontractor_id', $subcontractorUser['subcontractor_id']);
+        }
+    }
+
+    /** @param  array<string, mixed>  $resolved */
+    private function applyResolvedSiteFilters($query, array $resolved): void
+    {
+        if ($project = $resolved['selected']['project'] ?? null) {
+            $query->where('sites.project_id', $project['id']);
+        }
+
+        if ($mainContractor = $resolved['selected']['main_contractor'] ?? null) {
+            $query->where('projects.main_contractor_id', $mainContractor['id']);
+        }
+
+        if ($machineType = $resolved['selected']['machine_type'] ?? null) {
+            $query->where('sites.machine_type_id', $machineType['id']);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function resolveOperationFilters(array $filters): array
+    {
+        $project = $this->resolveNamedEntity('projects', 'project', $filters['project_name'] ?? null, ['name']);
+        $mainContractor = $this->resolveNamedEntity('main_contractors', 'main_contractor', $filters['main_contractor_name'] ?? null, ['name']);
+        $subcontractor = $this->resolveNamedEntity('subcontractors', 'subcontractor', $filters['subcontractor_name'] ?? null, ['name', 'code']);
+        $subcontractorUser = $this->resolveSubcontractorUser($filters['subcontractor_user_name'] ?? null);
+        $machineType = $this->resolveNamedEntity('machine_types', 'machine_type', $filters['machine_type_name'] ?? null, ['name']);
+
+        if (($subcontractor['selected'] ?? null) === null && filled($filters['subcontractor_name'] ?? null)) {
+            $fallbackUser = $this->resolveSubcontractorUser($filters['subcontractor_name']);
+
+            if (($fallbackUser['selected'] ?? null) !== null) {
+                $subcontractorUser = $fallbackUser;
+                $subcontractor = $this->emptyResolvedEntity('subcontractor', $filters['subcontractor_name']);
             }
         }
 
-        $matchedProject = null;
-        if ($projectName !== null && $projectName !== '') {
-            $matchedProject = DB::table('projects')
-                ->where('name', 'LIKE', "%{$projectName}%")
-                ->first(['id', 'name']);
-        }
+        $entities = [
+            'project' => $project,
+            'main_contractor' => $mainContractor,
+            'subcontractor' => $subcontractor,
+            'subcontractor_user' => $subcontractorUser,
+            'machine_type' => $machineType,
+        ];
 
-        $baseQuery = fn () => DB::table('assignments')
-            ->join('sites', 'assignments.site_id', '=', 'sites.id')
-            ->join('projects', 'sites.project_id', '=', 'projects.id')
-            ->when($matchedSubcon !== null, fn ($q) => $q->where('assignments.subcontractor_id', $matchedSubcon->id))
-            ->when($matchedProject !== null, fn ($q) => $q->where('sites.project_id', $matchedProject->id))
-            ->when($activityType !== null, fn ($q) => $q->where('assignments.activity_type', $activityType))
-            ->when($status !== null, fn ($q) => $q->where('assignments.status', $status));
+        $matchedEntities = collect($entities)
+            ->map(fn (array $entity): array => $entity['matches'])
+            ->all();
 
-        $total = $baseQuery()->count();
+        $selected = collect($entities)
+            ->map(fn (array $entity) => $entity['selected'])
+            ->filter()
+            ->all();
 
-        $statusBreakdown = [];
-        if ($status === null) {
-            $statusBreakdown = $baseQuery()
-                ->selectRaw('assignments.status, COUNT(*) as total')
-                ->groupBy('assignments.status')
-                ->pluck('total', 'status')
-                ->all();
-        }
-
-        $activityBreakdown = [];
-        if ($activityType === null) {
-            $activityBreakdown = $baseQuery()
-                ->selectRaw('assignments.activity_type, COUNT(*) as total')
-                ->groupBy('assignments.activity_type')
-                ->pluck('total', 'activity_type')
-                ->all();
-        }
+        $needsClarification = collect($entities)->contains(fn (array $entity): bool => $entity['needs_clarification']);
 
         return [
-            'count_target' => 'assignments',
-            'filter_project' => $matchedProject?->name ?? $projectName,
-            'filter_subcontractor' => $matchedSubcon?->name ?? $subcontractorName,
-            'filter_activity_type' => $activityType,
-            'filter_status' => $status,
-            'total_count' => $total,
-            'matched_subcontractor' => $matchedSubcon ? ['id' => $matchedSubcon->id, 'name' => $matchedSubcon->name] : null,
-            'matched_project' => $matchedProject ? ['id' => $matchedProject->id, 'name' => $matchedProject->name] : null,
-            'status_breakdown' => $statusBreakdown,
-            'activity_breakdown' => $activityBreakdown,
-            'generated_at' => now()->toIso8601String(),
+            'filters' => [
+                'project_name' => $project['selected']['name'] ?? $filters['project_name'] ?? null,
+                'main_contractor_name' => $mainContractor['selected']['name'] ?? $filters['main_contractor_name'] ?? null,
+                'subcontractor_name' => $subcontractor['selected']['name'] ?? $filters['subcontractor_name'] ?? null,
+                'subcontractor_user_name' => $subcontractorUser['selected']['name'] ?? $filters['subcontractor_user_name'] ?? null,
+                'machine_type_name' => $machineType['selected']['name'] ?? $filters['machine_type_name'] ?? null,
+                'activity_type' => $filters['activity_type'] ?? null,
+                'status' => $filters['status'] ?? null,
+            ],
+            'matched_entities' => $matchedEntities,
+            'selected' => $selected,
+            'needs_clarification' => $needsClarification,
+            'clarification_suggestions' => collect($matchedEntities)
+                ->flatten(1)
+                ->take(8)
+                ->map(fn (array $match): string => "{$match['type']}: {$match['name']}")
+                ->values()
+                ->all(),
         ];
+    }
+
+    /**
+     * @param  list<string>  $columns
+     * @return array<string, mixed>
+     */
+    private function resolveNamedEntity(string $table, string $type, mixed $term, array $columns): array
+    {
+        $term = trim((string) ($term ?? ''));
+
+        if ($term === '') {
+            return $this->emptyResolvedEntity($type, null);
+        }
+
+        $matches = DB::table($table)
+            ->select(['id', DB::raw($columns[0].' as name')])
+            ->where(function ($query) use ($columns, $term): void {
+                foreach ($columns as $column) {
+                    $query->orWhere($column, 'LIKE', "%{$term}%");
+                }
+            })
+            ->orderBy($columns[0])
+            ->limit(8)
+            ->get()
+            ->map(fn ($row): array => [
+                'type' => $type,
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+            ])
+            ->values();
+
+        $selected = $this->selectUnambiguousMatch($matches, $term);
+
+        return [
+            'input' => $term,
+            'matches' => $matches->all(),
+            'selected' => $selected,
+            'needs_clarification' => $matches->count() > 1 && $selected === null,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function resolveSubcontractorUser(mixed $term): array
+    {
+        $term = trim((string) ($term ?? ''));
+
+        if ($term === '') {
+            return $this->emptyResolvedEntity('subcontractor_user', null);
+        }
+
+        $matches = DB::table('users')
+            ->join('subcontractors', 'subcontractors.id', '=', 'users.subcontractor_id')
+            ->where('users.name', 'LIKE', "%{$term}%")
+            ->select([
+                'users.id',
+                'users.name',
+                'users.subcontractor_id',
+                'subcontractors.name as subcontractor_name',
+            ])
+            ->orderBy('users.name')
+            ->limit(8)
+            ->get()
+            ->map(fn ($row): array => [
+                'type' => 'subcontractor_user',
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+                'subcontractor_id' => (int) $row->subcontractor_id,
+                'subcontractor_name' => (string) $row->subcontractor_name,
+            ])
+            ->values();
+
+        $selected = $this->selectUnambiguousMatch($matches, $term);
+
+        return [
+            'input' => $term,
+            'matches' => $matches->all(),
+            'selected' => $selected,
+            'needs_clarification' => $matches->count() > 1 && $selected === null,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $matches
+     * @return array<string, mixed>|null
+     */
+    private function selectUnambiguousMatch(Collection $matches, string $term): ?array
+    {
+        if ($matches->count() === 1) {
+            return $matches->first();
+        }
+
+        $exact = $matches->filter(fn (array $match): bool => Str::lower($match['name']) === Str::lower($term));
+
+        return $exact->count() === 1 ? $exact->first() : null;
+    }
+
+    /** @return array<string, mixed> */
+    private function emptyResolvedEntity(string $type, ?string $input): array
+    {
+        return [
+            'input' => $input,
+            'matches' => [],
+            'selected' => null,
+            'needs_clarification' => false,
+            'type' => $type,
+        ];
+    }
+
+    /** @return array<string, int> */
+    private function breakdown($query, string $column): array
+    {
+        return $query
+            ->select($column, DB::raw('COUNT(*) as total'))
+            ->groupBy($column)
+            ->orderBy($column)
+            ->pluck('total', $column)
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+    }
+
+    /** @return array<string, int> */
+    private function namedBreakdown($query, string $column): array
+    {
+        return $query
+            ->select($column, DB::raw('COUNT(*) as total'))
+            ->whereNotNull($column)
+            ->groupBy($column)
+            ->orderByDesc('total')
+            ->limit(20)
+            ->pluck('total', $column)
+            ->map(fn ($count): int => (int) $count)
+            ->all();
     }
 
     /**
@@ -1446,8 +1832,9 @@ class AiAssistantService
         return match ($toolName) {
             'workflow_knowledge' => ['NexPM workflow rules', 'Application implementation'],
             'query_database' => ['Live database query'],
-            'resolve_entity_context' => ['Projects', 'Sites', 'Subcontractors'],
-            'query_entity_stats' => ['Assignments', 'Sites', 'Projects', 'Subcontractors'],
+            'resolve_entity_context' => ['Projects', 'Sites', 'Subcontractors', 'Subcontractor users', 'Main contractors', 'Machine types'],
+            'query_entity_stats' => ['Assignments', 'Sites', 'Projects', 'Subcontractors', 'Subcontractor users', 'Main contractors', 'Machine types'],
+            'summarize_assignment_operations' => ['Assignments', 'Sites', 'Projects', 'Subcontractors', 'Subcontractor users', 'Main contractors', 'Machine types'],
             'generate_subcontractor_reminder' => ['Assignments', 'Subcontractors', 'Sites', 'Projects'],
             'list_users' => ['Users'],
             default => ['Assignments', 'Sites', 'Projects'],
@@ -1490,6 +1877,11 @@ class AiAssistantService
                 'Buatkan reminder untuk subkon tersebut',
                 'Apa assignment yang masih pending di project ini?',
                 'Cek blocker subkon ini',
+            ],
+            'summarize_assignment_operations' => [
+                'Tampilkan outstanding untuk subkon ini',
+                'Breakdown berdasarkan status',
+                'Breakdown berdasarkan machine type',
             ],
             'generate_subcontractor_reminder' => [
                 'Berapa total assignment subkon ini?',
@@ -1546,13 +1938,137 @@ class AiAssistantService
 
     private function entitySearchTerm(string $normalized): string
     {
-        if (! preg_match('/(?:project|proyek|site|lokasi|subcon|subkon|subcontractor)\s+([a-z0-9][a-z0-9\s._-]{1,80})/i', $normalized, $matches)) {
+        if (! preg_match('/(?:project|proyek|site|lokasi|subcon|subkon|subcontractor|main con|main contractor|user|machine type|mesin)\s+([a-z0-9][a-z0-9\s._-]{1,80})/i', $normalized, $matches)) {
             return '';
         }
 
         $term = preg_replace('/\b(lambat|telat|terlambat|bermasalah|stuck|macet|ini|itu|kenapa|mengapa|apa|status|risiko|risk|blocker|progress|progres)\b.*$/i', '', $matches[1]) ?? '';
 
         return trim($term);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function statsFiltersFromContext(array $context): array
+    {
+        $query = (string) ($context['query'] ?? '');
+
+        return array_merge($this->operationFiltersFromContext($context), [
+            'count_target' => Str::contains(Str::lower($query), ['lokasi', 'location', 'locations', 'site', 'sites'])
+                && ! Str::contains(Str::lower($query), ['assignment', 'assignments'])
+                    ? 'sites'
+                    : 'assignments',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function operationFiltersFromContext(array $context): array
+    {
+        $query = (string) ($context['query'] ?? '');
+        $normalized = Str::lower($query);
+        $subcontractorTerm = $this->extractNamedPhrase($query, '(?:subcon|subkon|subcontractor|vendor)');
+
+        return [
+            'intent' => $this->inferAssignmentOperationIntent($normalized),
+            'project_name' => $this->extractNamedPhrase($query, '(?:project|proyek)'),
+            'main_contractor_name' => $this->extractNamedPhrase($query, '(?:main\s*con|main\s*contractor|kontraktor\s*utama)'),
+            'subcontractor_name' => Str::contains($normalized, ['user', 'pengguna']) ? null : $subcontractorTerm,
+            'subcontractor_user_name' => Str::contains($normalized, ['user', 'pengguna']) ? ($this->extractNamedPhrase($query, '(?:user|pengguna)') ?? $subcontractorTerm) : null,
+            'machine_type_name' => $this->extractNamedPhrase($query, '(?:machine\s*type|tipe\s*mesin|mesin)'),
+            'activity_type' => $this->inferActivityType($normalized),
+            'status' => $this->inferStatus($normalized),
+        ];
+    }
+
+    private function inferAssignmentOperationIntent(string $normalized): string
+    {
+        if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])) {
+            return 'outstanding';
+        }
+
+        if (Str::contains($normalized, ['survey']) && Str::contains($normalized, ['summary', 'summarize', 'ringkas', 'rangkum', 'recap', 'rekap'])) {
+            return 'survey_recap';
+        }
+
+        return 'assignment_recap';
+    }
+
+    private function inferActivityType(string $normalized): ?string
+    {
+        return match (true) {
+            Str::contains($normalized, ['pln']) => ActivityType::PlnConnection->value,
+            Str::contains($normalized, ['survey', 'survei']) => ActivityType::Survey->value,
+            Str::contains($normalized, ['construction', 'konstruksi']) => ActivityType::Construction->value,
+            Str::contains($normalized, ['bast']) => ActivityType::Bast->value,
+            default => null,
+        };
+    }
+
+    private function inferStatus(string $normalized): ?string
+    {
+        if (preg_match('/status\s+([a-z_]+)/i', $normalized, $matches)) {
+            return $this->normalizeAssignmentStatus($matches[1]);
+        }
+
+        $activityLikeStatuses = [
+            AssignmentStatus::Survey,
+            AssignmentStatus::Construction,
+        ];
+
+        foreach (AssignmentStatus::cases() as $status) {
+            if (in_array($status, $activityLikeStatuses, true)) {
+                continue;
+            }
+
+            if (Str::contains($normalized, Str::lower($status->value))) {
+                return $status->value;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeActivityType(mixed $value): ?string
+    {
+        $normalized = strtoupper(trim((string) ($value ?? '')));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return match ($normalized) {
+            'PLN' => ActivityType::PlnConnection->value,
+            'SURVEI' => ActivityType::Survey->value,
+            default => ActivityType::tryFrom($normalized)?->value ?? $normalized,
+        };
+    }
+
+    private function normalizeAssignmentStatus(mixed $value): ?string
+    {
+        $normalized = strtoupper(trim((string) ($value ?? '')));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return AssignmentStatus::tryFrom($normalized)?->value ?? $normalized;
+    }
+
+    private function extractNamedPhrase(string $query, string $keywordPattern): ?string
+    {
+        if (! preg_match('/'.$keywordPattern.'\s+([^,?.]+)/i', $query, $matches)) {
+            return null;
+        }
+
+        $term = preg_replace('/\b(how many|berapa|ada berapa|jumlah|assignment|assignments|lokasi|locations|site|sites|status|pending|survey|pln|construction|bast|outstanding|summary|summarize|ringkas|rangkum|recap|rekap|untuk|by|for|di|in)\b.*$/i', '', $matches[1]) ?? '';
+        $term = trim($term);
+
+        return $term === '' ? null : $term;
     }
 
     /**
@@ -1571,10 +2087,13 @@ class AiAssistantService
             'general_help' => 'Saya bisa membantu melihat risiko proyek, assignment telat, blocker subcon, kesiapan laporan, dan prioritas tindakan PM hari ini.',
             'workflow_knowledge' => 'Ringkasan workflow: PENDING berarti data belum siap, REVISION perlu diperbaiki, DOCUMENT berarti data lengkap untuk tahap dokumen/kesiapan laporan, VERIFIED sudah direview admin, dan REPORTED sudah masuk report. Survey lengkap tetapi belum DOCUMENT adalah gap yang perlu dicek.',
             'resolve_entity_context' => sprintf(
-                'Pencarian konteks menemukan %d project, %d site, dan %d subcon. Jika hasilnya lebih dari satu, pilih nama yang paling spesifik.',
+                'Pencarian konteks menemukan %d project, %d site, %d subcon, %d user subcon, %d main contractor, dan %d tipe mesin. Jika hasilnya lebih dari satu, pilih nama yang paling spesifik.',
                 count($toolPayload['projects'] ?? []),
                 count($toolPayload['sites'] ?? []),
                 count($toolPayload['subcontractors'] ?? []),
+                count($toolPayload['subcontractor_users'] ?? []),
+                count($toolPayload['main_contractors'] ?? []),
+                count($toolPayload['machine_types'] ?? []),
             ),
             'contextual_page_summary' => sprintf(
                 'Ringkasan konteks: ditemukan %d gap workflow untuk halaman ini.',
@@ -1612,6 +2131,12 @@ class AiAssistantService
                 (int) ($toolPayload['total_count'] ?? 0),
                 $toolPayload['count_target'] === 'sites' ? 'lokasi' : 'assignment',
                 isset($toolPayload['filter_project']) ? ' untuk project '.$toolPayload['filter_project'] : ''
+            ),
+            'summarize_assignment_operations' => sprintf(
+                'Rekap operasional assignment: ditemukan %d assignment. Pembagian status: %s. Pembagian activity: %s.',
+                (int) ($toolPayload['total_count'] ?? 0),
+                $this->formatCounts($toolPayload['status_breakdown'] ?? [], 'id'),
+                $this->formatCounts($toolPayload['activity_breakdown'] ?? [], 'id'),
             ),
             'generate_subcontractor_reminder' => sprintf(
                 'Reminder subkon: %s memiliki %d assignment outstanding di %d proyek.',
