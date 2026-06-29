@@ -42,3 +42,25 @@ it('is accessible to super admin', function () {
             ->where('userRole', 'super_admin')
         );
 });
+
+it('is accessible to project manager', function () {
+    $user = User::factory()->create(['role' => Role::ProjectManager]);
+
+    actingAs($user)->get('/faq')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('faq/Index')
+            ->where('userRole', 'project_manager')
+        );
+});
+
+it('is accessible to drafter', function () {
+    $user = User::factory()->create(['role' => Role::Drafter]);
+
+    actingAs($user)->get('/faq')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('faq/Index')
+            ->where('userRole', 'drafter')
+        );
+});

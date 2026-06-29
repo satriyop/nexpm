@@ -524,6 +524,34 @@ test('assistant counts pln assignments by main contractor', function () {
     Http::assertNothingSent();
 });
 
+test('assistant deterministically routes operational counts even in full mode', function () {
+    config(['ai.providers.deepseek.key' => 'test-key']);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $mainContractor = MainContractor::factory()->create(['name' => 'Sigma Tec']);
+    $project = Project::factory()->create(['main_contractor_id' => $mainContractor->id]);
+    $site = Site::factory()->create(['project_id' => $project->id]);
+
+    Assignment::factory()->plnConnection()->create(['site_id' => $site->id]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'ada berapa assignment PLN pada main contractor sigmatec?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($events['tool_data']['tool_payload']['total_count'])->toBe(1)
+        ->and($events['text']['delta'])->toStartWith('Statistik entitas:')
+        ->and($events['text']['delta'])->not->toContain('AI provider');
+
+    Http::assertNothingSent();
+});
+
 test('assistant returns survey recap for main contractor and outstanding by subcontractor company or user', function () {
     config(['ai.providers.deepseek.key' => null]);
     Http::fake();
@@ -623,4 +651,37 @@ test('assignment operation service supports combined filters and clarification',
 
     expect($ambiguousPayload['needs_clarification'])->toBeTrue()
         ->and($ambiguousPayload['clarification_suggestions'])->not->toBeEmpty();
+});
+
+test('assignment operation filters tolerate spacing and punctuation differences in names', function () {
+    $service = app(AiAssistantService::class);
+    $mainContractor = MainContractor::factory()->create(['name' => 'Sigma Tec']);
+    $subcontractor = Subcontractor::factory()->create(['name' => 'PT Ade-Ahyadi']);
+    $project = Project::factory()->create(['main_contractor_id' => $mainContractor->id]);
+    $site = Site::factory()->create(['project_id' => $project->id]);
+
+    Assignment::factory()->survey()->create([
+        'site_id' => $site->id,
+        'subcontractor_id' => $subcontractor->id,
+        'status' => AssignmentStatus::Pending,
+    ]);
+
+    $mainContractorPayload = $service->queryEntityStats([
+        'count_target' => 'assignments',
+        'main_contractor_name' => 'sigmatec',
+        'activity_type' => 'SURVEY',
+    ], []);
+
+    expect($mainContractorPayload['total_count'])->toBe(1)
+        ->and($mainContractorPayload['filters']['main_contractor_name'])->toBe('Sigma Tec');
+
+    $subcontractorPayload = $service->queryEntityStats([
+        'count_target' => 'assignments',
+        'subcontractor_name' => 'ade ahyadi',
+        'activity_type' => 'SURVEY',
+        'status' => 'PENDING',
+    ], []);
+
+    expect($subcontractorPayload['total_count'])->toBe(1)
+        ->and($subcontractorPayload['filters']['subcontractor_name'])->toBe('PT Ade-Ahyadi');
 });

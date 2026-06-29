@@ -18,12 +18,21 @@ import {
 import type { Component } from 'vue';
 import { computed, ref } from 'vue';
 import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { dashboard } from '@/routes';
 
-type UserRole = 'super_admin' | 'admin' | 'subcontractor';
+type UserRole =
+    | 'super_admin'
+    | 'admin'
+    | 'subcontractor'
+    | 'drafter'
+    | 'project_manager';
 type FaqRole = UserRole | 'all';
 
 interface FaqStep {
@@ -37,7 +46,13 @@ interface FaqQuestion {
     question: string;
     answer: string;
     steps?: FaqStep[];
-    diagram?: 'status_survey' | 'status_construction' | 'status_pln' | 'status_bast' | 'workflow_subcontractor' | 'workflow_admin';
+    diagram?:
+        | 'status_survey'
+        | 'status_construction'
+        | 'status_pln'
+        | 'status_bast'
+        | 'workflow_subcontractor'
+        | 'workflow_admin';
     tips?: string[];
     warning?: string;
 }
@@ -74,7 +89,8 @@ const statusColorMap = {
     amber: 'rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400',
     blue: 'rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[11px] font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400',
     cyan: 'rounded-lg border border-cyan-200 bg-cyan-50 px-2 py-1.5 text-[11px] font-semibold text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-400',
-    emerald: 'rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
+    emerald:
+        'rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
     violet: 'rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-[11px] font-semibold text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-400',
     orange: 'rounded-lg border border-orange-200 bg-orange-50 px-2 py-1.5 text-[11px] font-semibold text-orange-700 dark:border-orange-800 dark:bg-orange-950/30 dark:text-orange-400',
     teal: 'rounded-lg border border-teal-200 bg-teal-50 px-2 py-1.5 text-[11px] font-semibold text-teal-700 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-400',
@@ -114,6 +130,7 @@ const plnStatusSteps: StatusStep[] = [
 const bastStatusSteps: StatusStep[] = [
     { step: 'PENDING', label: 'Baru dibuat\n/ pasca revisi', color: 'amber' },
     { step: 'SUBMITTED', label: 'Subkon\nklik Submit', color: 'blue' },
+    { step: 'REVISION', label: 'Admin minta\nperbaikan', color: 'amber' },
     { step: 'VERIFIED', label: 'Diverifikasi\nadmin', color: 'emerald' },
     { step: 'REPORTED', label: 'Masuk\nlaporan BAST', color: 'violet' },
 ];
@@ -140,17 +157,19 @@ const allCategories: FaqCategory[] = [
                 question: 'Bagaimana cara login ke NexPM?',
                 answer: 'Untuk masuk ke NexPM, ikuti langkah-langkah berikut:',
                 steps: [
-                    { text: 'Buka browser dan akses URL aplikasi NexPM yang diberikan admin.' },
+                    {
+                        text: 'Buka browser dan akses URL aplikasi NexPM yang diberikan admin.',
+                    },
                     { text: 'Masukkan alamat email dan password akun Anda.' },
                     { text: 'Klik tombol "Sign In".' },
                     {
                         text: 'Anda diarahkan ke halaman sesuai role akun Anda.',
-                        note: 'Admin/Super Admin → Dashboard. Subkontraktor → My Assignments.',
+                        note: 'Super Admin/Admin/Project Manager → Dashboard. Subkontraktor → My Assignments. Drafter → Assignments.',
                     },
                 ],
                 tips: [
                     'Perhatikan huruf besar/kecil saat mengetik password',
-                    'Semua role (Super Admin, Admin, Subkontraktor) menggunakan halaman login yang sama',
+                    'Semua role menggunakan halaman login yang sama',
                 ],
             },
             {
@@ -158,19 +177,32 @@ const allCategories: FaqCategory[] = [
                 question: 'Bagaimana jika saya lupa password?',
                 answer: 'NexPM menyediakan fitur reset password melalui email:',
                 steps: [
-                    { text: 'Di halaman login, klik "Forgot your password?" di bawah form.' },
-                    { text: 'Masukkan alamat email akun Anda, lalu klik "Email Password Reset Link".' },
-                    { text: 'Buka inbox email dan klik tautan reset password yang dikirimkan.' },
-                    { text: 'Masukkan dan konfirmasi password baru.', note: 'Tautan berlaku selama 60 menit.' },
+                    {
+                        text: 'Di halaman login, klik "Forgot your password?" di bawah form.',
+                    },
+                    {
+                        text: 'Masukkan alamat email akun Anda, lalu klik "Email Password Reset Link".',
+                    },
+                    {
+                        text: 'Buka inbox email dan klik tautan reset password yang dikirimkan.',
+                    },
+                    {
+                        text: 'Masukkan dan konfirmasi password baru.',
+                        note: 'Tautan berlaku selama 60 menit.',
+                    },
                 ],
-                tips: ['Periksa folder Spam/Junk jika email tidak ada di inbox utama'],
+                tips: [
+                    'Periksa folder Spam/Junk jika email tidak ada di inbox utama',
+                ],
             },
             {
                 id: 'different-view',
-                question: 'Mengapa tampilan menu saya berbeda dari rekan kerja?',
-                answer:
-                    'NexPM menggunakan sistem role-based access. Setiap role melihat menu yang berbeda sesuai fungsinya:\n\n• Super Admin — Akses penuh ke semua fitur: manajemen sistem, semua proyek, AI Assistant\n• Admin — Akses ke manajemen proyek, site, assignment, verifikasi, dan laporan (terbatas pada Main Contractor-nya sendiri)\n• Subkontraktor — Hanya melihat dan mengerjakan assignment yang ditugaskan kepada perusahaan mereka',
-                tips: ['Jika akses tidak sesuai kebutuhan, hubungi Super Admin untuk penyesuaian role'],
+                question:
+                    'Mengapa tampilan menu saya berbeda dari rekan kerja?',
+                answer: 'NexPM menggunakan sistem role-based access. Setiap role melihat menu yang berbeda sesuai fungsinya:\n\n• Super Admin — Akses penuh ke semua fitur operasional, semua Main Contractor, manajemen user, pengaturan aplikasi, import manual, legacy reports, dan AI Assistant\n• Admin — Mengelola project, site, assignment, verifikasi, laporan, dan user dalam Main Contractor-nya sendiri\n• Project Manager — Melihat dashboard, project, assignment, laporan, dan konfigurasi dalam mode read-only; tidak dapat melakukan perubahan data\n• Drafter — Melihat assignment melalui menu khusus Drafter\n• Subkontraktor — Hanya melihat dan mengerjakan assignment yang ditugaskan kepada perusahaan mereka',
+                tips: [
+                    'Jika akses tidak sesuai kebutuhan, hubungi Super Admin untuk penyesuaian role',
+                ],
             },
         ],
     },
@@ -209,8 +241,7 @@ const allCategories: FaqCategory[] = [
             {
                 id: 'activity-types',
                 question: 'Apa saja tipe aktivitas (Activity Type) yang ada?',
-                answer:
-                    'Ada 4 tipe aktivitas dalam NexPM. Setiap assignment memiliki SATU tipe aktivitas yang tetap — tidak berubah setelah dibuat. Masing-masing memiliki form, status, dan alur kerja yang berbeda:',
+                answer: 'Ada 4 tipe aktivitas dalam NexPM. Setiap assignment memiliki SATU tipe aktivitas yang tetap — tidak berubah setelah dibuat. Masing-masing memiliki form, status, dan alur kerja yang berbeda:',
                 steps: [
                     {
                         icon: '🔍',
@@ -245,32 +276,69 @@ const allCategories: FaqCategory[] = [
             {
                 id: 'status-survey',
                 question: 'Apa saja status pada aktivitas Survey?',
-                answer:
-                    'Status Survey berjalan otomatis — tidak ada tombol Submit. Sistem memantau field yang tersimpan dan menaikkan status secara otomatis:',
+                answer: 'Status Survey berjalan otomatis — tidak ada tombol Submit. Sistem memantau field yang tersimpan dan menaikkan status secara otomatis:',
                 diagram: 'status_survey',
                 steps: [
-                    { icon: '⏳', text: 'PENDING — Assignment baru dibuat, belum ada data diisi.' },
-                    { icon: '📅', text: 'SURVEY — Tanggal jadwal survey (ss_schedule_date) sudah tersimpan.' },
-                    { icon: '📄', text: 'DOCUMENT — Semua field wajib terisi dan 5 foto sudah diupload. Siap diverifikasi admin.' },
-                    { icon: '✅', text: 'VERIFIED — Admin telah memverifikasi seluruh data survey.' },
-                    { icon: '📊', text: 'REPORTED — Assignment dimasukkan ke laporan SSR (Site Survey Report, format PDF).' },
+                    {
+                        icon: '⏳',
+                        text: 'PENDING — Assignment baru dibuat, belum ada data diisi.',
+                    },
+                    {
+                        icon: '📅',
+                        text: 'SURVEY — Tanggal jadwal survey (ss_schedule_date) sudah tersimpan.',
+                    },
+                    {
+                        icon: '📄',
+                        text: 'DOCUMENT — Semua field wajib terisi dan 5 foto sudah diupload. Siap diverifikasi admin.',
+                    },
+                    {
+                        icon: '✅',
+                        text: 'VERIFIED — Admin telah memverifikasi seluruh data survey.',
+                    },
+                    {
+                        icon: '📊',
+                        text: 'REPORTED — Assignment dimasukkan ke laporan SSR (Site Survey Report, format PDF).',
+                    },
                 ],
-                tips: ['Admin menerima notifikasi saat status mencapai DOCUMENT', 'Tidak ada REVISION untuk Survey — jika data perlu dikoreksi, admin dapat langsung mengedit di halaman detail'],
+                tips: [
+                    'Admin menerima notifikasi saat status mencapai DOCUMENT',
+                    'Tidak ada REVISION untuk Survey — jika data perlu dikoreksi, admin dapat langsung mengedit di halaman detail',
+                ],
             },
             {
                 id: 'status-construction',
                 question: 'Apa saja status pada aktivitas Konstruksi?',
-                answer:
-                    'Status Konstruksi juga naik otomatis, tetapi ada prasyarat penting: Nomor WO harus diisi oleh Admin terlebih dahulu sebelum subkontraktor bisa melakukan apapun:',
+                answer: 'Status Konstruksi juga naik otomatis, tetapi ada prasyarat penting: Nomor WO harus diisi oleh Admin terlebih dahulu sebelum subkontraktor bisa melakukan apapun:',
                 diagram: 'status_construction',
                 steps: [
-                    { icon: '🔒', text: 'PENDING — Assignment terkunci. Subkontraktor tidak bisa mengisi apapun sampai admin mengisi Nomor WO.' },
-                    { icon: '🏗️', text: 'CONSTRUCTION — Tanggal mulai aktual (cons_actual_start_date) diisi subkontraktor.' },
-                    { icon: '🔧', text: 'MACHINE_ONSITE — Serial number mesin dan foto mesin diisi oleh subkontraktor.' },
-                    { icon: '✔️', text: 'DONE — Tanggal selesai aktual (cons_actual_done_date) diisi subkontraktor.' },
-                    { icon: '⚡', text: 'LIVE — Tanggal go-live PLN diisi oleh Admin (bukan subkontraktor).' },
-                    { icon: '✅', text: 'VERIFIED — Admin memverifikasi seluruh data konstruksi.' },
-                    { icon: '📊', text: 'REPORTED — Assignment masuk ke laporan.' },
+                    {
+                        icon: '🔒',
+                        text: 'PENDING — Assignment terkunci. Subkontraktor tidak bisa mengisi apapun sampai admin mengisi Nomor WO.',
+                    },
+                    {
+                        icon: '🏗️',
+                        text: 'CONSTRUCTION — Tanggal mulai aktual (cons_actual_start_date) diisi subkontraktor.',
+                    },
+                    {
+                        icon: '🔧',
+                        text: 'MACHINE_ONSITE — Serial number mesin dan foto mesin diisi oleh subkontraktor.',
+                    },
+                    {
+                        icon: '✔️',
+                        text: 'DONE — Tanggal selesai aktual (cons_actual_done_date) diisi subkontraktor.',
+                    },
+                    {
+                        icon: '⚡',
+                        text: 'LIVE — Tanggal go-live PLN diisi oleh Admin (bukan subkontraktor).',
+                    },
+                    {
+                        icon: '✅',
+                        text: 'VERIFIED — Admin memverifikasi seluruh data konstruksi.',
+                    },
+                    {
+                        icon: '📊',
+                        text: 'REPORTED — Assignment masuk ke laporan.',
+                    },
                 ],
                 warning:
                     'Assignment Konstruksi terkunci sepenuhnya sampai Admin mengisi Nomor WO via fitur "Construction Prerequisite". Subkontraktor yang melihat tanda terkunci harus meminta admin untuk mengisi WO Number terlebih dahulu.',
@@ -278,36 +346,65 @@ const allCategories: FaqCategory[] = [
             {
                 id: 'status-pln',
                 question: 'Apa saja status pada aktivitas PLN Connection?',
-                answer:
-                    'Status PLN Connection mengikuti tahapan proses perizinan PLN dan naik otomatis saat dokumen/data yang relevan tersimpan:',
+                answer: 'Status PLN Connection mengikuti tahapan proses perizinan PLN dan naik otomatis saat dokumen/data yang relevan tersimpan:',
                 diagram: 'status_pln',
                 steps: [
                     { icon: '⏳', text: 'PENDING — Assignment baru dibuat.' },
-                    { icon: '📁', text: 'REGISTRATION — File SLO, NIDI, dan REG sudah diupload.' },
-                    { icon: '📧', text: 'BILLING — Tanggal email ke BPUJL dikirim sudah diisi.' },
-                    { icon: '🔌', text: 'CONNECTION — Tanggal BPUJL diperoleh sudah diisi.' },
-                    { icon: '⚡', text: 'KWH_DONE — ID Pelanggan PLN, Type Rate, tanggal instalasi kWh meter, dan foto kWh meter sudah lengkap. Siap diverifikasi admin.' },
+                    {
+                        icon: '📁',
+                        text: 'REGISTRATION — File SLO, NIDI, dan REG sudah diupload.',
+                    },
+                    {
+                        icon: '📧',
+                        text: 'BILLING — Tanggal email ke BPUJL dikirim sudah diisi.',
+                    },
+                    {
+                        icon: '🔌',
+                        text: 'CONNECTION — Tanggal BPUJL diperoleh sudah diisi.',
+                    },
+                    {
+                        icon: '⚡',
+                        text: 'KWH_DONE — ID Pelanggan PLN, Type Rate, tanggal instalasi kWh meter, dan foto kWh meter sudah lengkap. Siap diverifikasi admin.',
+                    },
                     { icon: '✅', text: 'VERIFIED — Admin memverifikasi.' },
                     { icon: '📊', text: 'REPORTED — Masuk laporan.' },
                 ],
-                tips: ['Tidak ada REVISION untuk PLN Connection — admin dapat langsung mengedit data jika perlu koreksi'],
+                tips: [
+                    'Tidak ada REVISION untuk PLN Connection — admin dapat langsung mengedit data jika perlu koreksi',
+                ],
             },
             {
                 id: 'status-bast',
                 question: 'Apa saja status pada aktivitas BAST?',
-                answer:
-                    'BAST adalah satu-satunya aktivitas yang tidak naik status secara otomatis. Subkontraktor harus secara aktif menekan tombol "Submit for Review" untuk mengajukan ke admin. BAST juga satu-satunya yang memiliki alur REVISION:',
+                answer: 'BAST adalah satu-satunya aktivitas yang tidak naik status secara otomatis. Subkontraktor harus secara aktif menekan tombol "Submit for Review" untuk mengajukan ke admin. BAST juga satu-satunya yang memiliki alur REVISION:',
                 diagram: 'status_bast',
                 steps: [
-                    { icon: '⏳', text: 'PENDING — Baru dibuat, atau setelah admin mengirim permintaan revisi.' },
-                    { icon: '📤', text: 'SUBMITTED — Subkontraktor menekan tombol "Submit for Review". Admin dapat memverifikasi atau mengirim revisi.' },
-                    { icon: '🔄', text: 'REVISION — (Opsional) Admin menemukan ketidaksesuaian dan mengirim catatan revisi. Status kembali ke PENDING, subkontraktor memperbaiki lalu submit ulang.' },
-                    { icon: '✅', text: 'VERIFIED — Admin memverifikasi seluruh data dan foto checkpoint BAST.' },
-                    { icon: '📊', text: 'REPORTED — Assignment masuk laporan BAST (format XLSX).' },
+                    {
+                        icon: '⏳',
+                        text: 'PENDING — Baru dibuat, atau setelah admin mengirim permintaan revisi.',
+                    },
+                    {
+                        icon: '📤',
+                        text: 'SUBMITTED — Subkontraktor menekan tombol "Submit for Review". Admin dapat memverifikasi atau mengirim revisi.',
+                    },
+                    {
+                        icon: '🔄',
+                        text: 'REVISION — (Opsional) Admin menemukan ketidaksesuaian dan mengirim catatan revisi. Status kembali ke PENDING, subkontraktor memperbaiki lalu submit ulang.',
+                    },
+                    {
+                        icon: '✅',
+                        text: 'VERIFIED — Admin memverifikasi seluruh data dan foto checkpoint BAST.',
+                    },
+                    {
+                        icon: '📊',
+                        text: 'REPORTED — Assignment masuk laporan BAST (format XLSX).',
+                    },
                 ],
                 warning:
                     'REVISION hanya ada di BAST. Survey, PLN Connection, dan Construction tidak memiliki alur REVISION — admin mengedit data langsung jika perlu koreksi.',
-                tips: ['Admin juga bisa menekan "Submit for Review" atas nama subkontraktor dari halaman admin detail assignment'],
+                tips: [
+                    'Admin juga bisa menekan "Submit for Review" atas nama subkontraktor dari halaman admin detail assignment',
+                ],
             },
         ],
     },
@@ -321,13 +418,17 @@ const allCategories: FaqCategory[] = [
         questions: [
             {
                 id: 'identify-activity',
-                question: 'Bagaimana cara mengetahui aktivitas apa yang perlu saya kerjakan?',
-                answer:
-                    'Setiap assignment yang ditugaskan kepada Anda memiliki SATU tipe aktivitas yang tetap dan tidak berubah. Tipe ini menentukan form apa yang harus Anda isi:',
+                question:
+                    'Bagaimana cara mengetahui aktivitas apa yang perlu saya kerjakan?',
+                answer: 'Setiap assignment yang ditugaskan kepada Anda memiliki SATU tipe aktivitas yang tetap dan tidak berubah. Tipe ini menentukan form apa yang harus Anda isi:',
                 steps: [
                     { text: 'Login → klik "My Assignments" di sidebar.' },
-                    { text: 'Setiap assignment menampilkan badge tipe aktivitas: Survey / PLN Connection / Construction / BAST.' },
-                    { text: 'Klik assignment untuk membuka halaman detail dan melihat form yang perlu diisi.' },
+                    {
+                        text: 'Setiap assignment menampilkan badge tipe aktivitas: Survey / PLN Connection / Construction / BAST.',
+                    },
+                    {
+                        text: 'Klik assignment untuk membuka halaman detail dan melihat form yang perlu diisi.',
+                    },
                     {
                         text: 'Status terkini ditampilkan di bagian atas halaman detail.',
                         note: 'Status PENDING berarti belum ada data yang diisi, atau data sudah dikembalikan untuk revisi (khusus BAST).',
@@ -344,13 +445,19 @@ const allCategories: FaqCategory[] = [
                 answer: 'Survey adalah aktivitas pengumpulan data teknis lokasi site. Status naik otomatis — tidak ada tombol Submit:',
                 steps: [
                     { text: 'Buka assignment bertipe Survey.' },
-                    { text: 'Isi field wajib: nama surveyor, nama & no. HP PIC lokasi, jenis charger, tanggal jadwal survey, jenis kabel, tipe jaringan PLN, dan jumlah parking slot.' },
+                    {
+                        text: 'Isi field wajib: nama surveyor, nama & no. HP PIC lokasi, jenis charger, tanggal jadwal survey, jenis kabel, tipe jaringan PLN, dan jumlah parking slot.',
+                    },
                     {
                         text: 'Upload 5 foto wajib: tampak keseluruhan site, lahan parkir, sudut pandang lain, jaringan PLN terdekat, foto satelit GMaps.',
                         note: 'Setiap foto maksimal 10 MB.',
                     },
-                    { text: 'Upload dokumen: Mockup 3D, Site Plan, dan BA Survey.' },
-                    { text: 'Klik Simpan — status otomatis berubah ke SURVEY saat jadwal diisi, lalu ke DOCUMENT saat semua field & foto lengkap.' },
+                    {
+                        text: 'Upload dokumen: Mockup 3D, Site Plan, dan BA Survey.',
+                    },
+                    {
+                        text: 'Klik Simpan — status otomatis berubah ke SURVEY saat jadwal diisi, lalu ke DOCUMENT saat semua field & foto lengkap.',
+                    },
                 ],
                 tips: [
                     'Tidak ada tombol Submit untuk Survey — admin menerima notifikasi secara otomatis saat status mencapai DOCUMENT',
@@ -371,63 +478,94 @@ const allCategories: FaqCategory[] = [
                         text: 'Upload File SLO, File NIDI, dan File REG → status berubah ke REGISTRATION.',
                         note: 'Ketiga file ini harus diupload sekaligus untuk status naik.',
                     },
-                    { text: 'Isi tanggal pengiriman email ke BPUJL → status berubah ke BILLING.' },
-                    { text: 'Isi tanggal BPUJL diperoleh → status berubah ke CONNECTION.' },
-                    { text: 'Isi ID Pelanggan PLN, Type Rate, tanggal instalasi kWh meter, dan upload foto kWh meter → status berubah ke KWH_DONE.' },
-                    { text: 'Isi catatan progres untuk mencatat perkembangan terkini.' },
+                    {
+                        text: 'Isi tanggal pengiriman email ke BPUJL → status berubah ke BILLING.',
+                    },
+                    {
+                        text: 'Isi tanggal BPUJL diperoleh → status berubah ke CONNECTION.',
+                    },
+                    {
+                        text: 'Isi ID Pelanggan PLN, Type Rate, tanggal instalasi kWh meter, dan upload foto kWh meter → status berubah ke KWH_DONE.',
+                    },
+                    {
+                        text: 'Isi catatan progres untuk mencatat perkembangan terkini.',
+                    },
                 ],
-                tips: ['Tidak ada tombol Submit — status naik otomatis setiap kali data tersimpan', 'Lengkapi setiap tahap secara berurutan untuk status naik dengan benar'],
+                tips: [
+                    'Tidak ada tombol Submit — status naik otomatis setiap kali data tersimpan',
+                    'Lengkapi setiap tahap secara berurutan untuk status naik dengan benar',
+                ],
             },
             {
                 id: 'fill-construction',
                 question: 'Bagaimana cara mengisi assignment Konstruksi?',
-                answer:
-                    'Construction adalah aktivitas pemasangan fisik. Penting: assignment ini TERKUNCI hingga Admin mengisi Nomor WO. Jika Anda melihat tanda gembok, hubungi admin Anda:',
+                answer: 'Construction adalah aktivitas pemasangan fisik. Penting: assignment ini TERKUNCI hingga Admin mengisi Nomor WO. Jika Anda melihat tanda gembok, hubungi admin Anda:',
                 steps: [
                     {
                         text: 'Tunggu Admin mengisi Nomor WO (Construction Prerequisite). Nomor WO akan tampil di halaman assignment setelah diisi admin.',
                         note: 'Selama Nomor WO belum diisi admin, seluruh form tidak bisa diedit.',
                     },
-                    { text: 'Setelah tidak terkunci, isi tanggal mulai aktual konstruksi → status berubah ke CONSTRUCTION.' },
-                    { text: 'Isi serial number mesin dan upload foto mesin (foto SN) → status berubah ke MACHINE_ONSITE.' },
-                    { text: 'Isi tanggal selesai aktual → status berubah ke DONE.' },
-                    { text: 'Upload minimal 1 foto progres konstruksi (maksimal 2 foto).' },
+                    {
+                        text: 'Setelah tidak terkunci, isi tanggal mulai aktual konstruksi → status berubah ke CONSTRUCTION.',
+                    },
+                    {
+                        text: 'Isi serial number mesin dan upload foto mesin (foto SN) → status berubah ke MACHINE_ONSITE.',
+                    },
+                    {
+                        text: 'Isi tanggal selesai aktual → status berubah ke DONE.',
+                    },
+                    {
+                        text: 'Upload minimal 1 foto progres konstruksi (maksimal 2 foto).',
+                    },
                     { text: 'Isi catatan progres.' },
                 ],
                 tips: [
                     'Tanggal go-live PLN (LIVE) diisi oleh Admin, bukan subkontraktor — Anda tidak perlu mengisi bagian itu',
                     'Tidak ada tombol Submit — status naik otomatis',
                 ],
-                warning: 'Jika assignment Konstruksi Anda masih terkunci (ada ikon gembok), artinya Admin belum mengisi Nomor WO. Hubungi Admin Anda untuk segera mengisi prerequisite ini.',
+                warning:
+                    'Jika assignment Konstruksi Anda masih terkunci (ada ikon gembok), artinya Admin belum mengisi Nomor WO. Hubungi Admin Anda untuk segera mengisi prerequisite ini.',
             },
             {
                 id: 'fill-bast',
-                question: 'Bagaimana cara mengisi dan mengirim assignment BAST?',
-                answer:
-                    'BAST (Berita Acara Serah Terima) adalah satu-satunya aktivitas yang memerlukan klik "Submit for Review" secara manual. Data tidak otomatis terkirim ke admin:',
+                question:
+                    'Bagaimana cara mengisi dan mengirim assignment BAST?',
+                answer: 'BAST (Berita Acara Serah Terima) adalah satu-satunya aktivitas yang memerlukan klik "Submit for Review" secara manual. Data tidak otomatis terkirim ke admin:',
                 steps: [
                     { text: 'Buka assignment bertipe BAST.' },
-                    { text: 'Isi data BAST: nomor SIM card, nama provider, dan tanggal commissioning.' },
+                    {
+                        text: 'Isi data BAST: nomor SIM card, nama provider, dan tanggal commissioning.',
+                    },
                     {
                         text: 'Upload foto untuk setiap checkpoint yang tersedia di halaman. Setiap checkpoint memerlukan foto sebagai bukti.',
                         note: 'Jumlah dan jenis checkpoint tergantung tipe site (EVCS atau BSS).',
                     },
-                    { text: 'Setelah semua checkpoint difoto, cari tombol "Submit for Review" di halaman.' },
-                    { text: 'Klik tombol tersebut dan konfirmasi → status berubah ke SUBMITTED, admin menerima notifikasi.' },
+                    {
+                        text: 'Setelah semua checkpoint difoto, cari tombol "Submit for Review" di halaman.',
+                    },
+                    {
+                        text: 'Klik tombol tersebut dan konfirmasi → status berubah ke SUBMITTED, admin menerima notifikasi.',
+                    },
                 ],
                 warning:
                     'BAST TIDAK otomatis terkirim. Anda harus aktif menekan tombol "Submit for Review". Tanpa klik Submit, admin tidak akan melihat pekerjaan Anda selesai.',
-                tips: ['Tombol Submit muncul hanya saat status PENDING atau REVISION (setelah revisi)'],
+                tips: [
+                    'Tombol Submit muncul hanya saat status PENDING atau REVISION (setelah revisi)',
+                ],
             },
             {
                 id: 'bast-revision',
-                question: 'Apa arti status "Revision" pada assignment BAST dan apa yang harus dilakukan?',
-                answer:
-                    'Jika BAST berstatus REVISION, Admin menemukan ketidaksesuaian atau kekurangan setelah Anda submit dan mengembalikan assignment disertai catatan:',
+                question:
+                    'Apa arti status "Revision" pada assignment BAST dan apa yang harus dilakukan?',
+                answer: 'Jika BAST berstatus REVISION, Admin menemukan ketidaksesuaian atau kekurangan setelah Anda submit dan mengembalikan assignment disertai catatan:',
                 steps: [
                     { text: 'Buka assignment BAST dengan status REVISION.' },
-                    { text: 'Baca catatan revisi dari admin yang tampil di bagian atas halaman — catatan ini menjelaskan apa yang perlu diperbaiki.' },
-                    { text: 'Perbaiki data atau foto checkpoint sesuai catatan admin.' },
+                    {
+                        text: 'Baca catatan revisi dari admin yang tampil di bagian atas halaman — catatan ini menjelaskan apa yang perlu diperbaiki.',
+                    },
+                    {
+                        text: 'Perbaiki data atau foto checkpoint sesuai catatan admin.',
+                    },
                     {
                         text: 'Klik kembali tombol "Submit for Review" untuk mengirim ulang ke admin.',
                         note: 'Prosesnya sama persis seperti submit pertama kali.',
@@ -455,12 +593,30 @@ const allCategories: FaqCategory[] = [
                 answer: 'Sebagai Admin, berikut alur kerja dari setup proyek hingga pelaporan:',
                 diagram: 'workflow_admin',
                 steps: [
-                    { icon: '1️⃣', text: 'Buat Project — Masukkan nama proyek, klien, dan main contractor.' },
-                    { icon: '2️⃣', text: 'Tambah Site — Daftarkan lokasi site satu per satu atau import massal via CSV.' },
-                    { icon: '3️⃣', text: 'Buat Assignment — Tugaskan subkontraktor ke site dengan menentukan tipe aktivitas.' },
-                    { icon: '4️⃣', text: 'Pantau Status — Monitor progress assignment melalui halaman Assignments.' },
-                    { icon: '5️⃣', text: 'Verifikasi — Review dan verifikasi data dari subkontraktor saat assignment mencapai status verifiable (DOCUMENT / SUBMITTED / LIVE / KWH_DONE).' },
-                    { icon: '6️⃣', text: 'Generate Laporan — Buat laporan SSR, BAST, atau Daily Monitoring sesuai kebutuhan.' },
+                    {
+                        icon: '1️⃣',
+                        text: 'Buat Project — Masukkan nama proyek, klien, dan main contractor.',
+                    },
+                    {
+                        icon: '2️⃣',
+                        text: 'Tambah Site — Daftarkan lokasi site satu per satu atau import massal via CSV.',
+                    },
+                    {
+                        icon: '3️⃣',
+                        text: 'Buat Assignment — Tugaskan subkontraktor ke site dengan menentukan tipe aktivitas.',
+                    },
+                    {
+                        icon: '4️⃣',
+                        text: 'Pantau Status — Monitor progress assignment melalui halaman Assignments.',
+                    },
+                    {
+                        icon: '5️⃣',
+                        text: 'Verifikasi — Review dan verifikasi data dari subkontraktor saat assignment mencapai status verifiable (DOCUMENT / SUBMITTED / LIVE / KWH_DONE).',
+                    },
+                    {
+                        icon: '6️⃣',
+                        text: 'Generate Laporan — Buat laporan SSR, BAST, atau Daily Monitoring sesuai kebutuhan.',
+                    },
                 ],
             },
             {
@@ -470,8 +626,13 @@ const allCategories: FaqCategory[] = [
                 steps: [
                     { text: 'Di sidebar, klik menu "Projects".' },
                     { text: 'Klik tombol "Add Project".' },
-                    { text: 'Isi nama project, pilih client, dan pilih main contractor.' },
-                    { text: 'Klik "Simpan". Project siap ditambahkan site.', note: 'Project dapat memiliki tanggal mulai dan selesai untuk tracking deadline.' },
+                    {
+                        text: 'Isi nama project, pilih client, dan pilih main contractor.',
+                    },
+                    {
+                        text: 'Klik "Simpan". Project siap ditambahkan site.',
+                        note: 'Project dapat memiliki tanggal mulai dan selesai untuk tracking deadline.',
+                    },
                 ],
             },
             {
@@ -479,14 +640,20 @@ const allCategories: FaqCategory[] = [
                 question: 'Bagaimana cara menambahkan site ke project?',
                 answer: 'Site adalah satu lokasi fisik pemasangan. Setiap site di sistem memiliki Site Code unik:',
                 steps: [
-                    { text: 'Buka detail project yang ingin ditambahkan site-nya.' },
+                    {
+                        text: 'Buka detail project yang ingin ditambahkan site-nya.',
+                    },
                     { text: 'Klik tab "Sites".' },
-                    { text: 'Untuk satu site: klik "Add Site", isi Site Code (wajib unik), nama lokasi, dan data lainnya.' },
+                    {
+                        text: 'Untuk satu site: klik "Add Site", isi Site Code (wajib unik), nama lokasi, dan data lainnya.',
+                    },
                     {
                         text: 'Untuk banyak site: klik "Import CSV", unduh template, isi data di template, lalu upload.',
                         note: 'CSV import menggunakan Site Code sebagai kunci upsert — site yang sudah ada akan diupdate, yang baru akan dibuat.',
                     },
-                    { text: 'Setelah site ditambahkan, Anda dapat membuat assignment untuk setiap site.' },
+                    {
+                        text: 'Setelah site ditambahkan, Anda dapat membuat assignment untuk setiap site.',
+                    },
                 ],
                 tips: [
                     'Import CSV sangat direkomendasikan untuk project dengan banyak site',
@@ -495,13 +662,18 @@ const allCategories: FaqCategory[] = [
             },
             {
                 id: 'create-assignment',
-                question: 'Bagaimana cara membuat assignment untuk sebuah site?',
+                question:
+                    'Bagaimana cara membuat assignment untuk sebuah site?',
                 answer: 'Assignment dibuat per site per tipe aktivitas. Satu site bisa memiliki hingga 4 assignment:',
                 steps: [
                     { text: 'Buka detail project → tab "Sites".' },
                     { text: 'Klik pada site yang ingin dibuat assignmentnya.' },
-                    { text: 'Di halaman site, klik "Assign Subcontractor" atau "Add Assignment".' },
-                    { text: 'Pilih tipe aktivitas (Survey, PLN Connection, Construction, BAST) dan pilih subkontraktor.' },
+                    {
+                        text: 'Di halaman site, klik "Assign Subcontractor" atau "Add Assignment".',
+                    },
+                    {
+                        text: 'Pilih tipe aktivitas (Survey, PLN Connection, Construction, BAST) dan pilih subkontraktor.',
+                    },
                     {
                         text: 'Klik konfirmasi untuk membuat assignment.',
                         note: 'Hanya boleh ada 1 assignment per tipe aktivitas per site. Sistem akan menolak duplikat.',
@@ -518,20 +690,27 @@ const allCategories: FaqCategory[] = [
             },
             {
                 id: 'construction-prerequisite',
-                question: 'Bagaimana cara mengisi Nomor WO (Construction Prerequisite)?',
-                answer:
-                    'Nomor WO adalah prasyarat wajib untuk aktivitas Construction. Tanpa ini, subkontraktor tidak dapat mengisi data apapun pada assignment tersebut:',
+                question:
+                    'Bagaimana cara mengisi Nomor WO (Construction Prerequisite)?',
+                answer: 'Nomor WO adalah prasyarat wajib untuk aktivitas Construction. Tanpa ini, subkontraktor tidak dapat mengisi data apapun pada assignment tersebut:',
                 steps: [
-                    { text: 'Buka halaman detail assignment bertipe Construction.' },
-                    { text: 'Cari tombol atau bagian "Construction Prerequisite" di halaman.' },
-                    { text: 'Isi Nomor WO (field wajib). Isi juga Project Status dan Setup Approval Date jika tersedia (opsional).' },
+                    {
+                        text: 'Buka halaman detail assignment bertipe Construction.',
+                    },
+                    {
+                        text: 'Cari tombol atau bagian "Construction Prerequisite" di halaman.',
+                    },
+                    {
+                        text: 'Isi Nomor WO (field wajib). Isi juga Project Status dan Setup Approval Date jika tersedia (opsional).',
+                    },
                     { text: 'Klik Simpan.' },
                     {
                         text: 'Assignment Konstruksi kini terbuka — subkontraktor bisa langsung mulai mengisi data.',
                         note: 'Subkontraktor akan melihat Nomor WO tampil di halaman mereka sebagai konfirmasi assignment sudah dibuka.',
                     },
                 ],
-                warning: 'Jangan lupa mengisi Construction Prerequisite segera setelah membuat assignment Construction. Subkontraktor tidak bisa melakukan apapun sampai ini diisi.',
+                warning:
+                    'Jangan lupa mengisi Construction Prerequisite segera setelah membuat assignment Construction. Subkontraktor tidak bisa melakukan apapun sampai ini diisi.',
             },
         ],
     },
@@ -546,26 +725,46 @@ const allCategories: FaqCategory[] = [
             {
                 id: 'verify-assignment',
                 question: 'Bagaimana cara memverifikasi assignment?',
-                answer:
-                    'Setiap tipe aktivitas mencapai status verifiable yang berbeda. Verifikasi tersedia saat assignment berada di status berikut:',
+                answer: 'Setiap tipe aktivitas mencapai status verifiable yang berbeda. Verifikasi tersedia saat assignment berada di status berikut:',
                 steps: [
-                    { icon: '🔍', text: 'Survey → verifiable saat status DOCUMENT (semua field & foto lengkap).' },
-                    { icon: '📋', text: 'BAST → verifiable saat status SUBMITTED (subkontraktor sudah klik Submit).' },
-                    { icon: '🏗️', text: 'Construction → verifiable saat status LIVE (tanggal go-live PLN sudah diisi admin).' },
-                    { icon: '⚡', text: 'PLN Connection → verifiable saat status KWH_DONE (ID Pelanggan & kWh meter lengkap).' },
+                    {
+                        icon: '🔍',
+                        text: 'Survey → verifiable saat status DOCUMENT (semua field & foto lengkap).',
+                    },
+                    {
+                        icon: '📋',
+                        text: 'BAST → verifiable saat status SUBMITTED (subkontraktor sudah klik Submit).',
+                    },
+                    {
+                        icon: '🏗️',
+                        text: 'Construction → verifiable saat status LIVE (tanggal go-live PLN sudah diisi admin).',
+                    },
+                    {
+                        icon: '⚡',
+                        text: 'PLN Connection → verifiable saat status KWH_DONE (ID Pelanggan & kWh meter lengkap).',
+                    },
                 ],
-                tips: ['Setelah menemukan assignment di status verifiable, buka halaman detailnya, review semua data, lalu klik tombol "Verify" dan konfirmasi'],
-                warning: 'Setelah diverifikasi, subkontraktor tidak bisa mengedit data. Jika klien menolak, Admin/Super Admin dapat membatalkan verifikasi (Unverify) dengan memberikan alasan.',
+                tips: [
+                    'Setelah menemukan assignment di status verifiable, buka halaman detailnya, review semua data, lalu klik tombol "Verify" dan konfirmasi',
+                ],
+                warning:
+                    'Setelah diverifikasi, subkontraktor tidak bisa mengedit data. Jika klien menolak, Admin/Super Admin dapat membatalkan verifikasi (Unverify) dengan memberikan alasan.',
             },
             {
                 id: 'unverify-assignment',
-                question: 'Bagaimana cara membatalkan verifikasi (Unverify) jika klien menolak?',
-                answer:
-                    'Admin dan Super Admin dapat membatalkan verifikasi assignment yang berstatus VERIFIED. Fitur ini tersedia untuk kasus seperti klien menolak hasil survey atau konstruksi. Semua data subkontraktor TETAP UTUH — hanya status dan data verifikasi yang direset:',
+                question:
+                    'Bagaimana cara membatalkan verifikasi (Unverify) jika klien menolak?',
+                answer: 'Admin dan Super Admin dapat membatalkan verifikasi assignment yang berstatus VERIFIED. Fitur ini tersedia untuk kasus seperti klien menolak hasil survey atau konstruksi. Semua data subkontraktor TETAP UTUH — hanya status dan data verifikasi yang direset:',
                 steps: [
-                    { text: 'Buka halaman detail assignment yang berstatus VERIFIED.' },
-                    { text: 'Di bagian status card (pojok kanan), klik tombol "Unverify" (berwarna merah) di bawah badge Verified.' },
-                    { text: 'Dialog konfirmasi muncul. Isi kolom "Reason" dengan alasan pembatalan yang jelas.' },
+                    {
+                        text: 'Buka halaman detail assignment yang berstatus VERIFIED.',
+                    },
+                    {
+                        text: 'Di bagian status card (pojok kanan), klik tombol "Unverify" (berwarna merah) di bawah badge Verified.',
+                    },
+                    {
+                        text: 'Dialog konfirmasi muncul. Isi kolom "Reason" dengan alasan pembatalan yang jelas.',
+                    },
                     {
                         text: 'Klik "Confirm Unverify" → status kembali ke status sebelum verifikasi dan subkontraktor bisa mengedit kembali.',
                         note: 'SURVEY → DOCUMENT, BAST → SUBMITTED, CONSTRUCTION → LIVE, PLN → KWH_DONE.',
@@ -576,13 +775,14 @@ const allCategories: FaqCategory[] = [
                     'Alasan unverify tersimpan di sistem sebagai catatan audit',
                     'Assignment berstatus REPORTED tidak bisa di-unverify — hanya VERIFIED',
                 ],
-                warning: 'Isi alasan yang jelas dan spesifik (contoh: "Klien menolak — tipe charger tidak sesuai"). Alasan ini dicatat di log sistem.',
+                warning:
+                    'Isi alasan yang jelas dan spesifik (contoh: "Klien menolak — tipe charger tidak sesuai"). Alasan ini dicatat di log sistem.',
             },
             {
                 id: 'request-revision',
-                question: 'Bagaimana cara mengirim permintaan revisi ke subkontraktor?',
-                answer:
-                    'Permintaan revisi HANYA tersedia untuk aktivitas BAST dalam status SUBMITTED. Untuk Survey, PLN Connection, dan Construction, Admin dapat langsung mengedit data via halaman detail tanpa perlu mengirim revisi:',
+                question:
+                    'Bagaimana cara mengirim permintaan revisi ke subkontraktor?',
+                answer: 'Permintaan revisi HANYA tersedia untuk aktivitas BAST dalam status SUBMITTED. Untuk Survey, PLN Connection, dan Construction, Admin dapat langsung mengedit data via halaman detail tanpa perlu mengirim revisi:',
                 steps: [
                     { text: 'Buka assignment BAST yang berstatus SUBMITTED.' },
                     { text: 'Klik tombol "Request Revision".' },
@@ -590,7 +790,9 @@ const allCategories: FaqCategory[] = [
                         text: 'Tulis catatan revisi yang spesifik — sebutkan checkpoint mana atau data apa yang perlu diperbaiki.',
                         note: 'Catatan ini langsung terlihat oleh subkontraktor.',
                     },
-                    { text: 'Klik Kirim → status berubah ke REVISION dan subkontraktor mendapat notifikasi.' },
+                    {
+                        text: 'Klik Kirim → status berubah ke REVISION dan subkontraktor mendapat notifikasi.',
+                    },
                 ],
                 tips: [
                     'Berikan catatan yang spesifik — sebutkan nama checkpoint atau field yang bermasalah',
@@ -601,13 +803,18 @@ const allCategories: FaqCategory[] = [
             },
             {
                 id: 'report-ssr',
-                question: 'Bagaimana cara membuat Laporan SSR (Site Survey Report)?',
+                question:
+                    'Bagaimana cara membuat Laporan SSR (Site Survey Report)?',
                 answer: 'Laporan SSR adalah laporan PDF yang merangkum hasil survei site. Hanya untuk assignment Survey berstatus VERIFIED:',
                 steps: [
-                    { text: 'Pastikan ada assignment Survey berstatus VERIFIED yang belum dilaporkan.' },
+                    {
+                        text: 'Pastikan ada assignment Survey berstatus VERIFIED yang belum dilaporkan.',
+                    },
                     { text: 'Klik menu "Reports" di sidebar.' },
                     { text: 'Pilih tipe "SSR".' },
-                    { text: 'Pilih assignment Survey VERIFIED yang ingin dimasukkan ke laporan.' },
+                    {
+                        text: 'Pilih assignment Survey VERIFIED yang ingin dimasukkan ke laporan.',
+                    },
                     {
                         text: 'Klik "Generate". Sistem menghasilkan PDF dan assignment masuk ke tab History.',
                         note: 'Assignment Survey yang masuk laporan SSR berubah status menjadi REPORTED.',
@@ -620,9 +827,13 @@ const allCategories: FaqCategory[] = [
                 question: 'Bagaimana cara membuat Laporan BAST?',
                 answer: 'Laporan BAST adalah file XLSX dokumentasi serah terima per site. Hanya untuk assignment BAST berstatus VERIFIED:',
                 steps: [
-                    { text: 'Pastikan ada assignment BAST berstatus VERIFIED yang belum dilaporkan.' },
+                    {
+                        text: 'Pastikan ada assignment BAST berstatus VERIFIED yang belum dilaporkan.',
+                    },
                     { text: 'Klik menu "Reports" → pilih tipe "BAST".' },
-                    { text: 'Pilih assignment BAST VERIFIED yang ingin dimasukkan.' },
+                    {
+                        text: 'Pilih assignment BAST VERIFIED yang ingin dimasukkan.',
+                    },
                     {
                         text: 'Klik "Generate". Jika satu assignment → file XLSX tunggal. Jika lebih dari satu → file ZIP berisi semua XLSX.',
                         note: 'Assignment BAST yang masuk laporan berubah status menjadi REPORTED.',
@@ -633,11 +844,14 @@ const allCategories: FaqCategory[] = [
             {
                 id: 'report-daily',
                 question: 'Bagaimana cara membuat Daily Monitoring Report?',
-                answer:
-                    'Daily Monitoring adalah laporan XLSX ringkasan harian yang mencakup SEMUA assignment aktif tanpa filter status — berbeda dari SSR dan BAST yang hanya mengambil assignment VERIFIED:',
+                answer: 'Daily Monitoring adalah laporan XLSX ringkasan harian yang mencakup SEMUA assignment aktif tanpa filter status — berbeda dari SSR dan BAST yang hanya mengambil assignment VERIFIED:',
                 steps: [
-                    { text: 'Klik menu "Reports" → pilih tipe "Daily Monitoring".' },
-                    { text: 'Klik "Generate Report". Sistem otomatis mengumpulkan SEMUA assignment yang tidak berstatus DROP.' },
+                    {
+                        text: 'Klik menu "Reports" → pilih tipe "Daily Monitoring".',
+                    },
+                    {
+                        text: 'Klik "Generate Report". Sistem otomatis mengumpulkan SEMUA assignment yang tidak berstatus DROP.',
+                    },
                     {
                         text: 'Laporan berisi 2 sheet: satu untuk EVCS, satu untuk BSS — mencakup semua kolom site, status per aktivitas, dan milestone pembayaran.',
                         note: 'Daily Monitoring tidak mengubah status assignment.',
@@ -657,25 +871,30 @@ const allCategories: FaqCategory[] = [
         id: 'user-management',
         label: 'Manajemen Pengguna',
         icon: Users,
-        roles: ['super_admin'],
+        roles: ['admin', 'super_admin', 'project_manager'],
         questions: [
             {
                 id: 'add-user',
                 question: 'Bagaimana cara menambahkan user baru?',
-                answer: 'Hanya Super Admin yang dapat membuat akun pengguna baru:',
+                answer: 'Super Admin dapat membuat akun untuk semua Main Contractor. Admin juga dapat membuat akun yang berada dalam cakupan Main Contractor-nya sendiri. Project Manager hanya dapat melihat data dan tidak dapat membuat user:',
                 steps: [
                     { text: 'Di sidebar, klik menu "Users".' },
                     { text: 'Klik tombol "Add User".' },
-                    { text: 'Isi nama lengkap, email, pilih role, dan buat password awal.' },
+                    {
+                        text: 'Isi nama lengkap, email, pilih role, dan buat password awal.',
+                    },
                     {
                         text: 'Untuk role Subkontraktor: pilih perusahaan subcontractor yang sudah terdaftar di sistem.',
-                        note: 'Satu perusahaan subcontractor hanya boleh punya satu akun login.',
+                        note: 'Beberapa akun user dapat terhubung ke perusahaan subcontractor yang sama jika operasional membutuhkannya.',
+                    },
+                    {
+                        text: 'Untuk role Admin: pastikan Main Contractor yang dipilih sudah benar.',
                     },
                     { text: 'Klik "Simpan". User bisa langsung login.' },
                 ],
                 tips: [
                     'Pastikan subcontractor company sudah terdaftar di menu Subcontractors sebelum membuat akun subkontraktor',
-                    'Admin bisa membuat akun subkontraktor jika diizinkan oleh Super Admin',
+                    'Role yang dapat dibuat saat ini: Admin, Subcontractor, Drafter, dan Project Manager',
                 ],
             },
             {
@@ -686,16 +905,73 @@ const allCategories: FaqCategory[] = [
                     { text: 'Buka menu "Users".' },
                     { text: 'Cari user yang ingin diubah.' },
                     { text: 'Klik ikon edit (pensil) di baris user tersebut.' },
-                    { text: 'Ubah data: nama, email, role, atau subcontractor company.' },
+                    {
+                        text: 'Ubah data: nama, email, role, atau subcontractor company.',
+                    },
                     { text: 'Klik "Simpan".' },
                 ],
-                warning: 'Mengubah role user akan segera mengubah hak akses mereka ke seluruh sistem. Perubahan berlaku instan.',
+                warning:
+                    'Mengubah role user akan segera mengubah hak akses mereka ke seluruh sistem. Perubahan berlaku instan.',
             },
             {
                 id: 'role-differences',
-                question: 'Apa perbedaan role Admin dan Super Admin?',
-                answer:
-                    'Super Admin memiliki semua akses Admin, ditambah kemampuan eksklusif:\n\n✦ Manajemen User — Tambah dan kelola semua akun pengguna\n✦ Cross-tenant — Bisa melihat dan mengelola data semua Main Contractor\n✦ AI Assistant — Akses asisten AI untuk analisis data proyek\n✦ App Settings — Konfigurasi pengaturan aplikasi (Company Settings)\n✦ Import Manual — Import data proyek secara massal\n✦ Legacy Reports — Upload laporan lama ke assignment\n\nAdmin dapat:\n✦ Membuat dan mengelola project, site, dan assignment di Main Contractor-nya\n✦ Mengisi Construction Prerequisite (Nomor WO)\n✦ Memverifikasi pekerjaan subkontraktor\n✦ Mengirim permintaan revisi (BAST)\n✦ Generate laporan (SSR, BAST, Daily Monitoring)\n✦ Edit data subkontraktor langsung dari halaman admin',
+                question:
+                    'Apa perbedaan role Super Admin, Admin, Project Manager, Drafter, dan Subkontraktor?',
+                answer: 'Super Admin memiliki cakupan global dan fitur eksklusif seperti AI Assistant, Company Settings, Manual Import, dan Legacy Reports.\n\nAdmin dapat mengelola project, site, assignment, user, verifikasi, revisi BAST, dan laporan dalam Main Contractor-nya sendiri.\n\nProject Manager memakai menu admin yang sama, tetapi dalam mode read-only. Role ini bisa melihat dashboard, project, assignment, laporan, client, main contractor, subcontractor, user, dan settings, tetapi tidak bisa menjalankan aksi perubahan data.\n\nDrafter hanya memiliki menu Assignments khusus Drafter untuk melihat data assignment yang diperlukan dalam proses drafting.\n\nSubkontraktor hanya melihat dan mengerjakan assignment yang ditugaskan ke perusahaan subcontractor miliknya.',
+            },
+        ],
+    },
+
+    // ── Project Manager ───────────────────────────────────────────────────────
+    {
+        id: 'project-manager',
+        label: 'Project Manager',
+        icon: FolderKanban,
+        roles: ['project_manager'],
+        questions: [
+            {
+                id: 'project-manager-access',
+                question: 'Apa yang dapat dilakukan Project Manager?',
+                answer: 'Project Manager memiliki akses baca untuk memonitor operasional tanpa mengubah data. Role ini cocok untuk review progress, audit status, dan koordinasi tindak lanjut:',
+                steps: [
+                    {
+                        text: 'Buka Dashboard untuk melihat ringkasan proyek dan progress.',
+                    },
+                    {
+                        text: 'Gunakan Projects, Assignments, Reports, Dashboard Map, dan menu konfigurasi untuk melihat data terkait.',
+                    },
+                    {
+                        text: 'Aksi perubahan seperti create, update, delete, verify, unverify, import, generate report, dan update form diblokir oleh sistem.',
+                    },
+                ],
+                tips: [
+                    'Jika perlu melakukan perubahan data, eskalasikan ke Admin atau Super Admin',
+                ],
+            },
+        ],
+    },
+
+    // ── Drafter ────────────────────────────────────────────────────────────────
+    {
+        id: 'drafter',
+        label: 'Drafter',
+        icon: ClipboardList,
+        roles: ['drafter'],
+        questions: [
+            {
+                id: 'drafter-access',
+                question: 'Apa yang dapat dilakukan Drafter?',
+                answer: 'Drafter memiliki menu Assignments khusus untuk melihat detail assignment yang diperlukan dalam pekerjaan drafting. Role ini tidak memakai menu admin umum dan tidak mengerjakan form subkontraktor.',
+                steps: [
+                    { text: 'Login ke NexPM.' },
+                    { text: 'Buka menu "Assignments" di sidebar.' },
+                    {
+                        text: 'Pilih assignment untuk melihat informasi site, project, aktivitas, status, dan data pendukung yang tersedia.',
+                    },
+                ],
+                tips: [
+                    'Jika data assignment belum lengkap, koordinasikan dengan Admin atau Subkontraktor terkait',
+                ],
             },
         ],
     },
@@ -712,9 +988,15 @@ const allCategories: FaqCategory[] = [
                 question: 'Bagaimana cara menggunakan AI Assistant?',
                 answer: 'AI Assistant NexPM membantu Super Admin menganalisis kondisi proyek secara cepat:',
                 steps: [
-                    { text: 'Klik ikon sparkle (✨) di header aplikasi, pojok kanan atas.' },
-                    { text: 'Panel AI Assistant muncul dari sisi kanan layar.' },
-                    { text: 'Ketikkan pertanyaan dalam Bahasa Indonesia atau Inggris.' },
+                    {
+                        text: 'Klik ikon sparkle (✨) di header aplikasi, pojok kanan atas.',
+                    },
+                    {
+                        text: 'Panel AI Assistant muncul dari sisi kanan layar.',
+                    },
+                    {
+                        text: 'Ketikkan pertanyaan dalam Bahasa Indonesia atau Inggris.',
+                    },
                     {
                         text: 'Tekan Enter. AI menganalisis data real-time dari sistem dan menjawab.',
                         note: 'AI hanya membaca data — tidak bisa mengubah, membuat, atau menghapus data apapun.',
@@ -731,14 +1013,42 @@ const allCategories: FaqCategory[] = [
                 question: 'Pertanyaan apa saja yang bisa ditanyakan ke AI?',
                 answer: 'AI Assistant dirancang untuk analisis dan monitoring proyek. Contoh pertanyaan efektif:',
                 steps: [
-                    { icon: '📊', text: '"Briefing proyek hari ini" — Ringkasan kondisi dan statistik semua proyek aktif.' },
-                    { icon: '⚠️', text: '"Apa risiko terbesar saat ini?" — Identifikasi assignment yang berisiko tinggi.' },
-                    { icon: '🚧', text: '"Assignment mana yang terblokir?" — Temukan assignment yang stuck atau sudah terlambat.' },
-                    { icon: '📋', text: '"Assignment mana yang siap dilaporkan?" — Daftar assignment VERIFIED yang belum masuk laporan.' },
-                    { icon: '🏗️', text: '"Subkontraktor mana yang paling banyak masalah?" — Analisis berdasarkan blocker per subkontraktor.' },
-                    { icon: '🔍', text: '"Ada workflow gap apa?" — Deteksi inkonsistensi data dan masalah alur kerja di seluruh sistem.' },
+                    {
+                        icon: '📊',
+                        text: '"Briefing proyek hari ini" — Ringkasan kondisi dan statistik semua proyek aktif.',
+                    },
+                    {
+                        icon: '⚠️',
+                        text: '"Apa risiko terbesar saat ini?" — Identifikasi assignment yang berisiko tinggi.',
+                    },
+                    {
+                        icon: '🚧',
+                        text: '"Assignment mana yang terblokir?" — Temukan assignment yang stuck atau sudah terlambat.',
+                    },
+                    {
+                        icon: '📋',
+                        text: '"Assignment mana yang siap diverifikasi?" — Daftar assignment yang berada pada status verifiable: DOCUMENT, SUBMITTED, LIVE, atau KWH_DONE.',
+                    },
+                    {
+                        icon: '📈',
+                        text: '"How many PLN assignment by main contractor Sigmatec?" — Hitung assignment dengan filter main contractor dan activity.',
+                    },
+                    {
+                        icon: '🧾',
+                        text: '"Outstanding for subcon Nusa Subcon?" — Rekap assignment aktif yang belum VERIFIED, REPORTED, atau DROP untuk subcontractor tertentu.',
+                    },
+                    {
+                        icon: '🏗️',
+                        text: '"Subkontraktor mana yang paling banyak masalah?" — Analisis berdasarkan blocker per subkontraktor.',
+                    },
+                    {
+                        icon: '🔍',
+                        text: '"Ada workflow gap apa?" — Deteksi inkonsistensi data dan masalah alur kerja di seluruh sistem.',
+                    },
                 ],
-                tips: ['Buka halaman assignment atau site tertentu, lalu tanya AI untuk analisis yang lebih terfokus pada konteks halaman tersebut'],
+                tips: [
+                    'Buka halaman assignment atau site tertentu, lalu tanya AI untuk analisis yang lebih terfokus pada konteks halaman tersebut',
+                ],
             },
         ],
     },
@@ -750,7 +1060,11 @@ const searchQuery = ref('');
 const openQuestions = ref<Record<string, boolean>>({});
 
 const visibleCategories = computed(() =>
-    allCategories.filter((cat) => cat.roles.includes('all') || cat.roles.includes(props.userRole as FaqRole)),
+    allCategories.filter(
+        (cat) =>
+            cat.roles.includes('all') ||
+            cat.roles.includes(props.userRole as FaqRole),
+    ),
 );
 
 const isSearching = computed(() => searchQuery.value.trim().length > 0);
@@ -759,15 +1073,26 @@ const searchResults = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
 
     if (!q) {
-return [];
-}
+        return [];
+    }
 
-    const results: Array<{ question: FaqQuestion; categoryLabel: string; categoryId: string }> = [];
+    const results: Array<{
+        question: FaqQuestion;
+        categoryLabel: string;
+        categoryId: string;
+    }> = [];
 
     for (const cat of visibleCategories.value) {
         for (const question of cat.questions) {
-            if (question.question.toLowerCase().includes(q) || question.answer.toLowerCase().includes(q)) {
-                results.push({ question, categoryLabel: cat.label, categoryId: cat.id });
+            if (
+                question.question.toLowerCase().includes(q) ||
+                question.answer.toLowerCase().includes(q)
+            ) {
+                results.push({
+                    question,
+                    categoryLabel: cat.label,
+                    categoryId: cat.id,
+                });
             }
         }
     }
@@ -794,22 +1119,30 @@ function scrollToCategory(id: string) {
     <div class="flex flex-col gap-4 p-3 sm:p-4 md:mx-auto md:max-w-4xl md:p-6">
         <!-- ── Page header ── -->
         <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10"
+            >
                 <HelpCircle class="h-5 w-5 text-primary" />
             </div>
             <div>
-                <h1 class="text-lg font-semibold tracking-tight sm:text-xl">Pusat Bantuan</h1>
-                <p class="text-sm text-muted-foreground">Temukan jawaban atas pertanyaan Anda tentang NexPM.</p>
+                <h1 class="text-lg font-semibold tracking-tight sm:text-xl">
+                    Pusat Bantuan
+                </h1>
+                <p class="text-sm text-muted-foreground">
+                    Temukan jawaban atas pertanyaan Anda tentang NexPM.
+                </p>
             </div>
         </div>
 
         <!-- ── Search bar ── -->
         <div class="relative">
-            <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search
+                class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
                 v-model="searchQuery"
                 placeholder="Cari pertanyaan..."
-                class="pl-9 pr-9"
+                class="pr-9 pl-9"
             />
             <button
                 v-if="searchQuery"
@@ -821,7 +1154,10 @@ function scrollToCategory(id: string) {
         </div>
 
         <!-- ── Category jump pills ── -->
-        <div v-if="!isSearching" class="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+        <div
+            v-if="!isSearching"
+            class="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        >
             <button
                 v-for="cat in visibleCategories"
                 :key="cat.id"
@@ -838,140 +1174,462 @@ function scrollToCategory(id: string) {
             <p class="text-sm text-muted-foreground">
                 <template v-if="searchResults.length > 0">
                     {{ searchResults.length }} hasil ditemukan untuk
-                    <span class="font-medium text-foreground">"{{ searchQuery.trim() }}"</span>
+                    <span class="font-medium text-foreground"
+                        >"{{ searchQuery.trim() }}"</span
+                    >
                 </template>
                 <template v-else>
                     Tidak ada hasil untuk
-                    <span class="font-medium text-foreground">"{{ searchQuery.trim() }}"</span>
+                    <span class="font-medium text-foreground"
+                        >"{{ searchQuery.trim() }}"</span
+                    >
                 </template>
             </p>
 
-            <div v-if="searchResults.length > 0" class="overflow-hidden rounded-xl border bg-card">
-                <template v-for="(result, idx) in searchResults" :key="result.question.id">
-                    <Collapsible v-model:open="openQuestions[result.question.id]">
-                        <CollapsibleTrigger class="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50">
+            <div
+                v-if="searchResults.length > 0"
+                class="overflow-hidden rounded-xl border bg-card"
+            >
+                <template
+                    v-for="(result, idx) in searchResults"
+                    :key="result.question.id"
+                >
+                    <Collapsible
+                        v-model:open="openQuestions[result.question.id]"
+                    >
+                        <CollapsibleTrigger
+                            class="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+                        >
                             <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium leading-snug text-foreground">{{ result.question.question }}</p>
-                                <Badge variant="outline" class="mt-1 text-[10px]">{{ result.categoryLabel }}</Badge>
+                                <p
+                                    class="text-sm leading-snug font-medium text-foreground"
+                                >
+                                    {{ result.question.question }}
+                                </p>
+                                <Badge
+                                    variant="outline"
+                                    class="mt-1 text-[10px]"
+                                    >{{ result.categoryLabel }}</Badge
+                                >
                             </div>
                             <ChevronDown
                                 class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                                :class="{ 'rotate-180': openQuestions[result.question.id] }"
+                                :class="{
+                                    'rotate-180':
+                                        openQuestions[result.question.id],
+                                }"
                             />
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                            <div class="border-t px-4 pb-4 pt-3">
+                            <div class="border-t px-4 pt-3 pb-4">
                                 <!-- Answer content rendered below -->
-                                <template v-if="openQuestions[result.question.id]">
+                                <template
+                                    v-if="openQuestions[result.question.id]"
+                                >
                                     <div class="space-y-3.5 text-sm">
-                                        <p class="whitespace-pre-wrap leading-relaxed text-foreground">{{ result.question.answer }}</p>
+                                        <p
+                                            class="leading-relaxed whitespace-pre-wrap text-foreground"
+                                        >
+                                            {{ result.question.answer }}
+                                        </p>
                                         <!-- diagrams and steps injected via shared slot below -->
-                                        <template v-if="result.question.diagram === 'status_survey'">
-                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Survey (otomatis)</p>
-                                                <div class="flex min-w-max items-start gap-1.5">
-                                                    <template v-for="(s, i) in surveyStatusSteps" :key="s.step">
-                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                            <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <template
+                                            v-if="
+                                                result.question.diagram ===
+                                                'status_survey'
+                                            "
+                                        >
+                                            <div
+                                                class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                            >
+                                                <p
+                                                    class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                                >
+                                                    Alur Status — Survey
+                                                    (otomatis)
+                                                </p>
+                                                <div
+                                                    class="flex min-w-max items-start gap-1.5"
+                                                >
+                                                    <template
+                                                        v-for="(
+                                                            s, i
+                                                        ) in surveyStatusSteps"
+                                                        :key="s.step"
+                                                    >
+                                                        <div
+                                                            class="flex w-[72px] flex-col items-center gap-1.5"
+                                                        >
+                                                            <span
+                                                                :class="
+                                                                    statusColorMap[
+                                                                        s.color
+                                                                    ]
+                                                                "
+                                                                class="text-center"
+                                                                >{{
+                                                                    s.step
+                                                                }}</span
+                                                            >
+                                                            <p
+                                                                class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                            >
+                                                                {{ s.label }}
+                                                            </p>
                                                         </div>
-                                                        <div v-if="i < surveyStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        <div
+                                                            v-if="
+                                                                i <
+                                                                surveyStatusSteps.length -
+                                                                    1
+                                                            "
+                                                            class="mt-[11px] flex shrink-0 items-center"
+                                                        >
+                                                            <ChevronRight
+                                                                class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                            />
                                                         </div>
                                                     </template>
                                                 </div>
                                             </div>
                                         </template>
-                                        <template v-if="result.question.diagram === 'status_construction'">
-                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Konstruksi (otomatis, setelah WO diisi)</p>
-                                                <div class="flex min-w-max items-start gap-1.5">
-                                                    <template v-for="(s, i) in constructionStatusSteps" :key="s.step">
-                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                            <span :class="statusColorMap[s.color]" class="whitespace-pre-line text-center">{{ s.step }}</span>
-                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <template
+                                            v-if="
+                                                result.question.diagram ===
+                                                'status_construction'
+                                            "
+                                        >
+                                            <div
+                                                class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                            >
+                                                <p
+                                                    class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                                >
+                                                    Alur Status — Konstruksi
+                                                    (otomatis, setelah WO diisi)
+                                                </p>
+                                                <div
+                                                    class="flex min-w-max items-start gap-1.5"
+                                                >
+                                                    <template
+                                                        v-for="(
+                                                            s, i
+                                                        ) in constructionStatusSteps"
+                                                        :key="s.step"
+                                                    >
+                                                        <div
+                                                            class="flex w-[72px] flex-col items-center gap-1.5"
+                                                        >
+                                                            <span
+                                                                :class="
+                                                                    statusColorMap[
+                                                                        s.color
+                                                                    ]
+                                                                "
+                                                                class="text-center whitespace-pre-line"
+                                                                >{{
+                                                                    s.step
+                                                                }}</span
+                                                            >
+                                                            <p
+                                                                class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                            >
+                                                                {{ s.label }}
+                                                            </p>
                                                         </div>
-                                                        <div v-if="i < constructionStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        <div
+                                                            v-if="
+                                                                i <
+                                                                constructionStatusSteps.length -
+                                                                    1
+                                                            "
+                                                            class="mt-[11px] flex shrink-0 items-center"
+                                                        >
+                                                            <ChevronRight
+                                                                class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                            />
                                                         </div>
                                                     </template>
                                                 </div>
                                             </div>
                                         </template>
-                                        <template v-if="result.question.diagram === 'status_pln'">
-                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — PLN Connection (otomatis)</p>
-                                                <div class="flex min-w-max items-start gap-1.5">
-                                                    <template v-for="(s, i) in plnStatusSteps" :key="s.step">
-                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                            <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <template
+                                            v-if="
+                                                result.question.diagram ===
+                                                'status_pln'
+                                            "
+                                        >
+                                            <div
+                                                class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                            >
+                                                <p
+                                                    class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                                >
+                                                    Alur Status — PLN Connection
+                                                    (otomatis)
+                                                </p>
+                                                <div
+                                                    class="flex min-w-max items-start gap-1.5"
+                                                >
+                                                    <template
+                                                        v-for="(
+                                                            s, i
+                                                        ) in plnStatusSteps"
+                                                        :key="s.step"
+                                                    >
+                                                        <div
+                                                            class="flex w-[72px] flex-col items-center gap-1.5"
+                                                        >
+                                                            <span
+                                                                :class="
+                                                                    statusColorMap[
+                                                                        s.color
+                                                                    ]
+                                                                "
+                                                                class="text-center"
+                                                                >{{
+                                                                    s.step
+                                                                }}</span
+                                                            >
+                                                            <p
+                                                                class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                            >
+                                                                {{ s.label }}
+                                                            </p>
                                                         </div>
-                                                        <div v-if="i < plnStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        <div
+                                                            v-if="
+                                                                i <
+                                                                plnStatusSteps.length -
+                                                                    1
+                                                            "
+                                                            class="mt-[11px] flex shrink-0 items-center"
+                                                        >
+                                                            <ChevronRight
+                                                                class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                            />
                                                         </div>
                                                     </template>
                                                 </div>
                                             </div>
                                         </template>
-                                        <template v-if="result.question.diagram === 'status_bast'">
-                                            <div class="rounded-lg border bg-muted/30 p-3">
-                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — BAST (manual Submit diperlukan)</p>
-                                                <div class="flex flex-wrap items-start gap-1.5">
-                                                    <template v-for="(s, i) in bastStatusSteps" :key="s.step">
-                                                        <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                            <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                            <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <template
+                                            v-if="
+                                                result.question.diagram ===
+                                                'status_bast'
+                                            "
+                                        >
+                                            <div
+                                                class="rounded-lg border bg-muted/30 p-3"
+                                            >
+                                                <p
+                                                    class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                                >
+                                                    Alur Status — BAST (manual
+                                                    Submit diperlukan)
+                                                </p>
+                                                <div
+                                                    class="flex flex-wrap items-start gap-1.5"
+                                                >
+                                                    <template
+                                                        v-for="(
+                                                            s, i
+                                                        ) in bastStatusSteps"
+                                                        :key="s.step"
+                                                    >
+                                                        <div
+                                                            class="flex w-[72px] flex-col items-center gap-1.5"
+                                                        >
+                                                            <span
+                                                                :class="
+                                                                    statusColorMap[
+                                                                        s.color
+                                                                    ]
+                                                                "
+                                                                class="text-center"
+                                                                >{{
+                                                                    s.step
+                                                                }}</span
+                                                            >
+                                                            <p
+                                                                class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                            >
+                                                                {{ s.label }}
+                                                            </p>
                                                         </div>
-                                                        <div v-if="i < bastStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                            <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                        <div
+                                                            v-if="
+                                                                i <
+                                                                bastStatusSteps.length -
+                                                                    1
+                                                            "
+                                                            class="mt-[11px] flex shrink-0 items-center"
+                                                        >
+                                                            <ChevronRight
+                                                                class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                            />
                                                         </div>
                                                     </template>
                                                 </div>
-                                                <div class="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-                                                    <span class="text-xs text-muted-foreground">Opsional:</span>
-                                                    <span :class="statusColorMap['blue']">SUBMITTED</span>
-                                                    <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                                    <span :class="statusColorMap['red']">REVISION</span>
-                                                    <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                                    <span :class="statusColorMap['amber']">PENDING</span>
-                                                    <span class="text-xs italic text-muted-foreground">→ subkon submit ulang</span>
+                                                <div
+                                                    class="mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+                                                >
+                                                    <span
+                                                        class="text-xs text-muted-foreground"
+                                                        >Opsional:</span
+                                                    >
+                                                    <span
+                                                        :class="
+                                                            statusColorMap[
+                                                                'blue'
+                                                            ]
+                                                        "
+                                                        >SUBMITTED</span
+                                                    >
+                                                    <ChevronRight
+                                                        class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                    />
+                                                    <span
+                                                        :class="
+                                                            statusColorMap[
+                                                                'red'
+                                                            ]
+                                                        "
+                                                        >REVISION</span
+                                                    >
+                                                    <ChevronRight
+                                                        class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                    />
+                                                    <span
+                                                        :class="
+                                                            statusColorMap[
+                                                                'amber'
+                                                            ]
+                                                        "
+                                                        >PENDING</span
+                                                    >
+                                                    <span
+                                                        class="text-xs text-muted-foreground italic"
+                                                        >→ subkon submit
+                                                        ulang</span
+                                                    >
                                                 </div>
                                             </div>
                                         </template>
-                                        <template v-if="result.question.diagram === 'workflow_admin'">
-                                            <div class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Lengkap Admin</p>
-                                                <div class="flex min-w-max items-start gap-1.5">
-                                                    <template v-for="(s, i) in adminWorkflowSteps" :key="s.step">
-                                                        <div class="flex w-[68px] flex-col items-center gap-2">
-                                                            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm">{{ s.step }}</div>
-                                                            <p class="whitespace-pre-line text-center text-[11px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <template
+                                            v-if="
+                                                result.question.diagram ===
+                                                'workflow_admin'
+                                            "
+                                        >
+                                            <div
+                                                class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                            >
+                                                <p
+                                                    class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                                >
+                                                    Alur Lengkap Admin
+                                                </p>
+                                                <div
+                                                    class="flex min-w-max items-start gap-1.5"
+                                                >
+                                                    <template
+                                                        v-for="(
+                                                            s, i
+                                                        ) in adminWorkflowSteps"
+                                                        :key="s.step"
+                                                    >
+                                                        <div
+                                                            class="flex w-[68px] flex-col items-center gap-2"
+                                                        >
+                                                            <div
+                                                                class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm"
+                                                            >
+                                                                {{ s.step }}
+                                                            </div>
+                                                            <p
+                                                                class="text-center text-[11px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                            >
+                                                                {{ s.label }}
+                                                            </p>
                                                         </div>
-                                                        <div v-if="i < adminWorkflowSteps.length - 1" class="mt-[18px] h-px w-4 shrink-0 bg-muted-foreground/30"></div>
+                                                        <div
+                                                            v-if="
+                                                                i <
+                                                                adminWorkflowSteps.length -
+                                                                    1
+                                                            "
+                                                            class="mt-[18px] h-px w-4 shrink-0 bg-muted-foreground/30"
+                                                        ></div>
                                                     </template>
                                                 </div>
                                             </div>
                                         </template>
-                                        <ol v-if="result.question.steps" class="space-y-2.5">
-                                            <li v-for="(step, idx) in result.question.steps" :key="idx" class="flex gap-3">
-                                                <span v-if="step.icon" class="mt-0.5 shrink-0 text-base leading-none">{{ step.icon }}</span>
-                                                <span v-else class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">{{ idx + 1 }}</span>
+                                        <ol
+                                            v-if="result.question.steps"
+                                            class="space-y-2.5"
+                                        >
+                                            <li
+                                                v-for="(step, idx) in result
+                                                    .question.steps"
+                                                :key="idx"
+                                                class="flex gap-3"
+                                            >
+                                                <span
+                                                    v-if="step.icon"
+                                                    class="mt-0.5 shrink-0 text-base leading-none"
+                                                    >{{ step.icon }}</span
+                                                >
+                                                <span
+                                                    v-else
+                                                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary"
+                                                    >{{ idx + 1 }}</span
+                                                >
                                                 <div class="min-w-0 flex-1">
-                                                    <span class="text-foreground">{{ step.text }}</span>
-                                                    <p v-if="step.note" class="mt-0.5 text-xs italic text-muted-foreground">{{ step.note }}</p>
+                                                    <span
+                                                        class="text-foreground"
+                                                        >{{ step.text }}</span
+                                                    >
+                                                    <p
+                                                        v-if="step.note"
+                                                        class="mt-0.5 text-xs text-muted-foreground italic"
+                                                    >
+                                                        {{ step.note }}
+                                                    </p>
                                                 </div>
                                             </li>
                                         </ol>
-                                        <div v-if="result.question.warning" class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3.5 py-3">
-                                            <span class="shrink-0 text-base">⚠️</span>
-                                            <p class="text-sm text-destructive">{{ result.question.warning }}</p>
+                                        <div
+                                            v-if="result.question.warning"
+                                            class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3.5 py-3"
+                                        >
+                                            <span class="shrink-0 text-base"
+                                                >⚠️</span
+                                            >
+                                            <p class="text-sm text-destructive">
+                                                {{ result.question.warning }}
+                                            </p>
                                         </div>
-                                        <div v-if="result.question.tips?.length" class="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-800 dark:bg-blue-950/20">
-                                            <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400"><span>💡</span> Tips</p>
+                                        <div
+                                            v-if="result.question.tips?.length"
+                                            class="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-800 dark:bg-blue-950/20"
+                                        >
+                                            <p
+                                                class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400"
+                                            >
+                                                <span>💡</span> Tips
+                                            </p>
                                             <ul class="space-y-1">
-                                                <li v-for="(tip, tidx) in result.question.tips" :key="tidx" class="flex items-start gap-1.5 text-xs text-blue-700 dark:text-blue-300">
-                                                    <span class="mt-0.5 shrink-0">•</span>
+                                                <li
+                                                    v-for="(tip, tidx) in result
+                                                        .question.tips"
+                                                    :key="tidx"
+                                                    class="flex items-start gap-1.5 text-xs text-blue-700 dark:text-blue-300"
+                                                >
+                                                    <span
+                                                        class="mt-0.5 shrink-0"
+                                                        >•</span
+                                                    >
                                                     <span>{{ tip }}</span>
                                                 </li>
                                             </ul>
@@ -995,143 +1653,437 @@ function scrollToCategory(id: string) {
                 class="overflow-hidden rounded-xl border bg-card"
             >
                 <!-- Category header -->
-                <div class="flex items-center gap-2.5 border-b bg-muted/30 px-4 py-3">
-                    <component :is="cat.icon" class="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <h2 class="text-sm font-semibold text-foreground">{{ cat.label }}</h2>
-                    <span class="ml-auto text-xs text-muted-foreground">{{ cat.questions.length }} pertanyaan</span>
+                <div
+                    class="flex items-center gap-2.5 border-b bg-muted/30 px-4 py-3"
+                >
+                    <component
+                        :is="cat.icon"
+                        class="h-4 w-4 shrink-0 text-muted-foreground"
+                    />
+                    <h2 class="text-sm font-semibold text-foreground">
+                        {{ cat.label }}
+                    </h2>
+                    <span class="ml-auto text-xs text-muted-foreground"
+                        >{{ cat.questions.length }} pertanyaan</span
+                    >
                 </div>
 
                 <!-- Questions -->
                 <div>
-                    <template v-for="(question, qIdx) in cat.questions" :key="question.id">
+                    <template
+                        v-for="(question, qIdx) in cat.questions"
+                        :key="question.id"
+                    >
                         <Collapsible v-model:open="openQuestions[question.id]">
-                            <CollapsibleTrigger class="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50">
-                                <span class="text-sm font-medium leading-snug text-foreground">{{ question.question }}</span>
+                            <CollapsibleTrigger
+                                class="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+                            >
+                                <span
+                                    class="text-sm leading-snug font-medium text-foreground"
+                                    >{{ question.question }}</span
+                                >
                                 <ChevronDown
                                     class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                                    :class="{ 'rotate-180': openQuestions[question.id] }"
+                                    :class="{
+                                        'rotate-180':
+                                            openQuestions[question.id],
+                                    }"
                                 />
                             </CollapsibleTrigger>
 
                             <CollapsibleContent>
-                                <div class="border-t px-4 pb-5 pt-3">
+                                <div class="border-t px-4 pt-3 pb-5">
                                     <div class="space-y-3.5 text-sm">
                                         <!-- Answer prose -->
-                                        <p class="whitespace-pre-wrap leading-relaxed text-foreground">{{ question.answer }}</p>
+                                        <p
+                                            class="leading-relaxed whitespace-pre-wrap text-foreground"
+                                        >
+                                            {{ question.answer }}
+                                        </p>
 
                                         <!-- ── Survey Status Diagram ── -->
-                                        <div v-if="question.diagram === 'status_survey'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Survey (otomatis)</p>
-                                            <div class="flex min-w-max items-start gap-1.5">
-                                                <template v-for="(s, i) in surveyStatusSteps" :key="s.step">
-                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                        <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <div
+                                            v-if="
+                                                question.diagram ===
+                                                'status_survey'
+                                            "
+                                            class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                        >
+                                            <p
+                                                class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                            >
+                                                Alur Status — Survey (otomatis)
+                                            </p>
+                                            <div
+                                                class="flex min-w-max items-start gap-1.5"
+                                            >
+                                                <template
+                                                    v-for="(
+                                                        s, i
+                                                    ) in surveyStatusSteps"
+                                                    :key="s.step"
+                                                >
+                                                    <div
+                                                        class="flex w-[72px] flex-col items-center gap-1.5"
+                                                    >
+                                                        <span
+                                                            :class="
+                                                                statusColorMap[
+                                                                    s.color
+                                                                ]
+                                                            "
+                                                            class="text-center"
+                                                            >{{ s.step }}</span
+                                                        >
+                                                        <p
+                                                            class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                        >
+                                                            {{ s.label }}
+                                                        </p>
                                                     </div>
-                                                    <div v-if="i < surveyStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    <div
+                                                        v-if="
+                                                            i <
+                                                            surveyStatusSteps.length -
+                                                                1
+                                                        "
+                                                        class="mt-[11px] flex shrink-0 items-center"
+                                                    >
+                                                        <ChevronRight
+                                                            class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                        />
                                                     </div>
                                                 </template>
                                             </div>
                                         </div>
 
                                         <!-- ── Construction Status Diagram ── -->
-                                        <div v-else-if="question.diagram === 'status_construction'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — Konstruksi (otomatis, setelah WO diisi)</p>
-                                            <div class="flex min-w-max items-start gap-1.5">
-                                                <template v-for="(s, i) in constructionStatusSteps" :key="s.step">
-                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                        <span :class="statusColorMap[s.color]" class="whitespace-pre-line text-center">{{ s.step }}</span>
-                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <div
+                                            v-else-if="
+                                                question.diagram ===
+                                                'status_construction'
+                                            "
+                                            class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                        >
+                                            <p
+                                                class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                            >
+                                                Alur Status — Konstruksi
+                                                (otomatis, setelah WO diisi)
+                                            </p>
+                                            <div
+                                                class="flex min-w-max items-start gap-1.5"
+                                            >
+                                                <template
+                                                    v-for="(
+                                                        s, i
+                                                    ) in constructionStatusSteps"
+                                                    :key="s.step"
+                                                >
+                                                    <div
+                                                        class="flex w-[72px] flex-col items-center gap-1.5"
+                                                    >
+                                                        <span
+                                                            :class="
+                                                                statusColorMap[
+                                                                    s.color
+                                                                ]
+                                                            "
+                                                            class="text-center whitespace-pre-line"
+                                                            >{{ s.step }}</span
+                                                        >
+                                                        <p
+                                                            class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                        >
+                                                            {{ s.label }}
+                                                        </p>
                                                     </div>
-                                                    <div v-if="i < constructionStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    <div
+                                                        v-if="
+                                                            i <
+                                                            constructionStatusSteps.length -
+                                                                1
+                                                        "
+                                                        class="mt-[11px] flex shrink-0 items-center"
+                                                    >
+                                                        <ChevronRight
+                                                            class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                        />
                                                     </div>
                                                 </template>
                                             </div>
                                         </div>
 
                                         <!-- ── PLN Status Diagram ── -->
-                                        <div v-else-if="question.diagram === 'status_pln'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — PLN Connection (otomatis)</p>
-                                            <div class="flex min-w-max items-start gap-1.5">
-                                                <template v-for="(s, i) in plnStatusSteps" :key="s.step">
-                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                        <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <div
+                                            v-else-if="
+                                                question.diagram ===
+                                                'status_pln'
+                                            "
+                                            class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                        >
+                                            <p
+                                                class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                            >
+                                                Alur Status — PLN Connection
+                                                (otomatis)
+                                            </p>
+                                            <div
+                                                class="flex min-w-max items-start gap-1.5"
+                                            >
+                                                <template
+                                                    v-for="(
+                                                        s, i
+                                                    ) in plnStatusSteps"
+                                                    :key="s.step"
+                                                >
+                                                    <div
+                                                        class="flex w-[72px] flex-col items-center gap-1.5"
+                                                    >
+                                                        <span
+                                                            :class="
+                                                                statusColorMap[
+                                                                    s.color
+                                                                ]
+                                                            "
+                                                            class="text-center"
+                                                            >{{ s.step }}</span
+                                                        >
+                                                        <p
+                                                            class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                        >
+                                                            {{ s.label }}
+                                                        </p>
                                                     </div>
-                                                    <div v-if="i < plnStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    <div
+                                                        v-if="
+                                                            i <
+                                                            plnStatusSteps.length -
+                                                                1
+                                                        "
+                                                        class="mt-[11px] flex shrink-0 items-center"
+                                                    >
+                                                        <ChevronRight
+                                                            class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                        />
                                                     </div>
                                                 </template>
                                             </div>
                                         </div>
 
                                         <!-- ── BAST Status Diagram ── -->
-                                        <div v-else-if="question.diagram === 'status_bast'" class="rounded-lg border bg-muted/30 p-3">
-                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Status — BAST (manual Submit diperlukan)</p>
-                                            <div class="flex flex-wrap items-start gap-1.5">
-                                                <template v-for="(s, i) in bastStatusSteps" :key="s.step">
-                                                    <div class="flex w-[72px] flex-col items-center gap-1.5">
-                                                        <span :class="statusColorMap[s.color]" class="text-center">{{ s.step }}</span>
-                                                        <p class="whitespace-pre-line text-center text-[10px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <div
+                                            v-else-if="
+                                                question.diagram ===
+                                                'status_bast'
+                                            "
+                                            class="rounded-lg border bg-muted/30 p-3"
+                                        >
+                                            <p
+                                                class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                            >
+                                                Alur Status — BAST (manual
+                                                Submit diperlukan)
+                                            </p>
+                                            <div
+                                                class="flex flex-wrap items-start gap-1.5"
+                                            >
+                                                <template
+                                                    v-for="(
+                                                        s, i
+                                                    ) in bastStatusSteps"
+                                                    :key="s.step"
+                                                >
+                                                    <div
+                                                        class="flex w-[72px] flex-col items-center gap-1.5"
+                                                    >
+                                                        <span
+                                                            :class="
+                                                                statusColorMap[
+                                                                    s.color
+                                                                ]
+                                                            "
+                                                            class="text-center"
+                                                            >{{ s.step }}</span
+                                                        >
+                                                        <p
+                                                            class="text-center text-[10px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                        >
+                                                            {{ s.label }}
+                                                        </p>
                                                     </div>
-                                                    <div v-if="i < bastStatusSteps.length - 1" class="mt-[11px] flex shrink-0 items-center">
-                                                        <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
+                                                    <div
+                                                        v-if="
+                                                            i <
+                                                            bastStatusSteps.length -
+                                                                1
+                                                        "
+                                                        class="mt-[11px] flex shrink-0 items-center"
+                                                    >
+                                                        <ChevronRight
+                                                            class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                        />
                                                     </div>
                                                 </template>
                                             </div>
-                                            <div class="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-                                                <span class="text-xs text-muted-foreground">Opsional:</span>
-                                                <span :class="statusColorMap['blue']">SUBMITTED</span>
-                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                                <span :class="statusColorMap['red']">REVISION</span>
-                                                <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/50" />
-                                                <span :class="statusColorMap['amber']">PENDING</span>
-                                                <span class="text-xs italic text-muted-foreground">→ subkon submit ulang</span>
+                                            <div
+                                                class="mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+                                            >
+                                                <span
+                                                    class="text-xs text-muted-foreground"
+                                                    >Opsional:</span
+                                                >
+                                                <span
+                                                    :class="
+                                                        statusColorMap['blue']
+                                                    "
+                                                    >SUBMITTED</span
+                                                >
+                                                <ChevronRight
+                                                    class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                />
+                                                <span
+                                                    :class="
+                                                        statusColorMap['red']
+                                                    "
+                                                    >REVISION</span
+                                                >
+                                                <ChevronRight
+                                                    class="h-3.5 w-3.5 text-muted-foreground/50"
+                                                />
+                                                <span
+                                                    :class="
+                                                        statusColorMap['amber']
+                                                    "
+                                                    >PENDING</span
+                                                >
+                                                <span
+                                                    class="text-xs text-muted-foreground italic"
+                                                    >→ subkon submit ulang</span
+                                                >
                                             </div>
                                         </div>
 
                                         <!-- ── Admin Workflow Diagram ── -->
-                                        <div v-else-if="question.diagram === 'workflow_admin'" class="overflow-x-auto rounded-lg border bg-muted/30 p-3">
-                                            <p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alur Lengkap Admin</p>
-                                            <div class="flex min-w-max items-start gap-1.5">
-                                                <template v-for="(s, i) in adminWorkflowSteps" :key="s.step">
-                                                    <div class="flex w-[68px] flex-col items-center gap-2">
-                                                        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm">{{ s.step }}</div>
-                                                        <p class="whitespace-pre-line text-center text-[11px] leading-tight text-muted-foreground">{{ s.label }}</p>
+                                        <div
+                                            v-else-if="
+                                                question.diagram ===
+                                                'workflow_admin'
+                                            "
+                                            class="overflow-x-auto rounded-lg border bg-muted/30 p-3"
+                                        >
+                                            <p
+                                                class="mb-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                                            >
+                                                Alur Lengkap Admin
+                                            </p>
+                                            <div
+                                                class="flex min-w-max items-start gap-1.5"
+                                            >
+                                                <template
+                                                    v-for="(
+                                                        s, i
+                                                    ) in adminWorkflowSteps"
+                                                    :key="s.step"
+                                                >
+                                                    <div
+                                                        class="flex w-[68px] flex-col items-center gap-2"
+                                                    >
+                                                        <div
+                                                            class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm"
+                                                        >
+                                                            {{ s.step }}
+                                                        </div>
+                                                        <p
+                                                            class="text-center text-[11px] leading-tight whitespace-pre-line text-muted-foreground"
+                                                        >
+                                                            {{ s.label }}
+                                                        </p>
                                                     </div>
-                                                    <div v-if="i < adminWorkflowSteps.length - 1" class="mt-[18px] h-px w-4 shrink-0 bg-muted-foreground/30"></div>
+                                                    <div
+                                                        v-if="
+                                                            i <
+                                                            adminWorkflowSteps.length -
+                                                                1
+                                                        "
+                                                        class="mt-[18px] h-px w-4 shrink-0 bg-muted-foreground/30"
+                                                    ></div>
                                                 </template>
                                             </div>
                                         </div>
 
                                         <!-- ── Steps / numbered list ── -->
-                                        <ol v-if="question.steps" class="space-y-2.5">
-                                            <li v-for="(step, idx) in question.steps" :key="idx" class="flex gap-3">
-                                                <span v-if="step.icon" class="mt-0.5 shrink-0 text-base leading-none">{{ step.icon }}</span>
-                                                <span v-else class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">{{ idx + 1 }}</span>
+                                        <ol
+                                            v-if="question.steps"
+                                            class="space-y-2.5"
+                                        >
+                                            <li
+                                                v-for="(
+                                                    step, idx
+                                                ) in question.steps"
+                                                :key="idx"
+                                                class="flex gap-3"
+                                            >
+                                                <span
+                                                    v-if="step.icon"
+                                                    class="mt-0.5 shrink-0 text-base leading-none"
+                                                    >{{ step.icon }}</span
+                                                >
+                                                <span
+                                                    v-else
+                                                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary"
+                                                    >{{ idx + 1 }}</span
+                                                >
                                                 <div class="min-w-0 flex-1">
-                                                    <span class="text-foreground">{{ step.text }}</span>
-                                                    <p v-if="step.note" class="mt-0.5 text-xs italic text-muted-foreground">{{ step.note }}</p>
+                                                    <span
+                                                        class="text-foreground"
+                                                        >{{ step.text }}</span
+                                                    >
+                                                    <p
+                                                        v-if="step.note"
+                                                        class="mt-0.5 text-xs text-muted-foreground italic"
+                                                    >
+                                                        {{ step.note }}
+                                                    </p>
                                                 </div>
                                             </li>
                                         </ol>
 
                                         <!-- ── Warning box ── -->
-                                        <div v-if="question.warning" class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3.5 py-3">
-                                            <span class="shrink-0 text-base">⚠️</span>
-                                            <p class="text-sm text-destructive">{{ question.warning }}</p>
+                                        <div
+                                            v-if="question.warning"
+                                            class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3.5 py-3"
+                                        >
+                                            <span class="shrink-0 text-base"
+                                                >⚠️</span
+                                            >
+                                            <p class="text-sm text-destructive">
+                                                {{ question.warning }}
+                                            </p>
                                         </div>
 
                                         <!-- ── Tips box ── -->
-                                        <div v-if="question.tips?.length" class="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-800 dark:bg-blue-950/20">
-                                            <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
+                                        <div
+                                            v-if="question.tips?.length"
+                                            class="rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3 dark:border-blue-800 dark:bg-blue-950/20"
+                                        >
+                                            <p
+                                                class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400"
+                                            >
                                                 <span>💡</span> Tips
                                             </p>
                                             <ul class="space-y-1">
-                                                <li v-for="(tip, tidx) in question.tips" :key="tidx" class="flex items-start gap-1.5 text-xs text-blue-700 dark:text-blue-300">
-                                                    <span class="mt-0.5 shrink-0">•</span>
+                                                <li
+                                                    v-for="(
+                                                        tip, tidx
+                                                    ) in question.tips"
+                                                    :key="tidx"
+                                                    class="flex items-start gap-1.5 text-xs text-blue-700 dark:text-blue-300"
+                                                >
+                                                    <span
+                                                        class="mt-0.5 shrink-0"
+                                                        >•</span
+                                                    >
                                                     <span>{{ tip }}</span>
                                                 </li>
                                             </ul>

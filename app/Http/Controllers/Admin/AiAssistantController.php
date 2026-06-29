@@ -74,6 +74,15 @@ class AiAssistantController extends Controller
     /** @param array{mode: string, max_rows: int} $preferences */
     private function streamResponse(AiAssistantService $service, string $message, array $context, AiConversation $conversation, string $mode = 'standard', ?int $mainContractorId = null, array $preferences = []): void
     {
+        $contextWithQuery = array_merge($context, ['query' => $message]);
+        $deterministicToolName = $service->selectTool($message, $contextWithQuery);
+
+        if ($this->shouldBypassModel($deterministicToolName)) {
+            $this->streamToolResponse($service, $deterministicToolName, $message, $contextWithQuery, $conversation);
+
+            return;
+        }
+
         $apiKey = config('ai.providers.deepseek.key');
 
         if (empty($apiKey)) {
@@ -141,6 +150,41 @@ class AiAssistantController extends Controller
 
             $this->streamFallback($service, $message, $context, $conversation, $exception);
         }
+    }
+
+    private function streamToolResponse(AiAssistantService $service, string $toolName, string $message, array $context, AiConversation $conversation): void
+    {
+        $toolPayload = $service->runTool($toolName, $context);
+        $toolPayload = $service->decorateToolPayload($toolName, $toolPayload, $context);
+        $language = $this->detectLanguage($message);
+        $answer = $service->fallbackAnswer($toolName, $toolPayload, $language, includeProviderPrefix: false);
+
+        $this->emit('tool_data', ['tool_name' => $toolName, 'tool_payload' => $toolPayload]);
+        $this->emit('text', ['delta' => $answer]);
+
+        $aiMessage = $conversation->messages()->create([
+            'role' => 'assistant',
+            'content' => $answer,
+            'tool_name' => $toolName,
+            'tool_payload' => $toolPayload,
+            'usage' => [],
+        ]);
+
+        $conversation->touch();
+
+        $this->emit('done', [
+            'conversation_id' => $conversation->id,
+            'message_id' => $aiMessage->id,
+        ]);
+    }
+
+    private function shouldBypassModel(string $toolName): bool
+    {
+        return in_array($toolName, [
+            'query_entity_stats',
+            'summarize_assignment_operations',
+            'generate_subcontractor_reminder',
+        ], true);
     }
 
     private function streamFallback(AiAssistantService $service, string $message, array $context, AiConversation $conversation, Throwable $exception): void

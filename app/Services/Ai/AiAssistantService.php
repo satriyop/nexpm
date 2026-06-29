@@ -24,6 +24,10 @@ class AiAssistantService
     {
         $normalized = Str::lower($message);
 
+        if (Str::contains($normalized, ['reminder', 'ingatkan', 'buatkan reminder', 'kirim reminder'])) {
+            return 'generate_subcontractor_reminder';
+        }
+
         if (Str::contains($normalized, ['summary', 'summarize', 'ringkas', 'rangkum', 'recap', 'rekap', 'rekapan'])
             && Str::contains($normalized, ['assignment', 'survey', 'pln', 'construction', 'bast', 'outstanding'])) {
             return 'summarize_assignment_operations';
@@ -32,10 +36,6 @@ class AiAssistantService
         if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])
             && Str::contains($normalized, ['subcon', 'subkon', 'subcontractor', 'vendor', 'user'])) {
             return 'summarize_assignment_operations';
-        }
-
-        if (Str::contains($normalized, ['reminder', 'ingatkan', 'outstanding', 'tunggakan', 'belum selesai subcon', 'buatkan reminder', 'kirim reminder'])) {
-            return 'generate_subcontractor_reminder';
         }
 
         if (Str::contains($normalized, ['berapa lokasi', 'berapa site', 'berapa assignment', 'how many location', 'how many site', 'how many assign', 'how many', 'jumlah lokasi', 'jumlah site', 'jumlah assignment', 'ada berapa'])
@@ -123,13 +123,15 @@ class AiAssistantService
      *
      * @param  array<string, mixed>  $toolPayload
      */
-    public function fallbackAnswer(string $toolName, array $toolPayload, string $language = 'en'): string
+    public function fallbackAnswer(string $toolName, array $toolPayload, string $language = 'en', bool $includeProviderPrefix = true): string
     {
         if ($language === 'id') {
-            return $this->fallbackAnswerInIndonesian($toolName, $toolPayload);
+            return $this->fallbackAnswerInIndonesian($toolName, $toolPayload, $includeProviderPrefix);
         }
 
-        $prefix = 'AI provider is not configured or reachable, so this is a local NexPM summary. ';
+        $prefix = $includeProviderPrefix
+            ? 'AI provider is not configured or reachable, so this is a local NexPM summary. '
+            : '';
 
         return $prefix.match ($toolName) {
             'list_users' => sprintf(
@@ -1280,6 +1282,23 @@ class AiAssistantService
             ])
             ->values();
 
+        if ($matches->isEmpty()) {
+            $normalizedTerm = $this->normalizeEntityName($term);
+            $matches = DB::table($table)
+                ->select(['id', DB::raw($columns[0].' as name')])
+                ->orderBy($columns[0])
+                ->limit(100)
+                ->get()
+                ->filter(fn ($row): bool => Str::contains($this->normalizeEntityName((string) $row->name), $normalizedTerm))
+                ->take(8)
+                ->map(fn ($row): array => [
+                    'type' => $type,
+                    'id' => (int) $row->id,
+                    'name' => (string) $row->name,
+                ])
+                ->values();
+        }
+
         $selected = $this->selectUnambiguousMatch($matches, $term);
 
         return [
@@ -1320,6 +1339,32 @@ class AiAssistantService
             ])
             ->values();
 
+        if ($matches->isEmpty()) {
+            $normalizedTerm = $this->normalizeEntityName($term);
+            $matches = DB::table('users')
+                ->join('subcontractors', 'subcontractors.id', '=', 'users.subcontractor_id')
+                ->whereNotNull('users.subcontractor_id')
+                ->select([
+                    'users.id',
+                    'users.name',
+                    'users.subcontractor_id',
+                    'subcontractors.name as subcontractor_name',
+                ])
+                ->orderBy('users.name')
+                ->limit(100)
+                ->get()
+                ->filter(fn ($row): bool => Str::contains($this->normalizeEntityName((string) $row->name), $normalizedTerm))
+                ->take(8)
+                ->map(fn ($row): array => [
+                    'type' => 'subcontractor_user',
+                    'id' => (int) $row->id,
+                    'name' => (string) $row->name,
+                    'subcontractor_id' => (int) $row->subcontractor_id,
+                    'subcontractor_name' => (string) $row->subcontractor_name,
+                ])
+                ->values();
+        }
+
         $selected = $this->selectUnambiguousMatch($matches, $term);
 
         return [
@@ -1342,7 +1387,23 @@ class AiAssistantService
 
         $exact = $matches->filter(fn (array $match): bool => Str::lower($match['name']) === Str::lower($term));
 
-        return $exact->count() === 1 ? $exact->first() : null;
+        if ($exact->count() === 1) {
+            return $exact->first();
+        }
+
+        $normalizedTerm = $this->normalizeEntityName($term);
+        $normalized = $matches->filter(fn (array $match): bool => $this->normalizeEntityName($match['name']) === $normalizedTerm);
+
+        return $normalized->count() === 1 ? $normalized->first() : null;
+    }
+
+    private function normalizeEntityName(string $name): string
+    {
+        return Str::of($name)
+            ->lower()
+            ->replaceMatches('/\b(pt|cv|tbk|ltd|inc|company|co)\b/u', '')
+            ->replaceMatches('/[^a-z0-9]+/u', '')
+            ->toString();
     }
 
     /** @return array<string, mixed> */
@@ -2074,9 +2135,11 @@ class AiAssistantService
     /**
      * @param  array<string, mixed>  $toolPayload
      */
-    private function fallbackAnswerInIndonesian(string $toolName, array $toolPayload): string
+    private function fallbackAnswerInIndonesian(string $toolName, array $toolPayload, bool $includeProviderPrefix = true): string
     {
-        $prefix = 'AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. ';
+        $prefix = $includeProviderPrefix
+            ? 'AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. '
+            : '';
 
         return $prefix.match ($toolName) {
             'list_users' => sprintf(
