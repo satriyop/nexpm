@@ -42,6 +42,15 @@ class AiAssistantService
             return 'query_entity_stats';
         }
 
+        if (Str::contains($normalized, ['machine type', 'tipe mesin', 'mesin', 'bss', 'evcs'])
+            && Str::contains($normalized, ['berapa', 'jumlah', 'lokasi', 'location', 'site', 'masing-masing', 'masing masing'])) {
+            return 'query_entity_stats';
+        }
+
+        if (Str::contains($normalized, ['machine type', 'tipe mesin']) && Str::contains($normalized, ['bss', 'evcs'])) {
+            return 'query_entity_stats';
+        }
+
         if (Str::contains($normalized, ['user', 'users', 'pengguna', 'siapa saja', 'daftar user', 'daftar pengguna', 'akun', 'admin', 'superadmin', 'super admin'])) {
             return 'list_users';
         }
@@ -181,10 +190,16 @@ class AiAssistantService
                 (int) $toolPayload['total_blocked_assignments'],
             ),
             'query_entity_stats' => sprintf(
-                'Entity stats: %d %s found%s.',
-                (int) ($toolPayload['total_count'] ?? 0),
-                $toolPayload['count_target'] ?? 'records',
-                isset($toolPayload['filter_project']) ? ' for project '.$toolPayload['filter_project'] : ''
+                isset($toolPayload['machine_type_counts'])
+                    ? 'Machine type site counts: %s. Total: %d sites.'
+                    : 'Entity stats: %d %s found%s.',
+                isset($toolPayload['machine_type_counts'])
+                    ? $this->formatCounts($toolPayload['machine_type_counts'] ?? [])
+                    : (int) ($toolPayload['total_count'] ?? 0),
+                isset($toolPayload['machine_type_counts'])
+                    ? (int) ($toolPayload['total_count'] ?? 0)
+                    : ($toolPayload['count_target'] ?? 'records'),
+                isset($toolPayload['machine_type_counts']) ? '' : (isset($toolPayload['filter_project']) ? ' for project '.$toolPayload['filter_project'] : '')
             ),
             'summarize_assignment_operations' => sprintf(
                 'Assignment operations recap: %d assignments found. Status split: %s. Activity split: %s.',
@@ -936,7 +951,7 @@ class AiAssistantService
     /**
      * Count sites or assignments for a named entity with optional activity/status filters.
      *
-     * @param  array{count_target?: string, project_name?: string, main_contractor_name?: string, subcontractor_name?: string, subcontractor_user_name?: string, machine_type_name?: string, activity_type?: string, status?: string}  $filters
+     * @param  array{count_target?: string, project_name?: string, main_contractor_name?: string, subcontractor_name?: string, subcontractor_user_name?: string, machine_type_name?: string, machine_type_names?: list<string>, activity_type?: string, status?: string}  $filters
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
@@ -948,10 +963,19 @@ class AiAssistantService
         $subcontractorName = isset($filters['subcontractor_name']) ? trim((string) $filters['subcontractor_name']) : null;
         $subcontractorUserName = isset($filters['subcontractor_user_name']) ? trim((string) $filters['subcontractor_user_name']) : null;
         $machineTypeName = isset($filters['machine_type_name']) ? trim((string) $filters['machine_type_name']) : null;
+        $machineTypeNames = collect($filters['machine_type_names'] ?? [])
+            ->map(fn (mixed $name): string => trim((string) $name))
+            ->filter()
+            ->values()
+            ->all();
         $activityType = $this->normalizeActivityType($filters['activity_type'] ?? null);
         $status = $this->normalizeAssignmentStatus($filters['status'] ?? null);
 
         if ($countTarget === 'sites') {
+            if ($machineTypeNames !== []) {
+                return $this->countSitesForMachineTypes($machineTypeNames, $context);
+            }
+
             return $this->countSitesForEntity($projectName, $mainContractorName, $machineTypeName, $context);
         }
 
@@ -962,6 +986,7 @@ class AiAssistantService
             'subcontractor_name' => $subcontractorName,
             'subcontractor_user_name' => $subcontractorUserName,
             'machine_type_name' => $machineTypeName,
+            'machine_type_names' => $machineTypeNames,
             'activity_type' => $activityType,
             'status' => $status,
             'include_items' => false,
@@ -1011,6 +1036,87 @@ class AiAssistantService
             'filters' => $resolved['filters'],
             'matched_entities' => $resolved['matched_entities'],
             'needs_clarification' => false,
+            'generated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  list<string>  $machineTypeNames
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function countSitesForMachineTypes(array $machineTypeNames, array $context): array
+    {
+        $resolvedMachineTypes = collect($machineTypeNames)
+            ->map(fn (string $name): array => $this->resolveNamedEntity('machine_types', 'machine_type', $name, ['name']))
+            ->all();
+
+        $matchedEntities = [
+            'machine_type' => collect($resolvedMachineTypes)
+                ->flatMap(fn (array $entity): array => $entity['matches'])
+                ->values()
+                ->all(),
+        ];
+
+        $needsClarification = collect($resolvedMachineTypes)->contains(
+            fn (array $entity): bool => $entity['needs_clarification']
+                || (filled($entity['input'] ?? null) && ($entity['selected'] ?? null) === null)
+        );
+
+        if ($needsClarification) {
+            return [
+                'count_target' => 'sites',
+                'total_count' => 0,
+                'filters' => [
+                    'machine_type_names' => $machineTypeNames,
+                ],
+                'matched_entities' => $matchedEntities,
+                'needs_clarification' => true,
+                'clarification_suggestions' => collect($matchedEntities['machine_type'])
+                    ->take(8)
+                    ->map(fn (array $match): string => "{$match['type']}: {$match['name']}")
+                    ->values()
+                    ->all(),
+                'machine_type_counts' => [],
+                'generated_at' => now()->toIso8601String(),
+            ];
+        }
+
+        $selected = collect($resolvedMachineTypes)
+            ->map(fn (array $entity): array => $entity['selected'])
+            ->values();
+
+        $query = DB::table('sites')
+            ->join('machine_types', 'machine_types.id', '=', 'sites.machine_type_id')
+            ->whereIn('sites.machine_type_id', $selected->pluck('id')->all());
+
+        if ($projectId = $this->contextProjectId($context)) {
+            $query->where('sites.project_id', $projectId);
+        }
+
+        $counts = $query
+            ->select('machine_types.name', DB::raw('COUNT(*) as total'))
+            ->groupBy('machine_types.name')
+            ->pluck('total', 'machine_types.name')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+
+        $orderedCounts = $selected
+            ->mapWithKeys(fn (array $machineType): array => [
+                $machineType['name'] => $counts[$machineType['name']] ?? 0,
+            ])
+            ->all();
+
+        return [
+            'count_target' => 'sites',
+            'total_count' => array_sum($orderedCounts),
+            'filters' => [
+                'machine_type_names' => array_keys($orderedCounts),
+            ],
+            'matched_entities' => $matchedEntities,
+            'needs_clarification' => false,
+            'machine_type_counts' => $orderedCounts,
+            'machine_type_breakdown' => $orderedCounts,
             'generated_at' => now()->toIso8601String(),
         ];
     }
@@ -2101,9 +2207,11 @@ class AiAssistantService
     private function statsFiltersFromContext(array $context): array
     {
         $query = (string) ($context['query'] ?? '');
+        $operationFilters = $this->operationFiltersFromContext($context);
+        $hasMachineTypeNames = ($operationFilters['machine_type_names'] ?? []) !== [];
 
-        return array_merge($this->operationFiltersFromContext($context), [
-            'count_target' => Str::contains(Str::lower($query), ['lokasi', 'location', 'locations', 'site', 'sites'])
+        return array_merge($operationFilters, [
+            'count_target' => ($hasMachineTypeNames || Str::contains(Str::lower($query), ['lokasi', 'location', 'locations', 'site', 'sites']))
                 && ! Str::contains(Str::lower($query), ['assignment', 'assignments'])
                     ? 'sites'
                     : 'assignments',
@@ -2121,6 +2229,7 @@ class AiAssistantService
         $subcontractorTerm = $this->extractNamedPhrase($query, '(?:subcon|subkon|subcontractor|vendor)');
         $projectName = $this->extractNamedPhrase($query, '(?:project|proyek)');
         $mainContractorName = $this->extractNamedPhrase($query, '(?:main\s*con|maincon|main\s*contractor|kontraktor\s*utama)');
+        $machineTypeNames = $this->extractKnownMachineTypeNames($query);
         $subcontractorTerm ??= $projectName === null && $mainContractorName === null
             ? $this->extractOperationalTargetPhrase($query, $normalized)
             : null;
@@ -2131,7 +2240,8 @@ class AiAssistantService
             'main_contractor_name' => $mainContractorName,
             'subcontractor_name' => Str::contains($normalized, ['user', 'pengguna']) ? null : $subcontractorTerm,
             'subcontractor_user_name' => Str::contains($normalized, ['user', 'pengguna']) ? ($this->extractNamedPhrase($query, '(?:user|pengguna)') ?? $subcontractorTerm) : null,
-            'machine_type_name' => $this->extractNamedPhrase($query, '(?:machine\s*type|tipe\s*mesin|mesin)'),
+            'machine_type_name' => count($machineTypeNames) === 1 ? $machineTypeNames[0] : $this->extractNamedPhrase($query, '(?:machine\s*type|tipe\s*mesin|mesin)'),
+            'machine_type_names' => count($machineTypeNames) > 1 ? $machineTypeNames : [],
             'activity_type' => $this->inferActivityType($normalized),
             'status' => $this->inferStatus($normalized),
         ];
@@ -2178,6 +2288,31 @@ class AiAssistantService
         }
 
         return null;
+    }
+
+    /** @return list<string> */
+    private function extractKnownMachineTypeNames(string $query): array
+    {
+        $normalizedQuery = $this->normalizeEntityName($query);
+
+        if ($normalizedQuery === '') {
+            return [];
+        }
+
+        return DB::table('machine_types')
+            ->select(['name'])
+            ->orderByDesc(DB::raw('LENGTH(name)'))
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($row): array => [
+                'name' => (string) $row->name,
+                'position' => strpos($normalizedQuery, $this->normalizeEntityName((string) $row->name)),
+            ])
+            ->filter(fn (array $machineType): bool => $machineType['position'] !== false)
+            ->sortBy('position')
+            ->pluck('name')
+            ->values()
+            ->all();
     }
 
     private function inferAssignmentOperationIntent(string $normalized): string
@@ -2324,10 +2459,16 @@ class AiAssistantService
                 (int) $toolPayload['total_blocked_assignments'],
             ),
             'query_entity_stats' => sprintf(
-                'Statistik entitas: ditemukan %d %s%s.',
-                (int) ($toolPayload['total_count'] ?? 0),
-                $toolPayload['count_target'] === 'sites' ? 'lokasi' : 'assignment',
-                isset($toolPayload['filter_project']) ? ' untuk project '.$toolPayload['filter_project'] : ''
+                isset($toolPayload['machine_type_counts'])
+                    ? 'Statistik machine type: %s. Total: %d lokasi.'
+                    : 'Statistik entitas: ditemukan %d %s%s.',
+                isset($toolPayload['machine_type_counts'])
+                    ? $this->formatCounts($toolPayload['machine_type_counts'] ?? [], 'id')
+                    : (int) ($toolPayload['total_count'] ?? 0),
+                isset($toolPayload['machine_type_counts'])
+                    ? (int) ($toolPayload['total_count'] ?? 0)
+                    : ($toolPayload['count_target'] === 'sites' ? 'lokasi' : 'assignment'),
+                isset($toolPayload['machine_type_counts']) ? '' : (isset($toolPayload['filter_project']) ? ' untuk project '.$toolPayload['filter_project'] : '')
             ),
             'summarize_assignment_operations' => sprintf(
                 'Rekap operasional assignment: ditemukan %d assignment. Pembagian status: %s. Pembagian activity: %s.',

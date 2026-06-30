@@ -753,6 +753,42 @@ test('assignment operation resolver suggests fuzzy candidates and never broadens
         ->and($unknownProject['clarification_suggestions'])->toBeEmpty();
 });
 
+test('assistant counts multiple exact machine types from one prompt', function () {
+    config(['ai.providers.deepseek.key' => 'test-key']);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $bss6s = MachineType::factory()->create(['name' => 'BSS 6S 1P']);
+    $bss12s = MachineType::factory()->create(['name' => 'BSS 12S 1P']);
+    $evcs = MachineType::factory()->create(['name' => 'EVCS 20KW']);
+
+    Site::factory()->count(2)->create(['machine_type_id' => $bss6s->id]);
+    Site::factory()->count(3)->create(['machine_type_id' => $bss12s->id]);
+    Site::factory()->create(['machine_type_id' => $evcs->id]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'BSS 6S 1P dan BSS 12S 1P adalah machine type juga',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($events['tool_data']['tool_payload']['count_target'])->toBe('sites')
+        ->and($events['tool_data']['tool_payload']['total_count'])->toBe(5)
+        ->and($events['tool_data']['tool_payload']['filters']['machine_type_names'])->toBe(['BSS 6S 1P', 'BSS 12S 1P'])
+        ->and($events['tool_data']['tool_payload']['machine_type_counts']['BSS 6S 1P'])->toBe(2)
+        ->and($events['tool_data']['tool_payload']['machine_type_counts']['BSS 12S 1P'])->toBe(3)
+        ->and($events['tool_data']['tool_payload']['machine_type_counts'])->not->toHaveKey('EVCS 20KW')
+        ->and($events['text']['delta'])->toContain('BSS 6S 1P: 2')
+        ->and($events['text']['delta'])->toContain('BSS 12S 1P: 3')
+        ->and($events['text']['delta'])->not->toContain('AI provider');
+
+    Http::assertNothingSent();
+});
+
 test('assistant returns survey recap for main contractor and outstanding by subcontractor company or user', function () {
     config(['ai.providers.deepseek.key' => null]);
     Http::fake();
