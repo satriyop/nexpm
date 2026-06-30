@@ -34,11 +34,20 @@ type ChatMessage = {
     role: 'user' | 'assistant';
     content: string;
     tool_name?: string | null;
-    tool_payload?: {
-        sources?: string[];
-        follow_up_suggestions?: string[];
-        record_links?: { label: string; url: string }[];
-    };
+    tool_payload?: ToolPayload;
+};
+
+type ToolPayload = {
+    sources?: string[];
+    follow_up_suggestions?: string[];
+    record_links?: { label: string; url: string }[];
+    needs_clarification?: boolean;
+    clarification_suggestions?: string[];
+    filters?: Record<string, unknown>;
+    matched_entities?: Record<string, unknown>;
+    total_count?: number;
+    count_target?: string;
+    intent?: string;
 };
 
 type PromptCategory = 'daily' | 'counts' | 'recap' | 'reminder';
@@ -229,6 +238,98 @@ const activePromptGroup = computed(
             (group) => group.key === activePromptCategory.value,
         ) ?? promptGroups.value[0],
 );
+
+const previousUserPrompt = (assistantIndex: number): string => {
+    for (let index = assistantIndex - 1; index >= 0; index--) {
+        const message = messages.value[index];
+
+        if (message?.role === 'user') {
+            return message.content;
+        }
+    }
+
+    return '';
+};
+
+const parsedClarification = (
+    suggestion: string,
+): { type: string; name: string } => {
+    const [rawType, ...nameParts] = suggestion.split(':');
+    const type = rawType.trim();
+    const name = nameParts.join(':').trim();
+
+    return { type, name: name || suggestion };
+};
+
+const clarificationPrompt = (suggestion: string, assistantIndex: number) => {
+    const { type, name } = parsedClarification(suggestion);
+    const previous = previousUserPrompt(assistantIndex).toLowerCase();
+    const activity = previous.includes('pln')
+        ? 'assignment PLN'
+        : previous.includes('survey') || previous.includes('survei')
+          ? 'assignment survey'
+          : previous.includes('construction') || previous.includes('konstruksi')
+            ? 'assignment construction'
+            : previous.includes('bast')
+              ? 'assignment BAST'
+              : 'assignment';
+    const status = previous.includes('pending') ? ' pending' : '';
+    const isCountQuestion =
+        previous.includes('berapa') ||
+        previous.includes('jumlah') ||
+        previous.includes('how many') ||
+        previous.includes('ada berapa');
+
+    if (type === 'project') {
+        return isCountQuestion
+            ? `Project ${name} ada berapa lokasi?`
+            : `Summary assignment project ${name}`;
+    }
+
+    if (type === 'main_contractor') {
+        return `Berapa ${activity}${status} untuk main contractor ${name}?`;
+    }
+
+    if (type === 'subcontractor') {
+        return isCountQuestion
+            ? `Berapa ${activity}${status} untuk subkon ${name}?`
+            : `Outstanding untuk subkon ${name}?`;
+    }
+
+    if (type === 'subcontractor_user') {
+        return isCountQuestion
+            ? `Berapa ${activity}${status} untuk subkon user ${name}?`
+            : `Outstanding untuk subkon user ${name}?`;
+    }
+
+    if (type === 'machine_type') {
+        return `Machine type ${name} ada berapa lokasi?`;
+    }
+
+    return name;
+};
+
+const debugPayload = (message: ChatMessage) => {
+    const payload = message.tool_payload;
+
+    if (!payload) {
+        return '';
+    }
+
+    return JSON.stringify(
+        {
+            tool: message.tool_name,
+            total_count: payload.total_count,
+            count_target: payload.count_target,
+            intent: payload.intent,
+            needs_clarification: payload.needs_clarification ?? false,
+            filters: payload.filters,
+            matched_entities: payload.matched_entities,
+        },
+        null,
+        2,
+    );
+};
 
 const ask = async (prompt?: string) => {
     const message = (prompt ?? input.value).trim();
@@ -530,6 +631,46 @@ onUnmounted(() => {
                         <div
                             v-if="
                                 message.role === 'assistant' &&
+                                message.tool_payload?.needs_clarification &&
+                                message.tool_payload?.clarification_suggestions
+                                    ?.length
+                            "
+                            class="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2"
+                        >
+                            <div
+                                class="mb-1.5 text-xs font-medium text-amber-700 dark:text-amber-300"
+                            >
+                                Pilih kandidat yang dimaksud
+                            </div>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button
+                                    v-for="suggestion in message.tool_payload
+                                        .clarification_suggestions"
+                                    :key="suggestion"
+                                    type="button"
+                                    class="rounded border border-amber-500/30 bg-background px-2 py-1 text-left text-xs text-foreground transition hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                                    :disabled="processing || streaming"
+                                    @click="
+                                        ask(
+                                            clarificationPrompt(
+                                                suggestion,
+                                                index,
+                                            ),
+                                        )
+                                    "
+                                >
+                                    {{ parsedClarification(suggestion).name }}
+                                    <span class="text-muted-foreground">
+                                        {{
+                                            parsedClarification(suggestion).type
+                                        }}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                        <div
+                            v-if="
+                                message.role === 'assistant' &&
                                 message.tool_payload?.sources?.length
                             "
                             class="mt-2 flex flex-wrap gap-1"
@@ -580,6 +721,23 @@ onUnmounted(() => {
                                 {{ suggestion }}
                             </button>
                         </div>
+                        <details
+                            v-if="
+                                message.role === 'assistant' &&
+                                message.tool_payload
+                            "
+                            class="mt-2 rounded border border-border bg-background/70 px-2 py-1"
+                        >
+                            <summary
+                                class="cursor-pointer text-xs font-medium text-muted-foreground"
+                            >
+                                Debug tool
+                            </summary>
+                            <pre
+                                class="mt-2 max-h-48 overflow-auto rounded bg-muted/60 p-2 text-[11px] leading-4 break-words whitespace-pre-wrap text-muted-foreground"
+                                >{{ debugPayload(message) }}</pre
+                            >
+                        </details>
                     </div>
                 </div>
 
