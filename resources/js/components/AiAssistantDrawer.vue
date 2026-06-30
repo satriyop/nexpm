@@ -1,13 +1,32 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { AlertCircle, Bot, Loader2, RotateCcw, Send, Settings, Sparkles } from 'lucide-vue-next';
+import {
+    AlertCircle,
+    Bot,
+    Loader2,
+    RotateCcw,
+    Send,
+    Settings,
+    Sparkles,
+} from 'lucide-vue-next';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 import { store as storeAiMessage } from '@/actions/App/Http/Controllers/Admin/AiAssistantController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { edit as editAiSettings } from '@/routes/ai-settings';
 
 type ChatMessage = {
@@ -22,6 +41,14 @@ type ChatMessage = {
     };
 };
 
+type PromptCategory = 'daily' | 'counts' | 'recap' | 'reminder';
+
+type PromptGroup = {
+    key: PromptCategory;
+    label: string;
+    prompts: string[];
+};
+
 const page = usePage();
 const open = ref(false);
 const input = ref('');
@@ -31,26 +58,21 @@ const error = ref<string | null>(null);
 const conversationId = ref<number | null>(null);
 const messages = ref<ChatMessage[]>([]);
 const messagesEl = ref<HTMLElement | null>(null);
+const activePromptCategory = ref<PromptCategory>('daily');
 
-const isSuperAdmin = computed(() => page.props.auth.user.role === 'super_admin');
+const isSuperAdmin = computed(
+    () => page.props.auth.user.role === 'super_admin',
+);
 const aiMode = computed<string>(() => {
-    const prefs = (page.props.auth.user as Record<string, unknown>).ai_preferences as Record<string, unknown> | null;
+    const prefs = (page.props.auth.user as Record<string, unknown>)
+        .ai_preferences as Record<string, unknown> | null;
 
     return (prefs?.mode as string) ?? 'standard';
 });
 
-const quickPrompts = [
-    'Briefing proyek hari ini',
-    'Apa risiko terbesar saat ini?',
-    'Assignment mana yang telat atau stuck?',
-    'Cek gap workflow',
-    'Apa yang siap dibuat laporan?',
-    'Apa prioritas tindakan saya hari ini?',
-    'Project [nama] ada berapa lokasi?',
-    'Buatkan reminder untuk subkon [nama]',
-];
-
-const csrfToken = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+const csrfToken = () =>
+    document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+        ?.content ?? '';
 
 const toolLabels: Record<string, string> = {
     check_report_readiness: 'Kesiapan laporan',
@@ -79,13 +101,18 @@ const scrollToBottom = async () => {
     }
 };
 
-const numericId = (value: unknown): number | undefined => (typeof value === 'number' ? value : undefined);
+const numericId = (value: unknown): number | undefined =>
+    typeof value === 'number' ? value : undefined;
 
 const currentContext = () => {
     const props = page.props as Record<string, unknown>;
     const assignment = props.assignment as Record<string, unknown> | undefined;
-    const site = (props.site ?? assignment?.site) as Record<string, unknown> | undefined;
-    const project = (props.project ?? site?.project) as Record<string, unknown> | undefined;
+    const site = (props.site ?? assignment?.site) as
+        | Record<string, unknown>
+        | undefined;
+    const project = (props.project ?? site?.project) as
+        | Record<string, unknown>
+        | undefined;
     const url = page.url;
 
     let type = 'page';
@@ -104,15 +131,104 @@ const currentContext = () => {
 
     return {
         type,
-        id: numericId(assignment?.id) ?? numericId(site?.id) ?? numericId(project?.id),
+        id:
+            numericId(assignment?.id) ??
+            numericId(site?.id) ??
+            numericId(project?.id),
         assignment_id: numericId(assignment?.id),
         site_id: numericId(site?.id),
         project_id: numericId(project?.id),
-        label: String(assignment?.site_code ?? site?.site_code ?? project?.name ?? url),
+        label: String(
+            assignment?.site_code ?? site?.site_code ?? project?.name ?? url,
+        ),
         url,
         component: page.component,
     };
 };
+
+const contextLabel = computed(() => currentContext().label);
+const contextType = computed(() => currentContext().type);
+
+const promptGroups = computed<PromptGroup[]>(() => {
+    const contextPrompts =
+        contextType.value === 'project'
+            ? [
+                  `Project ${contextLabel.value} ada berapa lokasi?`,
+                  `Summary assignment project ${contextLabel.value}`,
+                  `Apa risiko project ${contextLabel.value}?`,
+              ]
+            : contextType.value === 'site'
+              ? [
+                    `Site ${contextLabel.value} assignment apa saja?`,
+                    `Site ${contextLabel.value} statusnya bagaimana?`,
+                    `Apa gap workflow di site ${contextLabel.value}?`,
+                ]
+              : contextType.value === 'assignment'
+                ? [
+                      'Assignment ini apa masalahnya?',
+                      'Apa status assignment ini?',
+                      'Apa next action assignment ini?',
+                  ]
+                : [];
+
+    return [
+        {
+            key: 'daily',
+            label: 'Daily',
+            prompts: [
+                ...contextPrompts,
+                'Briefing proyek hari ini',
+                'Apa risiko terbesar saat ini?',
+                'Apa prioritas tindakan saya hari ini?',
+                'Assignment mana yang telat atau stuck?',
+                'Cek gap workflow',
+            ],
+        },
+        {
+            key: 'counts',
+            label: 'Counts',
+            prompts: [
+                'Berapa assignment SURVEY yang masih PENDING?',
+                'Berapa assignment PLN untuk main contractor [nama]?',
+                'Berapa assignment survey pending untuk subkon [nama/user]?',
+                'Berapa assignment outstanding untuk subkon [nama/user]?',
+                'Project [nama] ada berapa lokasi?',
+                'Machine type [nama] ada berapa lokasi?',
+                'BSS 6S 1P dan BSS 12S 1P ada berapa lokasi?',
+                'Breakdown lokasi berdasarkan machine type',
+            ],
+        },
+        {
+            key: 'recap',
+            label: 'Recap',
+            prompts: [
+                'Rekap assignment survey untuk main contractor [nama]',
+                'Rekap outstanding untuk subkon [nama/user]',
+                'Summary assignment project [nama]',
+                'Breakdown assignment berdasarkan status dan activity',
+                'Breakdown assignment berdasarkan project',
+                'Breakdown assignment berdasarkan subcontractor',
+            ],
+        },
+        {
+            key: 'reminder',
+            label: 'Reminder',
+            prompts: [
+                'Buatkan reminder untuk subkon [nama]',
+                'Reminder [nama user subkon] ada outstanding apa saja?',
+                'Buatkan draft reminder untuk assignment outstanding subkon [nama]',
+                'Outstanding [nama user subkon] apa saja?',
+            ],
+        },
+    ];
+});
+
+const activePromptGroup = computed(
+    () =>
+        promptGroups.value.find(
+            (group) => group.key === activePromptCategory.value,
+        ) ?? promptGroups.value[0],
+);
 
 const ask = async (prompt?: string) => {
     const message = (prompt ?? input.value).trim();
@@ -147,11 +263,19 @@ const ask = async (prompt?: string) => {
         if (!response.ok || !response.body) {
             const payload = await response.json().catch(() => ({}));
 
-            throw new Error(typeof payload.message === 'string' ? payload.message : 'AI assistant request failed.');
+            throw new Error(
+                typeof payload.message === 'string'
+                    ? payload.message
+                    : 'AI assistant request failed.',
+            );
         }
 
         // Push placeholder that gets filled as tokens arrive
-        const placeholder: ChatMessage = { role: 'assistant', content: '', tool_name: null };
+        const placeholder: ChatMessage = {
+            role: 'assistant',
+            content: '',
+            tool_name: null,
+        };
         messages.value.push(placeholder);
         const msgIndex = messages.value.length - 1;
 
@@ -184,7 +308,9 @@ const ask = async (prompt?: string) => {
                         eventName = line.slice(7).trim();
                     } else if (line.startsWith('data: ')) {
                         // SSE spec: multiple data lines must be concatenated with \n
-                        eventData = eventData ? eventData + '\n' + line.slice(6) : line.slice(6);
+                        eventData = eventData
+                            ? eventData + '\n' + line.slice(6)
+                            : line.slice(6);
                     }
                 }
 
@@ -195,21 +321,32 @@ const ask = async (prompt?: string) => {
                 const data = JSON.parse(eventData) as Record<string, unknown>;
 
                 if (eventName === 'tool_data') {
-                    messages.value[msgIndex].tool_name = data.tool_name as string | null;
-                    messages.value[msgIndex].tool_payload = data.tool_payload as ChatMessage['tool_payload'];
+                    messages.value[msgIndex].tool_name = data.tool_name as
+                        | string
+                        | null;
+                    messages.value[msgIndex].tool_payload =
+                        data.tool_payload as ChatMessage['tool_payload'];
                 } else if (eventName === 'text') {
                     messages.value[msgIndex].content += data.delta as string;
                     await scrollToBottom();
                 } else if (eventName === 'done') {
-                    conversationId.value = (data.conversation_id as number) ?? conversationId.value;
+                    conversationId.value =
+                        (data.conversation_id as number) ??
+                        conversationId.value;
                     messages.value[msgIndex].id = data.message_id as number;
                 } else if (eventName === 'error') {
-                    throw new Error((data.message as string) ?? 'AI assistant request failed.');
+                    throw new Error(
+                        (data.message as string) ??
+                            'AI assistant request failed.',
+                    );
                 }
             }
         }
     } catch (requestError) {
-        error.value = requestError instanceof Error ? requestError.message : 'AI assistant request failed.';
+        error.value =
+            requestError instanceof Error
+                ? requestError.message
+                : 'AI assistant request failed.';
     } finally {
         processing.value = false;
         streaming.value = false;
@@ -254,7 +391,11 @@ onUnmounted(() => {
             <Tooltip>
                 <TooltipTrigger as-child>
                     <SheetTrigger as-child>
-                        <Button variant="ghost" size="icon" aria-label="Open AI assistant">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Open AI assistant"
+                        >
                             <Sparkles class="size-4" />
                         </Button>
                     </SheetTrigger>
@@ -270,8 +411,10 @@ onUnmounted(() => {
                         <Bot class="size-4" />
                         AI Assistant
                         <Badge
-                            :variant="aiMode === 'full' ? 'default' : 'secondary'"
-                            class="text-[10px] px-1.5 py-0 font-normal"
+                            :variant="
+                                aiMode === 'full' ? 'default' : 'secondary'
+                            "
+                            class="px-1.5 py-0 text-[10px] font-normal"
                         >
                             {{ aiMode === 'full' ? 'Full DB' : 'Standard' }}
                         </Badge>
@@ -291,36 +434,76 @@ onUnmounted(() => {
                         </Button>
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="icon" class="size-8" as-child>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    class="size-8"
+                                    as-child
+                                >
                                     <Link :href="editAiSettings()">
                                         <Settings class="size-3.5" />
                                     </Link>
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="bottom">AI settings</TooltipContent>
+                            <TooltipContent side="bottom"
+                                >AI settings</TooltipContent
+                            >
                         </Tooltip>
                     </div>
                 </div>
             </SheetHeader>
 
-            <div ref="messagesEl" class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-                <div v-if="messages.length === 0" class="grid gap-2">
-                    <button
-                        v-for="prompt in quickPrompts"
-                        :key="prompt"
-                        type="button"
-                        class="rounded-md border border-border px-3 py-2 text-left text-sm transition hover:bg-accent hover:text-accent-foreground"
-                        @click="ask(prompt)"
+            <div
+                ref="messagesEl"
+                class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4"
+            >
+                <div v-if="messages.length === 0" class="space-y-3">
+                    <div
+                        class="grid grid-cols-4 gap-1 rounded-md border border-border bg-muted/30 p-1"
                     >
-                        {{ prompt }}
-                    </button>
+                        <button
+                            v-for="group in promptGroups"
+                            :key="group.key"
+                            type="button"
+                            class="h-8 rounded px-2 text-xs font-medium transition hover:bg-background hover:text-foreground"
+                            :class="
+                                activePromptCategory === group.key
+                                    ? 'bg-background text-foreground shadow-xs'
+                                    : 'text-muted-foreground'
+                            "
+                            @click="activePromptCategory = group.key"
+                        >
+                            {{ group.label }}
+                        </button>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <button
+                            v-for="prompt in activePromptGroup.prompts"
+                            :key="prompt"
+                            type="button"
+                            class="group flex min-h-11 items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left text-sm leading-5 transition hover:bg-accent hover:text-accent-foreground"
+                            @click="ask(prompt)"
+                        >
+                            <span class="min-w-0 flex-1 break-words">{{
+                                prompt
+                            }}</span>
+                            <Send
+                                class="size-3.5 shrink-0 text-muted-foreground transition group-hover:text-accent-foreground"
+                            />
+                        </button>
+                    </div>
                 </div>
 
                 <div
                     v-for="(message, index) in messages"
                     :key="message.id ?? `${message.role}-${index}`"
                     class="flex"
-                    :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                    :class="
+                        message.role === 'user'
+                            ? 'justify-end'
+                            : 'justify-start'
+                    "
                 >
                     <div
                         class="max-w-[86%] rounded-md px-3 py-2 text-sm leading-6 whitespace-pre-wrap"
@@ -330,8 +513,14 @@ onUnmounted(() => {
                                 : 'border border-border bg-muted/40 text-foreground'
                         "
                     >
-                        <div v-if="message.tool_name" class="mb-1 text-xs font-medium text-muted-foreground">
-                            {{ toolLabels[message.tool_name] ?? message.tool_name.replaceAll('_', ' ') }}
+                        <div
+                            v-if="message.tool_name"
+                            class="mb-1 text-xs font-medium text-muted-foreground"
+                        >
+                            {{
+                                toolLabels[message.tool_name] ??
+                                message.tool_name.replaceAll('_', ' ')
+                            }}
                         </div>
                         {{ message.content
                         }}<span
@@ -339,7 +528,10 @@ onUnmounted(() => {
                             class="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-current align-middle"
                         />
                         <div
-                            v-if="message.role === 'assistant' && message.tool_payload?.sources?.length"
+                            v-if="
+                                message.role === 'assistant' &&
+                                message.tool_payload?.sources?.length
+                            "
                             class="mt-2 flex flex-wrap gap-1"
                         >
                             <Badge
@@ -352,11 +544,15 @@ onUnmounted(() => {
                             </Badge>
                         </div>
                         <div
-                            v-if="message.role === 'assistant' && message.tool_payload?.record_links?.length"
+                            v-if="
+                                message.role === 'assistant' &&
+                                message.tool_payload?.record_links?.length
+                            "
                             class="mt-2 flex flex-wrap gap-1"
                         >
                             <Link
-                                v-for="link in message.tool_payload.record_links"
+                                v-for="link in message.tool_payload
+                                    .record_links"
                                 :key="link.url"
                                 :href="link.url"
                                 class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground transition hover:bg-accent"
@@ -365,11 +561,16 @@ onUnmounted(() => {
                             </Link>
                         </div>
                         <div
-                            v-if="message.role === 'assistant' && message.tool_payload?.follow_up_suggestions?.length"
+                            v-if="
+                                message.role === 'assistant' &&
+                                message.tool_payload?.follow_up_suggestions
+                                    ?.length
+                            "
                             class="mt-2 flex flex-wrap gap-1"
                         >
                             <button
-                                v-for="suggestion in message.tool_payload.follow_up_suggestions"
+                                v-for="suggestion in message.tool_payload
+                                    .follow_up_suggestions"
                                 :key="suggestion"
                                 type="button"
                                 class="rounded border border-border bg-background px-2 py-1 text-left text-xs text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
@@ -382,12 +583,18 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <div v-if="processing" class="flex items-center gap-2 text-sm text-muted-foreground">
+                <div
+                    v-if="processing"
+                    class="flex items-center gap-2 text-sm text-muted-foreground"
+                >
                     <Loader2 class="size-4 animate-spin" />
                     Memproses
                 </div>
 
-                <div v-if="error" class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                <div
+                    v-if="error"
+                    class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+                >
                     <AlertCircle class="mt-0.5 size-4 shrink-0" />
                     <span>{{ error }}</span>
                 </div>
@@ -397,13 +604,21 @@ onUnmounted(() => {
                 <textarea
                     v-model="input"
                     rows="2"
-                    class="min-h-11 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="min-h-11 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="processing || streaming"
                     placeholder="Tanyakan risiko proyek, blocker, laporan, atau prioritas"
                     @keydown.enter.exact.prevent="ask()"
                 />
-                <Button type="submit" size="icon" :disabled="processing || streaming || input.trim() === ''" aria-label="Send message">
-                    <Loader2 v-if="processing || streaming" class="size-4 animate-spin" />
+                <Button
+                    type="submit"
+                    size="icon"
+                    :disabled="processing || streaming || input.trim() === ''"
+                    aria-label="Send message"
+                >
+                    <Loader2
+                        v-if="processing || streaming"
+                        class="size-4 animate-spin"
+                    />
                     <Send v-else class="size-4" />
                 </Button>
             </form>
