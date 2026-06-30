@@ -25,6 +25,10 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified', 'role:super_admin,admin,project_manager', 'readonly:project_manager'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('ai/prompt-examples', [Admin\AiAssistantController::class, 'promptExamples'])
+        ->middleware(['role:super_admin'])
+        ->name('ai.prompt-examples');
+
     Route::post('ai/messages', [Admin\AiAssistantController::class, 'store'])
         ->middleware(['role:super_admin', 'throttle:20,1'])
         ->name('ai.messages.store');

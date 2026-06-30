@@ -7,6 +7,7 @@ use App\Enums\AssignmentStatus;
 use App\Enums\Role;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
+use App\Models\AiPromptLog;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
@@ -785,6 +786,97 @@ test('assistant counts multiple exact machine types from one prompt', function (
         ->and($events['text']['delta'])->toContain('BSS 6S 1P: 2')
         ->and($events['text']['delta'])->toContain('BSS 12S 1P: 3')
         ->and($events['text']['delta'])->not->toContain('AI provider');
+
+    Http::assertNothingSent();
+});
+
+test('assistant prompt examples use real database names', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $mainContractor = MainContractor::factory()->create(['name' => 'Sigma Tec']);
+    $project = Project::factory()->create(['name' => 'Planet Ban Rollout', 'main_contractor_id' => $mainContractor->id]);
+    Site::factory()->count(2)->create(['project_id' => $project->id]);
+    $subcontractor = Subcontractor::factory()->create(['name' => 'PT Karya Fiber']);
+    User::factory()->create(['name' => 'Asep Riyadi', 'role' => Role::Subcontractor, 'subcontractor_id' => $subcontractor->id]);
+    MachineType::factory()->create(['name' => 'BSS 6S 1P']);
+    MachineType::factory()->create(['name' => 'BSS 12S 1P']);
+
+    $response = $this->actingAs($superAdmin)
+        ->getJson(route('admin.ai.prompt-examples'))
+        ->assertOk();
+
+    expect($response['groups']['counts'])->toContain('Project Planet Ban Rollout ada berapa lokasi?')
+        ->and($response['groups']['counts'])->toContain('Berapa assignment PLN untuk main contractor Sigma Tec?')
+        ->and($response['groups']['counts'])->toContain('Berapa assignment survey pending untuk subkon PT Karya Fiber?')
+        ->and($response['groups']['reminder'])->toContain('Reminder Asep Riyadi ada outstanding apa saja?');
+});
+
+test('assistant resolves terse clarification follow up from previous candidates', function () {
+    config(['ai.providers.deepseek.key' => 'test-key']);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $barat = Project::factory()->create(['name' => 'Alpha Rollout Barat']);
+    Project::factory()->create(['name' => 'Alpha Rollout Timur']);
+    Site::factory()->count(2)->create(['project_id' => $barat->id]);
+
+    $ambiguousResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'Project Alpha ada berapa lokasi?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+    $ambiguousEvents = parseSseEvents($ambiguousResponse->streamedContent());
+
+    expect($ambiguousEvents['tool_data']['tool_payload']['needs_clarification'])->toBeTrue();
+
+    $followUpResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'yang Alpha Rollout Barat',
+            'mode' => 'full',
+            'conversation_id' => $ambiguousEvents['done']['conversation_id'],
+            'clarification_context' => [
+                'prompt' => 'Project Alpha ada berapa lokasi?',
+                'suggestions' => $ambiguousEvents['tool_data']['tool_payload']['clarification_suggestions'],
+            ],
+        ])
+        ->assertOk();
+    $followUpEvents = parseSseEvents($followUpResponse->streamedContent());
+
+    expect($followUpEvents['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($followUpEvents['tool_data']['tool_payload']['total_count'])->toBe(2)
+        ->and($followUpEvents['tool_data']['tool_payload']['filters']['project_name'])->toBe('Alpha Rollout Barat');
+
+    Http::assertNothingSent();
+});
+
+test('assistant logs ambiguous and zero-result prompt outcomes', function () {
+    config(['ai.providers.deepseek.key' => 'test-key']);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    Project::factory()->create(['name' => 'Alpha Rollout Barat']);
+    Project::factory()->create(['name' => 'Alpha Rollout Timur']);
+    Project::factory()->create(['name' => 'Empty Rollout']);
+
+    $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'Project Alpha ada berapa lokasi?',
+            'mode' => 'full',
+        ])
+        ->assertOk()
+        ->streamedContent();
+
+    $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'Project Empty Rollout ada berapa lokasi?',
+            'mode' => 'full',
+        ])
+        ->assertOk()
+        ->streamedContent();
+
+    expect(AiPromptLog::query()->where('outcome', 'needs_clarification')->count())->toBe(1)
+        ->and(AiPromptLog::query()->where('outcome', 'zero_results')->count())->toBe(1)
+        ->and(AiPromptLog::query()->where('prompt', 'Project Empty Rollout ada berapa lokasi?')->first()?->metadata['total_count'])->toBe(0);
 
     Http::assertNothingSent();
 });

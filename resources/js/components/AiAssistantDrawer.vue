@@ -9,9 +9,12 @@ import {
     Settings,
     Sparkles,
 } from 'lucide-vue-next';
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
-import { store as storeAiMessage } from '@/actions/App/Http/Controllers/Admin/AiAssistantController';
+import {
+    promptExamples as getPromptExamples,
+    store as storeAiMessage,
+} from '@/actions/App/Http/Controllers/Admin/AiAssistantController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +51,24 @@ type ToolPayload = {
     total_count?: number;
     count_target?: string;
     intent?: string;
+    status_breakdown?: Record<string, number>;
+    activity_breakdown?: Record<string, number>;
+    project_breakdown?: Record<string, number>;
+    subcontractor_breakdown?: Record<string, number>;
+    machine_type_breakdown?: Record<string, number>;
+    machine_type_counts?: Record<string, number>;
+    items?: {
+        id: number;
+        site_code?: string | null;
+        location?: string | null;
+        project?: string | null;
+        activity_type?: string | null;
+        status?: string | null;
+        subcontractor?: string | null;
+        machine_type?: string | null;
+        age_days?: number;
+        url?: string;
+    }[];
 };
 
 type PromptCategory = 'daily' | 'counts' | 'recap' | 'reminder';
@@ -56,6 +77,10 @@ type PromptGroup = {
     key: PromptCategory;
     label: string;
     prompts: string[];
+};
+
+type PromptExamplesPayload = {
+    groups?: Partial<Record<PromptCategory, string[]>>;
 };
 
 const page = usePage();
@@ -68,6 +93,8 @@ const conversationId = ref<number | null>(null);
 const messages = ref<ChatMessage[]>([]);
 const messagesEl = ref<HTMLElement | null>(null);
 const activePromptCategory = ref<PromptCategory>('daily');
+const promptExamples = ref<Partial<Record<PromptCategory, string[]>>>({});
+const promptExamplesLoaded = ref(false);
 
 const isSuperAdmin = computed(
     () => page.props.auth.user.role === 'super_admin',
@@ -197,6 +224,7 @@ const promptGroups = computed<PromptGroup[]>(() => {
             key: 'counts',
             label: 'Counts',
             prompts: [
+                ...(promptExamples.value.counts ?? []),
                 'Berapa assignment SURVEY yang masih PENDING?',
                 'Berapa assignment PLN untuk main contractor [nama]?',
                 'Berapa assignment survey pending untuk subkon [nama/user]?',
@@ -211,6 +239,7 @@ const promptGroups = computed<PromptGroup[]>(() => {
             key: 'recap',
             label: 'Recap',
             prompts: [
+                ...(promptExamples.value.recap ?? []),
                 'Rekap assignment survey untuk main contractor [nama]',
                 'Rekap outstanding untuk subkon [nama/user]',
                 'Summary assignment project [nama]',
@@ -223,6 +252,7 @@ const promptGroups = computed<PromptGroup[]>(() => {
             key: 'reminder',
             label: 'Reminder',
             prompts: [
+                ...(promptExamples.value.reminder ?? []),
                 'Buatkan reminder untuk subkon [nama]',
                 'Reminder [nama user subkon] ada outstanding apa saja?',
                 'Buatkan draft reminder untuk assignment outstanding subkon [nama]',
@@ -234,10 +264,37 @@ const promptGroups = computed<PromptGroup[]>(() => {
 
 const activePromptGroup = computed(
     () =>
-        promptGroups.value.find(
-            (group) => group.key === activePromptCategory.value,
-        ) ?? promptGroups.value[0],
+        promptGroups.value
+            .map((group) => ({
+                ...group,
+                prompts: [...new Set(group.prompts)],
+            }))
+            .find((group) => group.key === activePromptCategory.value) ??
+        promptGroups.value[0],
 );
+
+const fetchPromptExamples = async () => {
+    if (promptExamplesLoaded.value) {
+        return;
+    }
+
+    const response = await fetch(getPromptExamples.url(), {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    if (!response.ok) {
+        return;
+    }
+
+    const payload = (await response.json()) as PromptExamplesPayload;
+    promptExamples.value = payload.groups ?? {};
+    promptExamplesLoaded.value = true;
+};
 
 const previousUserPrompt = (assistantIndex: number): string => {
     for (let index = assistantIndex - 1; index >= 0; index--) {
@@ -331,6 +388,51 @@ const debugPayload = (message: ChatMessage) => {
     );
 };
 
+const latestClarificationContext = () => {
+    for (let index = messages.value.length - 1; index >= 0; index--) {
+        const message = messages.value[index];
+
+        if (
+            message?.role === 'assistant' &&
+            message.tool_payload?.needs_clarification &&
+            message.tool_payload.clarification_suggestions?.length
+        ) {
+            return {
+                prompt: previousUserPrompt(index),
+                suggestions: message.tool_payload.clarification_suggestions,
+            };
+        }
+    }
+
+    return null;
+};
+
+const countRows = (payload?: ToolPayload) => {
+    const counts =
+        payload?.machine_type_counts ?? payload?.machine_type_breakdown;
+
+    return Object.entries(counts ?? {}).map(([label, count]) => ({
+        label,
+        count,
+    }));
+};
+
+const primaryBreakdownRows = (payload?: ToolPayload) => {
+    const breakdown =
+        payload?.status_breakdown ??
+        payload?.activity_breakdown ??
+        payload?.project_breakdown ??
+        payload?.subcontractor_breakdown ??
+        payload?.machine_type_breakdown;
+
+    return Object.entries(breakdown ?? {})
+        .slice(0, 6)
+        .map(([label, count]) => ({ label, count }));
+};
+
+const visibleItems = (payload?: ToolPayload) =>
+    (payload?.items ?? []).slice(0, 5);
+
 const ask = async (prompt?: string) => {
     const message = (prompt ?? input.value).trim();
 
@@ -358,6 +460,7 @@ const ask = async (prompt?: string) => {
                 conversation_id: conversationId.value,
                 mode: aiMode.value,
                 context: { ...currentContext() },
+                clarification_context: latestClarificationContext(),
             }),
         });
 
@@ -479,6 +582,12 @@ const handleExternalAsk = (event: Event) => {
 
 onMounted(() => {
     window.addEventListener('nexpm:ai-assistant:ask', handleExternalAsk);
+});
+
+watch(open, (isOpen) => {
+    if (isOpen) {
+        void fetchPromptExamples();
+    }
 });
 
 onUnmounted(() => {
@@ -699,6 +808,86 @@ onUnmounted(() => {
                                 class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground transition hover:bg-accent"
                             >
                                 {{ link.label }}
+                            </Link>
+                        </div>
+                        <div
+                            v-if="
+                                message.role === 'assistant' &&
+                                countRows(message.tool_payload).length
+                            "
+                            class="mt-2 overflow-hidden rounded-md border border-border bg-background/80"
+                        >
+                            <div
+                                class="grid grid-cols-[1fr_auto] border-b border-border px-2 py-1 text-xs font-medium text-muted-foreground"
+                            >
+                                <span>Breakdown</span>
+                                <span>Jumlah</span>
+                            </div>
+                            <div
+                                v-for="row in countRows(message.tool_payload)"
+                                :key="row.label"
+                                class="grid grid-cols-[1fr_auto] gap-3 px-2 py-1 text-xs"
+                            >
+                                <span class="min-w-0 truncate">{{
+                                    row.label
+                                }}</span>
+                                <span class="font-medium">{{ row.count }}</span>
+                            </div>
+                        </div>
+                        <div
+                            v-else-if="
+                                message.role === 'assistant' &&
+                                primaryBreakdownRows(message.tool_payload)
+                                    .length
+                            "
+                            class="mt-2 flex flex-wrap gap-1.5"
+                        >
+                            <span
+                                v-for="row in primaryBreakdownRows(
+                                    message.tool_payload,
+                                )"
+                                :key="row.label"
+                                class="rounded border border-border bg-background px-2 py-1 text-xs"
+                            >
+                                {{ row.label }}:
+                                <span class="font-medium">{{ row.count }}</span>
+                            </span>
+                        </div>
+                        <div
+                            v-if="
+                                message.role === 'assistant' &&
+                                visibleItems(message.tool_payload).length
+                            "
+                            class="mt-2 grid gap-1.5"
+                        >
+                            <Link
+                                v-for="item in visibleItems(
+                                    message.tool_payload,
+                                )"
+                                :key="item.id"
+                                :href="item.url ?? '#'"
+                                class="rounded-md border border-border bg-background px-2 py-1.5 text-xs transition hover:bg-accent"
+                            >
+                                <div
+                                    class="flex items-center justify-between gap-2"
+                                >
+                                    <span class="font-medium">
+                                        {{
+                                            item.site_code ??
+                                            `Assignment #${item.id}`
+                                        }}
+                                    </span>
+                                    <span class="text-muted-foreground">{{
+                                        item.status
+                                    }}</span>
+                                </div>
+                                <div
+                                    class="mt-0.5 truncate text-muted-foreground"
+                                >
+                                    {{ item.project }} ·
+                                    {{ item.activity_type }} ·
+                                    {{ item.subcontractor }}
+                                </div>
                             </Link>
                         </div>
                         <div
