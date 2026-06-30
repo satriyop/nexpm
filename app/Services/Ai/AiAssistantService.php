@@ -107,7 +107,7 @@ class AiAssistantService
             'resolve_entity_context' => $this->resolveEntityContext($context['query'] ?? '', $context),
             'query_entity_stats' => $this->queryEntityStats($this->statsFiltersFromContext($context), $context),
             'summarize_assignment_operations' => $this->summarizeAssignmentOperations($this->operationFiltersFromContext($context), $context),
-            'generate_subcontractor_reminder' => $this->generateSubcontractorReminder($context['query'] ?? '', $context),
+            'generate_subcontractor_reminder' => $this->generateSubcontractorReminder($this->subcontractorReminderTargetFromContext($context), $context),
             'summarize_priority_actions' => $this->summarizePriorityActions($context),
             'summarize_project_risks' => $this->summarizeProjectRisks($context),
             'summarize_subcontractor_blockers' => $this->summarizeSubcontractorBlockers($context),
@@ -194,8 +194,12 @@ class AiAssistantService
                 $this->formatCounts($toolPayload['activity_breakdown'] ?? []),
             ),
             'generate_subcontractor_reminder' => sprintf(
-                'Subcontractor reminder: %s has %d outstanding assignments across %d projects.',
-                $toolPayload['subcontractor'] ?? 'Unknown',
+                ($toolPayload['needs_clarification'] ?? false)
+                    ? 'Subcontractor reminder needs clarification. Candidates: %s.'
+                    : 'Subcontractor reminder: %s has %d outstanding assignments across %d projects.',
+                ($toolPayload['needs_clarification'] ?? false)
+                    ? implode(', ', $toolPayload['clarification_suggestions'] ?? [])
+                    : ($toolPayload['subcontractor'] ?? 'Unknown'),
                 (int) ($toolPayload['outstanding_count'] ?? 0),
                 (int) ($toolPayload['projects_count'] ?? 0),
             ),
@@ -1203,10 +1207,10 @@ class AiAssistantService
         $subcontractorUser = $this->resolveSubcontractorUser($filters['subcontractor_user_name'] ?? null);
         $machineType = $this->resolveNamedEntity('machine_types', 'machine_type', $filters['machine_type_name'] ?? null, ['name']);
 
-        if (($subcontractor['selected'] ?? null) === null && filled($filters['subcontractor_name'] ?? null)) {
+        if (($subcontractor['selected'] ?? null) === null && filled($filters['subcontractor_name'] ?? null) && $subcontractor['matches'] === []) {
             $fallbackUser = $this->resolveSubcontractorUser($filters['subcontractor_name']);
 
-            if (($fallbackUser['selected'] ?? null) !== null) {
+            if (($fallbackUser['selected'] ?? null) !== null || $fallbackUser['matches'] !== []) {
                 $subcontractorUser = $fallbackUser;
                 $subcontractor = $this->emptyResolvedEntity('subcontractor', $filters['subcontractor_name']);
             }
@@ -1452,16 +1456,46 @@ class AiAssistantService
      */
     public function generateSubcontractorReminder(string $subcontractorName, array $context): array
     {
-        $subcon = DB::table('subcontractors')
-            ->where('name', 'LIKE', "%{$subcontractorName}%")
-            ->first(['id', 'name', 'phone']);
+        $resolved = $this->resolveOperationFilters([
+            'subcontractor_name' => $subcontractorName,
+            'subcontractor_user_name' => null,
+        ]);
 
-        if ($subcon === null) {
+        if ($resolved['needs_clarification']) {
+            return [
+                'subcontractor_name' => $subcontractorName,
+                'filters' => $resolved['filters'],
+                'matched_entities' => $resolved['matched_entities'],
+                'needs_clarification' => true,
+                'clarification_suggestions' => $resolved['clarification_suggestions'],
+                'outstanding_count' => 0,
+                'projects_count' => 0,
+                'generated_at' => now()->toIso8601String(),
+            ];
+        }
+
+        $selectedSubcontractor = $resolved['selected']['subcontractor'] ?? null;
+        $selectedSubcontractorUser = $resolved['selected']['subcontractor_user'] ?? null;
+
+        $subcontractorId = $selectedSubcontractor['id'] ?? $selectedSubcontractorUser['subcontractor_id'] ?? null;
+
+        if ($subcontractorId === null) {
             return [
                 'error' => "Tidak ada subkontraktor yang cocok dengan nama '{$subcontractorName}'.",
                 'subcontractor_name' => $subcontractorName,
+                'filters' => $resolved['filters'],
+                'matched_entities' => $resolved['matched_entities'],
+                'needs_clarification' => false,
+                'clarification_suggestions' => $resolved['clarification_suggestions'],
+                'outstanding_count' => 0,
+                'projects_count' => 0,
+                'generated_at' => now()->toIso8601String(),
             ];
         }
+
+        $subcon = DB::table('subcontractors')
+            ->where('id', $subcontractorId)
+            ->first(['id', 'name', 'phone']);
 
         $terminalStatuses = [
             AssignmentStatus::Verified->value,
@@ -1472,7 +1506,7 @@ class AiAssistantService
         $outstanding = DB::table('assignments')
             ->join('sites', 'assignments.site_id', '=', 'sites.id')
             ->join('projects', 'sites.project_id', '=', 'projects.id')
-            ->where('assignments.subcontractor_id', $subcon->id)
+            ->where('assignments.subcontractor_id', $subcontractorId)
             ->whereNotIn('assignments.status', $terminalStatuses)
             ->select([
                 'assignments.id',
@@ -1508,6 +1542,11 @@ class AiAssistantService
             'subcontractor' => $subcon->name,
             'subcontractor_id' => $subcon->id,
             'subcontractor_phone' => $subcon->phone,
+            'resolved_from' => $selectedSubcontractorUser === null ? 'subcontractor' : 'subcontractor_user',
+            'subcontractor_user' => $selectedSubcontractorUser['name'] ?? null,
+            'filters' => $resolved['filters'],
+            'matched_entities' => $resolved['matched_entities'],
+            'needs_clarification' => false,
             'outstanding_count' => $outstanding->count(),
             'projects_count' => count($grouped),
             'grouped_by_project' => $grouped,
@@ -2046,6 +2085,22 @@ class AiAssistantService
         ];
     }
 
+    /** @param  array<string, mixed>  $context */
+    private function subcontractorReminderTargetFromContext(array $context): string
+    {
+        $filters = $this->operationFiltersFromContext($context);
+
+        foreach (['subcontractor_name', 'subcontractor_user_name'] as $key) {
+            $value = trim((string) ($filters[$key] ?? ''));
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return trim((string) ($context['query'] ?? ''));
+    }
+
     private function inferAssignmentOperationIntent(string $normalized): string
     {
         if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])) {
@@ -2202,8 +2257,12 @@ class AiAssistantService
                 $this->formatCounts($toolPayload['activity_breakdown'] ?? [], 'id'),
             ),
             'generate_subcontractor_reminder' => sprintf(
-                'Reminder subkon: %s memiliki %d assignment outstanding di %d proyek.',
-                $toolPayload['subcontractor'] ?? 'Tidak diketahui',
+                ($toolPayload['needs_clarification'] ?? false)
+                    ? 'Reminder subkon perlu nama yang lebih spesifik. Kandidat: %s.'
+                    : 'Reminder subkon: %s memiliki %d assignment outstanding di %d proyek.',
+                ($toolPayload['needs_clarification'] ?? false)
+                    ? implode(', ', $toolPayload['clarification_suggestions'] ?? [])
+                    : ($toolPayload['subcontractor'] ?? 'Tidak diketahui'),
                 (int) ($toolPayload['outstanding_count'] ?? 0),
                 (int) ($toolPayload['projects_count'] ?? 0),
             ),

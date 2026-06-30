@@ -552,6 +552,113 @@ test('assistant deterministically routes operational counts even in full mode', 
     Http::assertNothingSent();
 });
 
+test('assistant understands Indonesian pending survey counts for a subcontractor user', function () {
+    config(['ai.providers.deepseek.key' => 'test-key']);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $subcontractor = Subcontractor::factory()->create(['name' => 'PT Ade Fiber']);
+    User::factory()->create(['name' => 'Ade Ahyadi', 'role' => Role::Subcontractor, 'subcontractor_id' => $subcontractor->id]);
+
+    Assignment::factory()->count(2)->survey()->create([
+        'subcontractor_id' => $subcontractor->id,
+        'status' => AssignmentStatus::Pending,
+    ]);
+    Assignment::factory()->survey()->create([
+        'subcontractor_id' => $subcontractor->id,
+        'status' => AssignmentStatus::Document,
+    ]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'berapa jumlah assignment survey yg masih pending untuk subkon ade ahyadi?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($events['tool_data']['tool_payload']['total_count'])->toBe(2)
+        ->and($events['tool_data']['tool_payload']['filters']['activity_type'])->toBe(ActivityType::Survey->value)
+        ->and($events['tool_data']['tool_payload']['filters']['status'])->toBe(AssignmentStatus::Pending->value)
+        ->and($events['tool_data']['tool_payload']['filters']['subcontractor_user_name'])->toBe('Ade Ahyadi')
+        ->and($events['text']['delta'])->not->toContain('AI provider');
+
+    Http::assertNothingSent();
+});
+
+test('assistant generates subcontractor reminders from parsed company and user targets', function () {
+    config(['ai.providers.deepseek.key' => 'test-key']);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $companySubcontractor = Subcontractor::factory()->create(['name' => 'PT Asep Jaya']);
+    $userSubcontractor = Subcontractor::factory()->create(['name' => 'PT Karya Fiber']);
+    User::factory()->create(['name' => 'Asep Riyadi', 'role' => Role::Subcontractor, 'subcontractor_id' => $userSubcontractor->id]);
+
+    Assignment::factory()->survey()->create([
+        'subcontractor_id' => $companySubcontractor->id,
+        'status' => AssignmentStatus::Pending,
+        'updated_at' => now()->subDays(4),
+    ]);
+    Assignment::factory()->plnConnection()->create([
+        'subcontractor_id' => $userSubcontractor->id,
+        'status' => AssignmentStatus::Revision,
+        'updated_at' => now()->subDays(6),
+    ]);
+    Assignment::factory()->survey()->create([
+        'subcontractor_id' => $userSubcontractor->id,
+        'status' => AssignmentStatus::Verified,
+    ]);
+
+    $companyResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'buatkan reminder untuk subkon asep jaya, ada outstanding apa saja?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+    $companyEvents = parseSseEvents($companyResponse->streamedContent());
+
+    expect($companyEvents['tool_data']['tool_name'])->toBe('generate_subcontractor_reminder')
+        ->and($companyEvents['tool_data']['tool_payload']['subcontractor'])->toBe('PT Asep Jaya')
+        ->and($companyEvents['tool_data']['tool_payload']['resolved_from'])->toBe('subcontractor')
+        ->and($companyEvents['tool_data']['tool_payload']['outstanding_count'])->toBe(1);
+
+    $userResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'buatkan reminder untuk subkon asep riyadi, ada outstanding apa saja?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+    $userEvents = parseSseEvents($userResponse->streamedContent());
+
+    expect($userEvents['tool_data']['tool_name'])->toBe('generate_subcontractor_reminder')
+        ->and($userEvents['tool_data']['tool_payload']['subcontractor'])->toBe('PT Karya Fiber')
+        ->and($userEvents['tool_data']['tool_payload']['resolved_from'])->toBe('subcontractor_user')
+        ->and($userEvents['tool_data']['tool_payload']['subcontractor_user'])->toBe('Asep Riyadi')
+        ->and($userEvents['tool_data']['tool_payload']['outstanding_count'])->toBe(1)
+        ->and($userEvents['text']['delta'])->not->toContain('AI provider');
+
+    Http::assertNothingSent();
+});
+
+test('subcontractor reminder asks for clarification when a target matches multiple users', function () {
+    $service = app(AiAssistantService::class);
+    $firstSubcontractor = Subcontractor::factory()->create(['name' => 'PT Alpha Fiber']);
+    $secondSubcontractor = Subcontractor::factory()->create(['name' => 'PT Beta Fiber']);
+
+    User::factory()->create(['name' => 'Asep Riyadi', 'role' => Role::Subcontractor, 'subcontractor_id' => $firstSubcontractor->id]);
+    User::factory()->create(['name' => 'Asep Hidayat', 'role' => Role::Subcontractor, 'subcontractor_id' => $secondSubcontractor->id]);
+
+    $payload = $service->generateSubcontractorReminder('asep', []);
+
+    expect($payload['needs_clarification'])->toBeTrue()
+        ->and($payload['clarification_suggestions'])->toContain('subcontractor_user: Asep Hidayat')
+        ->and($payload['clarification_suggestions'])->toContain('subcontractor_user: Asep Riyadi')
+        ->and($payload['outstanding_count'])->toBe(0);
+});
+
 test('assistant returns survey recap for main contractor and outstanding by subcontractor company or user', function () {
     config(['ai.providers.deepseek.key' => null]);
     Http::fake();
