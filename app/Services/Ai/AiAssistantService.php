@@ -33,8 +33,7 @@ class AiAssistantService
             return 'summarize_assignment_operations';
         }
 
-        if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])
-            && Str::contains($normalized, ['subcon', 'subkon', 'subcontractor', 'vendor', 'user'])) {
+        if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])) {
             return 'summarize_assignment_operations';
         }
 
@@ -1212,7 +1211,7 @@ class AiAssistantService
 
             if (($fallbackUser['selected'] ?? null) !== null || $fallbackUser['matches'] !== []) {
                 $subcontractorUser = $fallbackUser;
-                $subcontractor = $this->emptyResolvedEntity('subcontractor', $filters['subcontractor_name']);
+                $subcontractor = $this->emptyResolvedEntity('subcontractor', null);
             }
         }
 
@@ -1233,7 +1232,10 @@ class AiAssistantService
             ->filter()
             ->all();
 
-        $needsClarification = collect($entities)->contains(fn (array $entity): bool => $entity['needs_clarification']);
+        $needsClarification = collect($entities)->contains(
+            fn (array $entity): bool => $entity['needs_clarification']
+                || (filled($entity['input'] ?? null) && ($entity['selected'] ?? null) === null)
+        );
 
         return [
             'filters' => [
@@ -1288,11 +1290,13 @@ class AiAssistantService
 
         if ($matches->isEmpty()) {
             $normalizedTerm = $this->normalizeEntityName($term);
-            $matches = DB::table($table)
+            $rows = DB::table($table)
                 ->select(['id', DB::raw($columns[0].' as name')])
                 ->orderBy($columns[0])
                 ->limit(100)
-                ->get()
+                ->get();
+
+            $matches = $rows
                 ->filter(fn ($row): bool => Str::contains($this->normalizeEntityName((string) $row->name), $normalizedTerm))
                 ->take(8)
                 ->map(fn ($row): array => [
@@ -1301,6 +1305,22 @@ class AiAssistantService
                     'name' => (string) $row->name,
                 ])
                 ->values();
+
+            if ($matches->isEmpty() && strlen($normalizedTerm) >= 3) {
+                $threshold = $this->fuzzyEntityThreshold($normalizedTerm);
+                $matches = $rows
+                    ->map(fn ($row): array => [
+                        'type' => $type,
+                        'id' => (int) $row->id,
+                        'name' => (string) $row->name,
+                        'is_fuzzy' => true,
+                        'score' => levenshtein($this->normalizeEntityName((string) $row->name), $normalizedTerm),
+                    ])
+                    ->filter(fn (array $match): bool => $match['score'] <= $threshold)
+                    ->sortBy('score')
+                    ->take(8)
+                    ->values();
+            }
         }
 
         $selected = $this->selectUnambiguousMatch($matches, $term);
@@ -1309,7 +1329,7 @@ class AiAssistantService
             'input' => $term,
             'matches' => $matches->all(),
             'selected' => $selected,
-            'needs_clarification' => $matches->count() > 1 && $selected === null,
+            'needs_clarification' => $matches->isNotEmpty() && $selected === null,
         ];
     }
 
@@ -1345,7 +1365,7 @@ class AiAssistantService
 
         if ($matches->isEmpty()) {
             $normalizedTerm = $this->normalizeEntityName($term);
-            $matches = DB::table('users')
+            $rows = DB::table('users')
                 ->join('subcontractors', 'subcontractors.id', '=', 'users.subcontractor_id')
                 ->whereNotNull('users.subcontractor_id')
                 ->select([
@@ -1356,7 +1376,9 @@ class AiAssistantService
                 ])
                 ->orderBy('users.name')
                 ->limit(100)
-                ->get()
+                ->get();
+
+            $matches = $rows
                 ->filter(fn ($row): bool => Str::contains($this->normalizeEntityName((string) $row->name), $normalizedTerm))
                 ->take(8)
                 ->map(fn ($row): array => [
@@ -1367,6 +1389,24 @@ class AiAssistantService
                     'subcontractor_name' => (string) $row->subcontractor_name,
                 ])
                 ->values();
+
+            if ($matches->isEmpty() && strlen($normalizedTerm) >= 3) {
+                $threshold = $this->fuzzyEntityThreshold($normalizedTerm);
+                $matches = $rows
+                    ->map(fn ($row): array => [
+                        'type' => 'subcontractor_user',
+                        'id' => (int) $row->id,
+                        'name' => (string) $row->name,
+                        'subcontractor_id' => (int) $row->subcontractor_id,
+                        'subcontractor_name' => (string) $row->subcontractor_name,
+                        'is_fuzzy' => true,
+                        'score' => levenshtein($this->normalizeEntityName((string) $row->name), $normalizedTerm),
+                    ])
+                    ->filter(fn (array $match): bool => $match['score'] <= $threshold)
+                    ->sortBy('score')
+                    ->take(8)
+                    ->values();
+            }
         }
 
         $selected = $this->selectUnambiguousMatch($matches, $term);
@@ -1375,7 +1415,7 @@ class AiAssistantService
             'input' => $term,
             'matches' => $matches->all(),
             'selected' => $selected,
-            'needs_clarification' => $matches->count() > 1 && $selected === null,
+            'needs_clarification' => $matches->isNotEmpty() && $selected === null,
         ];
     }
 
@@ -1386,7 +1426,9 @@ class AiAssistantService
     private function selectUnambiguousMatch(Collection $matches, string $term): ?array
     {
         if ($matches->count() === 1) {
-            return $matches->first();
+            $match = $matches->first();
+
+            return ($match['is_fuzzy'] ?? false) === true ? null : $match;
         }
 
         $exact = $matches->filter(fn (array $match): bool => Str::lower($match['name']) === Str::lower($term));
@@ -1408,6 +1450,11 @@ class AiAssistantService
             ->replaceMatches('/\b(pt|cv|tbk|ltd|inc|company|co)\b/u', '')
             ->replaceMatches('/[^a-z0-9]+/u', '')
             ->toString();
+    }
+
+    private function fuzzyEntityThreshold(string $normalizedTerm): int
+    {
+        return max(1, min(4, (int) floor(strlen($normalizedTerm) / 3)));
     }
 
     /** @return array<string, mixed> */
@@ -2072,11 +2119,16 @@ class AiAssistantService
         $query = (string) ($context['query'] ?? '');
         $normalized = Str::lower($query);
         $subcontractorTerm = $this->extractNamedPhrase($query, '(?:subcon|subkon|subcontractor|vendor)');
+        $projectName = $this->extractNamedPhrase($query, '(?:project|proyek)');
+        $mainContractorName = $this->extractNamedPhrase($query, '(?:main\s*con|maincon|main\s*contractor|kontraktor\s*utama)');
+        $subcontractorTerm ??= $projectName === null && $mainContractorName === null
+            ? $this->extractOperationalTargetPhrase($query, $normalized)
+            : null;
 
         return [
             'intent' => $this->inferAssignmentOperationIntent($normalized),
-            'project_name' => $this->extractNamedPhrase($query, '(?:project|proyek)'),
-            'main_contractor_name' => $this->extractNamedPhrase($query, '(?:main\s*con|main\s*contractor|kontraktor\s*utama)'),
+            'project_name' => $projectName,
+            'main_contractor_name' => $mainContractorName,
             'subcontractor_name' => Str::contains($normalized, ['user', 'pengguna']) ? null : $subcontractorTerm,
             'subcontractor_user_name' => Str::contains($normalized, ['user', 'pengguna']) ? ($this->extractNamedPhrase($query, '(?:user|pengguna)') ?? $subcontractorTerm) : null,
             'machine_type_name' => $this->extractNamedPhrase($query, '(?:machine\s*type|tipe\s*mesin|mesin)'),
@@ -2099,6 +2151,33 @@ class AiAssistantService
         }
 
         return trim((string) ($context['query'] ?? ''));
+    }
+
+    private function extractOperationalTargetPhrase(string $query, string $normalized): ?string
+    {
+        if (! Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai', 'reminder', 'ingatkan'])) {
+            return null;
+        }
+
+        $patterns = [
+            '/(?:outstanding|tunggakan|belum selesai)\s+(?:untuk\s+|for\s+|subcon\s+|subkon\s+|subcontractor\s+|vendor\s+)?([^,?.]+)/i',
+            '/(?:reminder|ingatkan|buatkan reminder|kirim reminder)\s+(?:untuk\s+|for\s+|ke\s+)?(?:subcon\s+|subkon\s+|subcontractor\s+|vendor\s+)?([^,?.]+)/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (! preg_match($pattern, $query, $matches)) {
+                continue;
+            }
+
+            $term = preg_replace('/\b(apa|aja|saja|yang|yg|masih|belum|pending|assignment|assignments|survey|survei|pln|construction|konstruksi|bast|outstanding|reminder|tolong|buatkan|kirim|untuk|for|by|di|in|ada)\b.*$/i', '', $matches[1]) ?? '';
+            $term = trim($term);
+
+            if ($term !== '') {
+                return $term;
+            }
+        }
+
+        return null;
     }
 
     private function inferAssignmentOperationIntent(string $normalized): string

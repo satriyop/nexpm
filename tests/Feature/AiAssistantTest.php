@@ -659,6 +659,100 @@ test('subcontractor reminder asks for clarification when a target matches multip
         ->and($payload['outstanding_count'])->toBe(0);
 });
 
+test('assistant handles unlabeled operational prompts with known entity names', function () {
+    config(['ai.providers.deepseek.key' => 'test-key']);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $mainContractor = MainContractor::factory()->create(['name' => 'Sigma Tec']);
+    $project = Project::factory()->create(['name' => 'Planet Ban Rollout', 'main_contractor_id' => $mainContractor->id]);
+    $sites = Site::factory()->count(2)->create(['project_id' => $project->id]);
+    $subcontractor = Subcontractor::factory()->create(['name' => 'PT Karya Fiber']);
+    User::factory()->create(['name' => 'Asep Riyadi', 'role' => Role::Subcontractor, 'subcontractor_id' => $subcontractor->id]);
+
+    Assignment::factory()->plnConnection()->create([
+        'site_id' => $sites[0]->id,
+        'subcontractor_id' => $subcontractor->id,
+        'status' => AssignmentStatus::Pending,
+    ]);
+    Assignment::factory()->survey()->create([
+        'site_id' => $sites[1]->id,
+        'subcontractor_id' => $subcontractor->id,
+        'status' => AssignmentStatus::Verified,
+    ]);
+
+    $outstandingResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'outstanding Asep Riyadi apa aja?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+    $outstandingEvents = parseSseEvents($outstandingResponse->streamedContent());
+
+    expect($outstandingEvents['tool_data']['tool_name'])->toBe('summarize_assignment_operations')
+        ->and($outstandingEvents['tool_data']['tool_payload']['intent'])->toBe('outstanding')
+        ->and($outstandingEvents['tool_data']['tool_payload']['total_count'])->toBe(1)
+        ->and($outstandingEvents['tool_data']['tool_payload']['filters']['subcontractor_user_name'])->toBe('Asep Riyadi');
+
+    $reminderResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'reminder Asep Riyadi ada outstanding apa saja?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+    $reminderEvents = parseSseEvents($reminderResponse->streamedContent());
+
+    expect($reminderEvents['tool_data']['tool_name'])->toBe('generate_subcontractor_reminder')
+        ->and($reminderEvents['tool_data']['tool_payload']['subcontractor'])->toBe('PT Karya Fiber')
+        ->and($reminderEvents['tool_data']['tool_payload']['resolved_from'])->toBe('subcontractor_user')
+        ->and($reminderEvents['tool_data']['tool_payload']['outstanding_count'])->toBe(1);
+
+    $mainconResponse = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => 'maincon sigmatec ada berapa assignment pln?',
+            'mode' => 'full',
+        ])
+        ->assertOk();
+    $mainconEvents = parseSseEvents($mainconResponse->streamedContent());
+
+    expect($mainconEvents['tool_data']['tool_name'])->toBe('query_entity_stats')
+        ->and($mainconEvents['tool_data']['tool_payload']['total_count'])->toBe(1)
+        ->and($mainconEvents['tool_data']['tool_payload']['filters']['main_contractor_name'])->toBe('Sigma Tec')
+        ->and($mainconEvents['tool_data']['tool_payload']['filters']['activity_type'])->toBe(ActivityType::PlnConnection->value);
+
+    Http::assertNothingSent();
+});
+
+test('assignment operation resolver suggests fuzzy candidates and never broadens unresolved filters', function () {
+    $service = app(AiAssistantService::class);
+    $mainContractor = MainContractor::factory()->create(['name' => 'Sigma Tec']);
+    $project = Project::factory()->create(['main_contractor_id' => $mainContractor->id]);
+    $site = Site::factory()->create(['project_id' => $project->id]);
+
+    Assignment::factory()->plnConnection()->create(['site_id' => $site->id]);
+    Assignment::factory()->plnConnection()->create();
+
+    $misspelledMainContractor = $service->queryEntityStats([
+        'count_target' => 'assignments',
+        'main_contractor_name' => 'sigmtec',
+        'activity_type' => 'PLN',
+    ], []);
+
+    expect($misspelledMainContractor['needs_clarification'])->toBeTrue()
+        ->and($misspelledMainContractor['total_count'])->toBe(0)
+        ->and($misspelledMainContractor['clarification_suggestions'])->toContain('main_contractor: Sigma Tec');
+
+    $unknownProject = $service->queryEntityStats([
+        'count_target' => 'assignments',
+        'project_name' => 'No Such Project',
+        'activity_type' => 'PLN',
+    ], []);
+
+    expect($unknownProject['needs_clarification'])->toBeTrue()
+        ->and($unknownProject['total_count'])->toBe(0)
+        ->and($unknownProject['clarification_suggestions'])->toBeEmpty();
+});
+
 test('assistant returns survey recap for main contractor and outstanding by subcontractor company or user', function () {
     config(['ai.providers.deepseek.key' => null]);
     Http::fake();
