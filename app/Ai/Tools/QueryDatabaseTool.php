@@ -10,6 +10,15 @@ use Laravel\Ai\Tools\Request;
 
 class QueryDatabaseTool implements Tool
 {
+    private const REPAIR_GUIDANCE = [
+        'Retry once with a corrected SELECT-only query.',
+        'Use only allowed tables from the schema.',
+        'Use canonical joins from the relationship map.',
+        'Include the required main_contractor_id scope.',
+        'Keep one statement only and include a LIMIT.',
+        'If the corrected query still fails, explain the failure instead of retrying again.',
+    ];
+
     private const FORBIDDEN_KEYWORDS = [
         'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'TRUNCATE', 'REPLACE', 'EXEC', 'EXECUTE', 'CALL',
     ];
@@ -104,7 +113,11 @@ class QueryDatabaseTool implements Tool
     /** @param array<string, mixed> $extra */
     private function errorResponse(string $error, array $extra = []): string
     {
-        $payload = ['error' => $error] + $extra;
+        $payload = [
+            'error' => $error,
+            'repairable' => true,
+            'repair_guidance' => self::REPAIR_GUIDANCE,
+        ] + $extra;
         $this->bag->toolName = $this->name();
         $this->bag->toolPayload = $payload;
 

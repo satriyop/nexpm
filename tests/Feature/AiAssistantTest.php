@@ -502,6 +502,20 @@ test('full mode agent includes curated pm tools before raw database querying', f
         ->and($toolNames)->toContain('query_database');
 });
 
+test('full mode agent instructs one safe sql repair retry', function () {
+    $agent = new NexpmFullModeAgent(
+        app(DbSchemaService::class),
+        app(AiAssistantService::class),
+        [],
+        ['mode' => 'full', 'max_rows' => 100],
+        1,
+    );
+
+    expect($agent->instructions())->toContain('repairable=true')
+        ->and($agent->instructions())->toContain('exactly one more time')
+        ->and($agent->instructions())->toContain('Full mode is read-only');
+});
+
 test('full mode schema description includes relationship map and configured row limit', function () {
     $schema = app(DbSchemaService::class)->buildSchemaDescription(12, 75);
 
@@ -565,8 +579,24 @@ test('full mode query database rejects unsafe sql', function () {
         ->and(runQueryDatabaseTool('SELECT * FROM machine_types -- hide', $mainContractor->id)['error'])
         ->toBe('SQL comments are not allowed.')
         ->and($unscopedPayload['error'])->toContain('must scope to main_contractor_id')
+        ->and($unscopedPayload['repairable'])->toBeTrue()
+        ->and($unscopedPayload['repair_guidance'])->toContain('Retry once with a corrected SELECT-only query.')
         ->and($bag->toolName)->toBe('query_database')
         ->and($bag->toolPayload['error'])->toContain('must scope to main_contractor_id');
+});
+
+test('full mode query database returns repair context for database errors', function () {
+    $mainContractor = MainContractor::factory()->create();
+
+    $payload = runQueryDatabaseTool(
+        "SELECT p.not_a_real_column FROM projects p WHERE p.main_contractor_id = {$mainContractor->id}",
+        $mainContractor->id,
+    );
+
+    expect($payload['error'])->toContain('Query failed:')
+        ->and($payload['repairable'])->toBeTrue()
+        ->and($payload['sql'])->toContain('not_a_real_column')
+        ->and($payload['repair_guidance'])->toContain('Use canonical joins from the relationship map.');
 });
 
 test('full mode query database allows reference tables without project scope', function () {
