@@ -2,6 +2,8 @@
 
 use App\Ai\Agents\NexpmAssistantAgent;
 use App\Ai\Agents\NexpmFullModeAgent;
+use App\Ai\Tools\QueryDatabaseTool;
+use App\Ai\Tools\ToolResultBag;
 use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Enums\Role;
@@ -21,6 +23,7 @@ use App\Models\User;
 use App\Services\Ai\AiAssistantService;
 use App\Services\Ai\DbSchemaService;
 use Illuminate\Support\Facades\Http;
+use Laravel\Ai\Tools\Request as ToolRequest;
 
 /**
  * Parse SSE event stream into a keyed array of event data.
@@ -55,6 +58,13 @@ function parseSseEvents(string $content): array
     }
 
     return $events;
+}
+
+function runQueryDatabaseTool(string $sql, int $mainContractorId = 1, ?ToolResultBag $bag = null): array
+{
+    $tool = new QueryDatabaseTool(['mode' => 'full', 'max_rows' => 100], $bag ?? new ToolResultBag, $mainContractorId);
+
+    return json_decode($tool->handle(new ToolRequest(['sql' => $sql])), true);
 }
 
 test('only super admins can ask the assistant', function () {
@@ -157,7 +167,57 @@ test('assistant does not default unrelated questions to blocked assignments', fu
     $events = parseSseEvents($response->streamedContent());
 
     expect($events['tool_data']['tool_name'])->toBe('general_help')
-        ->and($events['text']['delta'])->toBe('AI provider belum dikonfigurasi atau tidak dapat dihubungi, jadi ini ringkasan lokal NexPM. Saya bisa membantu melihat risiko proyek, assignment telat, blocker subcon, kesiapan laporan, dan prioritas tindakan PM hari ini.');
+        ->and($events['text']['delta'])->toContain('Saya belum bisa memastikan satu tool yang tepat')
+        ->and($events['text']['delta'])->toContain('count project/site/assignment')
+        ->and($events['tool_data']['tool_payload']['supported_tools'])->toContain('query_entity_stats')
+        ->and($events['tool_data']['tool_payload']['fallback_guidance'])->not->toBeEmpty();
+
+    Http::assertNothingSent();
+});
+
+test('assistant resolves unknown domain questions before generic help', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    Project::factory()->create(['name' => 'Alpha Rollout Barat']);
+    Project::factory()->create(['name' => 'Alpha Rollout Timur']);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'Tolong bahas project Alpha'])
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('resolve_entity_context')
+        ->and($events['tool_data']['tool_payload']['needs_clarification'])->toBeTrue()
+        ->and($events['tool_data']['tool_payload']['clarification_suggestions'])->toContain('project: Alpha Rollout Barat')
+        ->and($events['tool_data']['tool_payload']['clarification_suggestions'])->toContain('project: Alpha Rollout Timur')
+        ->and($events['text']['delta'])->toContain('Pencarian konteks menemukan 2 project');
+
+    Http::assertNothingSent();
+});
+
+test('assistant resolves unknown machine type questions before generic help', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    MachineType::factory()->create(['name' => 'BSS 6S 1P']);
+    MachineType::factory()->create(['name' => 'BSS 12S 1P']);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), ['message' => 'BSS mana yang perlu dicek?'])
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('resolve_entity_context')
+        ->and($events['tool_data']['tool_payload']['needs_clarification'])->toBeTrue()
+        ->and($events['tool_data']['tool_payload']['clarification_suggestions'])->toContain('machine_type: BSS 6S 1P')
+        ->and($events['tool_data']['tool_payload']['clarification_suggestions'])->toContain('machine_type: BSS 12S 1P');
 
     Http::assertNothingSent();
 });
@@ -413,6 +473,83 @@ test('full mode agent includes curated pm tools before raw database querying', f
         ->and($toolNames)->toContain('workflow_knowledge')
         ->and($toolNames)->toContain('resolve_entity_context')
         ->and($toolNames)->toContain('query_database');
+});
+
+test('full mode schema description includes relationship map and configured row limit', function () {
+    $schema = app(DbSchemaService::class)->buildSchemaDescription(12, 75);
+
+    expect($schema)->toContain('RELATIONSHIP MAP')
+        ->and($schema)->toContain('`assignments.site_id` → `sites.id`')
+        ->and($schema)->toContain('`sites.machine_type_id` → `machine_types.id`')
+        ->and($schema)->toContain('LIMIT 75')
+        ->and($schema)->toContain('main_contractor_id = 12');
+});
+
+test('full mode query database allows scoped joins', function () {
+    $mainContractor = MainContractor::factory()->create();
+    $project = Project::factory()->create(['main_contractor_id' => $mainContractor->id]);
+    $site = Site::factory()->create(['project_id' => $project->id]);
+    Assignment::factory()->survey()->create(['site_id' => $site->id]);
+
+    $payload = runQueryDatabaseTool(
+        "SELECT COUNT(*) AS total FROM assignments a JOIN sites st ON a.site_id = st.id JOIN projects p ON st.project_id = p.id WHERE p.main_contractor_id = {$mainContractor->id}",
+        $mainContractor->id,
+    );
+
+    expect($payload)->not->toHaveKey('error')
+        ->and($payload['rows_returned'])->toBe(1)
+        ->and((int) $payload['rows'][0]['total'])->toBe(1)
+        ->and($payload['sql'])->toContain('LIMIT 100');
+});
+
+test('full mode query database allows displaying joined main contractor names when project scoped', function () {
+    $mainContractor = MainContractor::factory()->create(['name' => 'Sigma Tec']);
+    Project::factory()->create(['main_contractor_id' => $mainContractor->id]);
+
+    $payload = runQueryDatabaseTool(
+        "SELECT p.name AS project_name, mc.name AS main_contractor FROM projects p JOIN main_contractors mc ON p.main_contractor_id = mc.id WHERE p.main_contractor_id = {$mainContractor->id}",
+        $mainContractor->id,
+    );
+
+    expect($payload)->not->toHaveKey('error')
+        ->and($payload['rows_returned'])->toBe(1)
+        ->and($payload['rows'][0]['main_contractor'])->toBe('Sigma Tec');
+});
+
+test('full mode query database rejects unscoped assignment queries', function () {
+    $mainContractor = MainContractor::factory()->create();
+
+    $payload = runQueryDatabaseTool('SELECT COUNT(*) AS total FROM assignments', $mainContractor->id);
+
+    expect($payload['error'])->toBe("Queries for project/site/assignment/report data must scope to main_contractor_id {$mainContractor->id}.");
+});
+
+test('full mode query database rejects unsafe sql', function () {
+    $mainContractor = MainContractor::factory()->create();
+    $bag = new ToolResultBag;
+    $unscopedPayload = runQueryDatabaseTool('SELECT COUNT(*) AS total FROM assignments', $mainContractor->id, $bag);
+
+    expect(runQueryDatabaseTool('UPDATE assignments SET status = "DROP"', $mainContractor->id)['error'])
+        ->toBe('Only SELECT queries are allowed.')
+        ->and(runQueryDatabaseTool('SELECT * FROM password_reset_tokens', $mainContractor->id)['error'])
+        ->toBe("Table 'password_reset_tokens' is not in the allowed list.")
+        ->and(runQueryDatabaseTool('SELECT * FROM machine_types; SELECT * FROM users', $mainContractor->id)['error'])
+        ->toBe('Only a single SELECT statement is allowed.')
+        ->and(runQueryDatabaseTool('SELECT * FROM machine_types -- hide', $mainContractor->id)['error'])
+        ->toBe('SQL comments are not allowed.')
+        ->and($unscopedPayload['error'])->toContain('must scope to main_contractor_id')
+        ->and($bag->toolName)->toBe('query_database')
+        ->and($bag->toolPayload['error'])->toContain('must scope to main_contractor_id');
+});
+
+test('full mode query database allows reference tables without project scope', function () {
+    MachineType::factory()->create(['name' => 'BSS 6S 1P']);
+
+    $payload = runQueryDatabaseTool('SELECT name FROM machine_types ORDER BY name', 1);
+
+    expect($payload)->not->toHaveKey('error')
+        ->and($payload['rows_returned'])->toBeGreaterThanOrEqual(1)
+        ->and($payload['sql'])->toContain('LIMIT 100');
 });
 
 test('assistant can resolve ambiguous natural language project and subcon references', function () {

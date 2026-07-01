@@ -443,7 +443,8 @@ class AiAssistantController extends Controller
         if (Str::contains($normalized, [
             'apa', 'siapa', 'saja', 'yang', 'temukan', 'daftar', 'pengguna',
             'telat', 'terlambat', 'ringkas', 'rangkum', 'progres', 'laporan',
-            'siap', 'bisa', 'kamu', 'bantu', 'sudah', 'belum',
+            'siap', 'bisa', 'kamu', 'bantu', 'sudah', 'belum', 'tolong',
+            'bahas', 'mana', 'perlu', 'cek',
         ])) {
             return 'id';
         }

@@ -95,6 +95,10 @@ class AiAssistantService
             return 'find_blocked_assignments';
         }
 
+        if ($this->shouldResolveUnknownDomainQuestion($normalized, $context)) {
+            return 'resolve_entity_context';
+        }
+
         return 'general_help';
     }
 
@@ -121,9 +125,70 @@ class AiAssistantService
             'summarize_subcontractor_blockers' => $this->summarizeSubcontractorBlockers($context),
             'check_report_readiness' => $this->checkReportReadiness($context),
             'summarize_dashboard' => $this->summarizeDashboard($context),
-            'general_help' => $this->generalHelp(),
+            'general_help' => $this->generalHelp($context),
             default => $this->findBlockedAssignments($context),
         };
+    }
+
+    /** @param  array<string, mixed>  $context */
+    private function shouldResolveUnknownDomainQuestion(string $normalized, array $context): bool
+    {
+        if ($this->hasRecordContext($context)) {
+            return Str::contains($normalized, [
+                'ini',
+                'record',
+                'halaman',
+                'cek',
+                'lihat',
+                'review',
+                'bahas',
+                'status',
+                'masalah',
+            ]);
+        }
+
+        $mentionsDomain = Str::contains($normalized, [
+            'project',
+            'proyek',
+            'site',
+            'lokasi',
+            'assignment',
+            'assign',
+            'subcon',
+            'subkon',
+            'subcontractor',
+            'vendor',
+            'main con',
+            'main contractor',
+            'machine type',
+            'tipe mesin',
+            'mesin',
+            'bss',
+            'evcs',
+            'report',
+            'laporan',
+            'workflow',
+        ]);
+
+        $asksForInterpretation = Str::contains($normalized, [
+            'apa',
+            'which',
+            'mana',
+            'cek',
+            'lihat',
+            'review',
+            'bahas',
+            'tentang',
+            'about',
+            'detail',
+            'rincian',
+            'kenapa',
+            'mengapa',
+            'bagaimana',
+            'gimana',
+        ]);
+
+        return $mentionsDomain && $asksForInterpretation;
     }
 
     /**
@@ -147,7 +212,10 @@ class AiAssistantService
                 (int) $toolPayload['total_users_returned'],
                 $this->formatCounts($toolPayload['role_counts'] ?? [])
             ),
-            'general_help' => 'I can help with project risks, late assignments, subcontractor blockers, report readiness, and PM priority actions.',
+            'general_help' => sprintf(
+                'I could not identify one exact tool for that question yet. I can answer project/site/assignment counts, operational recaps, outstanding work, workflow status, report readiness, blockers, and PM priority actions. Try one of these: %s.',
+                implode('; ', array_slice($toolPayload['examples'] ?? [], 0, 4))
+            ),
             'workflow_knowledge' => 'Workflow knowledge: survey completion moves eligible survey assignments to DOCUMENT, DOCUMENT assignments are ready for report preparation, VERIFIED means admin review is complete, and REPORTED means the assignment has been included in a generated report.',
             'resolve_entity_context' => sprintf(
                 'Entity lookup: %d project matches, %d site matches, %d subcontractor matches, %d subcontractor user matches, %d main contractor matches, and %d machine type matches found.',
@@ -734,10 +802,12 @@ class AiAssistantService
     /**
      * @return array<string, mixed>
      */
-    public function generalHelp(): array
+    /** @param  array<string, mixed>  $context */
+    public function generalHelp(array $context = []): array
     {
         return [
             'generated_at' => now()->toIso8601String(),
+            'current_context' => $this->normalizedContext($context),
             'supported_tools' => [
                 'project_health_briefing',
                 'detect_workflow_gaps',
@@ -748,12 +818,36 @@ class AiAssistantService
                 'summarize_priority_actions',
                 'summarize_dashboard',
                 'check_report_readiness',
+                'query_entity_stats',
+                'summarize_assignment_operations',
+                'generate_subcontractor_reminder',
+                'resolve_entity_context',
             ],
             'examples' => [
                 'Briefing proyek hari ini',
                 'Cek gap workflow',
                 'Assignment ini apa masalahnya?',
                 'Apa prioritas tindakan saya hari ini?',
+                'Project [nama] ada berapa lokasi?',
+                'Berapa assignment survey pending untuk subkon [nama/user]?',
+                'Rekap outstanding untuk subkon [nama/user]',
+            ],
+            'understood_domains' => [
+                'projects',
+                'sites',
+                'assignments',
+                'main contractors',
+                'subcontractors',
+                'subcontractor users',
+                'machine types',
+                'workflow/status',
+                'reports',
+            ],
+            'fallback_guidance' => [
+                'Jika pertanyaan menyebut nama project/site/subkon/machine type tetapi maksudnya belum jelas, saya akan cari kandidat entitas dulu.',
+                'Jika ingin angka, gunakan kata seperti berapa/jumlah/count.',
+                'Jika ingin pekerjaan yang belum selesai, gunakan outstanding/telat/stuck/pending.',
+                'Full DB mode bisa memakai query read-only untuk pertanyaan database yang belum punya tool khusus.',
             ],
         ];
     }
@@ -818,6 +912,9 @@ class AiAssistantService
     {
         $normalized = Str::lower($query);
         $searchTerm = $this->entitySearchTerm($normalized);
+        $machineTypeSearchTerm = $searchTerm !== ''
+            ? $searchTerm
+            : $this->machineTypeFamilySearchTerm($normalized);
 
         $projects = Project::query()
             ->select(['id', 'name'])
@@ -908,10 +1005,10 @@ class AiAssistantService
 
         $machineTypes = DB::table('machine_types')
             ->select(['id', 'name'])
-            ->when($searchTerm !== '', fn ($query) => $query->where('name', 'like', "%{$searchTerm}%"))
+            ->when($machineTypeSearchTerm !== '', fn ($query) => $query->where('name', 'like', "%{$machineTypeSearchTerm}%"))
             ->limit(8)
             ->get()
-            ->filter(fn ($machineType): bool => $searchTerm !== '' || Str::contains($normalized, Str::lower((string) $machineType->name)))
+            ->filter(fn ($machineType): bool => $machineTypeSearchTerm !== '' || Str::contains($normalized, Str::lower((string) $machineType->name)))
             ->map(fn ($machineType): array => [
                 'type' => 'machine_type',
                 'id' => (int) $machineType->id,
@@ -927,6 +1024,10 @@ class AiAssistantService
             ->concat($mainContractors)
             ->concat($machineTypes)
             ->values();
+        $clarificationSuggestions = $matches
+            ->take(5)
+            ->map(fn (array $match): string => "{$match['type']}: {$match['label']}")
+            ->all();
 
         return [
             'generated_at' => now()->toIso8601String(),
@@ -935,6 +1036,7 @@ class AiAssistantService
             'current_context' => $this->normalizedContext($context),
             'match_count' => $matches->count(),
             'needs_clarification' => $matches->count() > 1,
+            'clarification_suggestions' => $clarificationSuggestions,
             'projects' => $projects->all(),
             'sites' => $sites->all(),
             'subcontractors' => $subcontractors->all(),
@@ -2315,6 +2417,15 @@ class AiAssistantService
             ->all();
     }
 
+    private function machineTypeFamilySearchTerm(string $normalized): string
+    {
+        return match (true) {
+            Str::contains($normalized, 'bss') => 'bss',
+            Str::contains($normalized, 'evcs') => 'evcs',
+            default => '',
+        };
+    }
+
     private function inferAssignmentOperationIntent(string $normalized): string
     {
         if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])) {
@@ -2416,7 +2527,10 @@ class AiAssistantService
                 (int) $toolPayload['total_users_returned'],
                 $this->formatCounts($toolPayload['role_counts'] ?? [], 'id')
             ),
-            'general_help' => 'Saya bisa membantu melihat risiko proyek, assignment telat, blocker subcon, kesiapan laporan, dan prioritas tindakan PM hari ini.',
+            'general_help' => sprintf(
+                'Saya belum bisa memastikan satu tool yang tepat untuk pertanyaan itu. Saya bisa bantu count project/site/assignment, rekap operasional, outstanding, status workflow, kesiapan laporan, blocker, dan prioritas tindakan PM. Coba salah satu ini: %s.',
+                implode('; ', array_slice($toolPayload['examples'] ?? [], 0, 4))
+            ),
             'workflow_knowledge' => 'Ringkasan workflow: PENDING berarti data belum siap, REVISION perlu diperbaiki, DOCUMENT berarti data lengkap untuk tahap dokumen/kesiapan laporan, VERIFIED sudah direview admin, dan REPORTED sudah masuk report. Survey lengkap tetapi belum DOCUMENT adalah gap yang perlu dicek.',
             'resolve_entity_context' => sprintf(
                 'Pencarian konteks menemukan %d project, %d site, %d subcon, %d user subcon, %d main contractor, dan %d tipe mesin. Jika hasilnya lebih dari satu, pilih nama yang paling spesifik.',

@@ -60,8 +60,8 @@ class NexpmFullModeAgent implements Agent, Conversational, HasTools
 
     public function instructions(): string
     {
-        $schema = $this->schemaService->buildSchemaDescription($this->mainContractorId);
         $maxRows = (int) ($this->preferences['max_rows'] ?? 500);
+        $schema = $this->schemaService->buildSchemaDescription($this->mainContractorId, $maxRows);
 
         return <<<PROMPT
 You are NexPM's full-access database analyst for super admins.
@@ -103,7 +103,7 @@ PROMPT;
             new DetectWorkflowGapsTool($this->assistantService, $this->context, $this->bag),
             new ListUsersTool($this->assistantService, $this->context, $this->bag),
             new GeneralHelpTool($this->assistantService, $this->context, $this->bag),
-            new QueryDatabaseTool($this->preferences, $this->bag),
+            new QueryDatabaseTool($this->preferences, $this->bag, $this->mainContractorId),
         ];
     }
 
