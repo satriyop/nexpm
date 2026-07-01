@@ -15,6 +15,8 @@ use Illuminate\Support\Str;
 
 class AiAssistantService
 {
+    public function __construct(private readonly AiQueryPlanner $queryPlanner) {}
+
     /**
      * Select a tool based on keyword matching (used for local fallback).
      *
@@ -22,84 +24,7 @@ class AiAssistantService
      */
     public function selectTool(string $message, array $context): string
     {
-        $normalized = Str::lower($message);
-
-        if (Str::contains($normalized, ['reminder', 'ingatkan', 'buatkan reminder', 'kirim reminder'])) {
-            return 'generate_subcontractor_reminder';
-        }
-
-        if (Str::contains($normalized, ['summary', 'summarize', 'ringkas', 'rangkum', 'recap', 'rekap', 'rekapan'])
-            && Str::contains($normalized, ['assignment', 'survey', 'pln', 'construction', 'bast', 'outstanding'])) {
-            return 'summarize_assignment_operations';
-        }
-
-        if (Str::contains($normalized, ['outstanding', 'tunggakan', 'belum selesai'])) {
-            return 'summarize_assignment_operations';
-        }
-
-        if (Str::contains($normalized, ['berapa lokasi', 'berapa site', 'berapa assignment', 'how many location', 'how many site', 'how many assign', 'how many', 'jumlah lokasi', 'jumlah site', 'jumlah assignment', 'ada berapa'])
-            && Str::contains($normalized, ['lokasi', 'location', 'site', 'assignment', 'assign'])) {
-            return 'query_entity_stats';
-        }
-
-        if (Str::contains($normalized, ['machine type', 'tipe mesin', 'mesin', 'bss', 'evcs'])
-            && Str::contains($normalized, ['berapa', 'jumlah', 'lokasi', 'location', 'site', 'masing-masing', 'masing masing'])) {
-            return 'query_entity_stats';
-        }
-
-        if (Str::contains($normalized, ['machine type', 'tipe mesin']) && Str::contains($normalized, ['bss', 'evcs'])) {
-            return 'query_entity_stats';
-        }
-
-        if (Str::contains($normalized, ['user', 'users', 'pengguna', 'siapa saja', 'daftar user', 'daftar pengguna', 'akun', 'admin', 'superadmin', 'super admin'])) {
-            return 'list_users';
-        }
-
-        if (Str::contains($normalized, ['briefing', 'brief', 'kabar proyek', 'kondisi proyek', 'health', 'health briefing'])) {
-            return 'project_health_briefing';
-        }
-
-        if (Str::contains($normalized, ['gap', 'workflow gap', 'gap workflow', 'inkonsisten', 'inconsistent', 'missing field', 'data kurang', 'belum lengkap', 'tidak lengkap'])) {
-            return 'detect_workflow_gaps';
-        }
-
-        if (Str::contains($normalized, ['arti', 'maksud', 'alur', 'workflow', 'flow', 'status', 'document', 'verified', 'reported', 'field wajib', 'wajib diisi', 'required field', 'siapa yang input', 'siapa input'])) {
-            return 'workflow_knowledge';
-        }
-
-        if ($this->hasRecordContext($context) && Str::contains($normalized, ['halaman ini', 'record ini', 'assignment ini', 'site ini', 'project ini', 'proyek ini', 'apa masalah', 'masalahnya', 'statusnya', 'apa status'])) {
-            return 'contextual_page_summary';
-        }
-
-        if (Str::contains($normalized, ['risiko proyek', 'risiko terbesar', 'project risk', 'project mana', 'proyek mana', 'paling lambat', 'lambat', 'project lambat', 'proyek lambat'])) {
-            return 'summarize_project_risks';
-        }
-
-        if (Str::contains($normalized, ['prioritas', 'priority', 'tindakan', 'action', 'next action', 'apa yang harus'])) {
-            return 'summarize_priority_actions';
-        }
-
-        if (Str::contains($normalized, ['subcon', 'sub contractor', 'subcontractor', 'vendor', 'blocker subcon', 'paling banyak blocker'])) {
-            return 'summarize_subcontractor_blockers';
-        }
-
-        if (Str::contains($normalized, ['report', 'readiness', 'generate', 'verified', 'laporan', 'siap report', 'siap laporan', 'verifikasi'])) {
-            return 'check_report_readiness';
-        }
-
-        if (Str::contains($normalized, ['dashboard', 'overview', 'summary', 'summarize', 'progress', 'progres', 'ringkas', 'rangkum'])) {
-            return 'summarize_dashboard';
-        }
-
-        if (Str::contains($normalized, ['blocked', 'stuck', 'late', 'risk', 'risky', 'pending', 'revision', 'telat', 'terlambat', 'macet', 'bermasalah'])) {
-            return 'find_blocked_assignments';
-        }
-
-        if ($this->shouldResolveUnknownDomainQuestion($normalized, $context)) {
-            return 'resolve_entity_context';
-        }
-
-        return 'general_help';
+        return $this->queryPlanner->plan($message, $context)['tool'];
     }
 
     /**
@@ -128,67 +53,6 @@ class AiAssistantService
             'general_help' => $this->generalHelp($context),
             default => $this->findBlockedAssignments($context),
         };
-    }
-
-    /** @param  array<string, mixed>  $context */
-    private function shouldResolveUnknownDomainQuestion(string $normalized, array $context): bool
-    {
-        if ($this->hasRecordContext($context)) {
-            return Str::contains($normalized, [
-                'ini',
-                'record',
-                'halaman',
-                'cek',
-                'lihat',
-                'review',
-                'bahas',
-                'status',
-                'masalah',
-            ]);
-        }
-
-        $mentionsDomain = Str::contains($normalized, [
-            'project',
-            'proyek',
-            'site',
-            'lokasi',
-            'assignment',
-            'assign',
-            'subcon',
-            'subkon',
-            'subcontractor',
-            'vendor',
-            'main con',
-            'main contractor',
-            'machine type',
-            'tipe mesin',
-            'mesin',
-            'bss',
-            'evcs',
-            'report',
-            'laporan',
-            'workflow',
-        ]);
-
-        $asksForInterpretation = Str::contains($normalized, [
-            'apa',
-            'which',
-            'mana',
-            'cek',
-            'lihat',
-            'review',
-            'bahas',
-            'tentang',
-            'about',
-            'detail',
-            'rincian',
-            'kenapa',
-            'mengapa',
-            'bagaimana',
-            'gimana',
-        ]);
-
-        return $mentionsDomain && $asksForInterpretation;
     }
 
     /**

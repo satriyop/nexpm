@@ -152,7 +152,12 @@ class AiAssistantController extends Controller
     /** @param array{mode: string, max_rows: int} $preferences */
     private function streamResponse(AiAssistantService $service, string $message, string $originalMessage, array $context, AiConversation $conversation, int $userId, string $mode = 'standard', ?int $mainContractorId = null, array $preferences = []): void
     {
-        $contextWithQuery = array_merge($context, ['query' => $message]);
+        $apiKey = config('ai.providers.deepseek.key');
+        $contextWithQuery = array_merge($context, [
+            'query' => $message,
+            'mode' => $mode,
+            'ai_provider_available' => ! empty($apiKey),
+        ]);
         $deterministicToolName = $service->selectTool($message, $contextWithQuery);
 
         if ($this->shouldBypassModel($deterministicToolName)) {
@@ -161,10 +166,8 @@ class AiAssistantController extends Controller
             return;
         }
 
-        $apiKey = config('ai.providers.deepseek.key');
-
         if (empty($apiKey)) {
-            $this->streamFallback($service, $message, $originalMessage, $context, $conversation, $userId, new \RuntimeException('DeepSeek API key is not configured.'));
+            $this->streamFallback($service, $message, $originalMessage, $context, $conversation, $userId, new \RuntimeException('DeepSeek API key is not configured.'), $mode);
 
             return;
         }
@@ -227,7 +230,7 @@ class AiAssistantController extends Controller
                 return;
             }
 
-            $this->streamFallback($service, $message, $originalMessage, $context, $conversation, $userId, $exception);
+            $this->streamFallback($service, $message, $originalMessage, $context, $conversation, $userId, $exception, $mode);
         }
     }
 
@@ -267,9 +270,13 @@ class AiAssistantController extends Controller
         ], true);
     }
 
-    private function streamFallback(AiAssistantService $service, string $message, string $originalMessage, array $context, AiConversation $conversation, int $userId, Throwable $exception): void
+    private function streamFallback(AiAssistantService $service, string $message, string $originalMessage, array $context, AiConversation $conversation, int $userId, Throwable $exception, string $mode = 'standard'): void
     {
-        $context = array_merge($context, ['query' => $message]);
+        $context = array_merge($context, [
+            'query' => $message,
+            'mode' => $mode,
+            'ai_provider_available' => false,
+        ]);
         $toolName = $service->selectTool($message, $context);
         $toolPayload = $service->runTool($toolName, $context);
         $toolPayload = $service->decorateToolPayload($toolName, $toolPayload, $context);

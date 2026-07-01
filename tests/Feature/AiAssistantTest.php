@@ -21,6 +21,7 @@ use App\Models\Site;
 use App\Models\Subcontractor;
 use App\Models\User;
 use App\Services\Ai\AiAssistantService;
+use App\Services\Ai\AiQueryPlanner;
 use App\Services\Ai\DbSchemaService;
 use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Tools\Request as ToolRequest;
@@ -220,6 +221,32 @@ test('assistant resolves unknown machine type questions before generic help', fu
         ->and($events['tool_data']['tool_payload']['clarification_suggestions'])->toContain('machine_type: BSS 12S 1P');
 
     Http::assertNothingSent();
+});
+
+test('query planner exposes deterministic routing confidence and entities', function () {
+    $planner = app(AiQueryPlanner::class);
+
+    $countPlan = $planner->plan('Sigmatec PLN berapa?', ['mode' => 'standard']);
+    $unknownPlan = $planner->plan('Planet Ban gimana progressnya?', ['mode' => 'standard']);
+    $fullModePlan = $planner->plan('Tampilkan clients dan financials per project', [
+        'mode' => 'full',
+        'ai_provider_available' => true,
+    ]);
+    $offlineFullModePlan = $planner->plan('Tampilkan clients dan financials per project', [
+        'mode' => 'full',
+        'ai_provider_available' => false,
+    ]);
+
+    expect($countPlan['tool'])->toBe('query_entity_stats')
+        ->and($countPlan['intent'])->toBe('count')
+        ->and($countPlan['confidence'])->toBeGreaterThan(0.8)
+        ->and($unknownPlan['tool'])->toBe('resolve_entity_context')
+        ->and($unknownPlan['route'])->toBe('entity_prepass')
+        ->and($fullModePlan['tool'])->toBe('query_database')
+        ->and($fullModePlan['route'])->toBe('full_mode_sql')
+        ->and($fullModePlan['entities'])->toContain('client')
+        ->and($fullModePlan['entities'])->toContain('financial')
+        ->and($offlineFullModePlan['tool'])->toBe('general_help');
 });
 
 test('assistant routes project manager risk questions to project risk analytics', function () {
