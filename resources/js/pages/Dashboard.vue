@@ -8,8 +8,11 @@ import {
     Bot,
     Clock,
     HelpCircle,
+    MapPin,
+    ShieldAlert,
     TrendingDown,
     TrendingUp,
+    Wrench,
     XCircle,
 } from 'lucide-vue-next';
 import type { AcceptableValue } from 'reka-ui';
@@ -200,7 +203,68 @@ interface ControlTower {
     priority_queue: ControlTowerItem[];
 }
 
+type SiteOverallStatus =
+    | 'done'
+    | 'blocked'
+    | 'stalled'
+    | 'needs_review'
+    | 'ready_for_report'
+    | 'not_started'
+    | 'dropped'
+    | 'in_progress';
+
+type SiteIssueSeverity = 'critical' | 'high' | 'medium' | 'low' | null;
+
+interface SiteWorkstream {
+    assignment_id: number;
+    activity_type: string;
+    label: string;
+    status: string;
+    subcontractor: string | null;
+    age_days: number | null;
+    url: string;
+}
+
+interface SiteOperationsRow {
+    site_id: number;
+    site_code: string;
+    location_name: string;
+    project_id: number;
+    project: string;
+    main_contractor: string;
+    machine_type: string | null;
+    overall_status: SiteOverallStatus;
+    completion_pct: number;
+    active_assignment_count: number;
+    workstreams: Record<string, SiteWorkstream | null>;
+    main_issue: string;
+    issue_type: string | null;
+    issue_severity: SiteIssueSeverity;
+    severity_score: number;
+    owner: string | null;
+    age_days: number | null;
+    next_action: string;
+    url: string;
+    ai_prompt: string;
+}
+
+interface SiteOperations {
+    generated_at: string;
+    metrics: {
+        total_sites: number;
+        done_sites: number;
+        blocked_sites: number;
+        stalled_sites: number;
+        needs_review_sites: number;
+        ready_for_report_sites: number;
+        not_started_sites: number;
+    };
+    problem_breakdown: Record<string, number>;
+    site_rows: SiteOperationsRow[];
+}
+
 const props = defineProps<{
+    siteOperations: SiteOperations | null;
     controlTower: ControlTower | null;
     deadlineRisk: DeadlineRisk[] | null;
     statusCounts: StatusCounts | null;
@@ -225,6 +289,7 @@ usePoll(30_000, {
         'projectBreakdowns',
         'recentActivity',
         'activityChart',
+        'siteOperations',
         'controlTower',
         'deadlineRisk',
         'subcontractorLeaderboard',
@@ -542,12 +607,110 @@ function askAi(prompt: string): void {
     );
 }
 
+const siteRows = computed(() => props.siteOperations?.site_rows ?? []);
+const siteWorkstreamOrder: { key: string; label: string }[] = [
+    { key: 'survey', label: 'Survey' },
+    { key: 'pln', label: 'PLN' },
+    { key: 'construction', label: 'Construction' },
+    { key: 'bast', label: 'BAST' },
+];
+const problemBreakdownRows = computed(() =>
+    Object.entries(props.siteOperations?.problem_breakdown ?? {})
+        .slice(0, 5)
+        .map(([type, count]) => ({
+            type,
+            count,
+            label: issueTypeLabel(type),
+        })),
+);
+
 function severityClass(severity: ControlTowerItem['severity']): string {
     return {
         critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
         high: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
         medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     }[severity];
+}
+
+function siteSeverityClass(severity: SiteIssueSeverity): string {
+    return {
+        critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+        high: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+        medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+        low: 'bg-muted text-muted-foreground',
+    }[severity ?? 'low'];
+}
+
+function siteStatusClass(status: SiteOverallStatus): string {
+    return {
+        blocked: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+        stalled:
+            'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+        needs_review:
+            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+        ready_for_report:
+            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+        not_started: 'bg-muted text-muted-foreground',
+        in_progress:
+            'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+        dropped: 'bg-red-50 text-red-500 dark:bg-red-900/10 dark:text-red-400',
+        done: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    }[status];
+}
+
+function siteStatusLabel(status: SiteOverallStatus): string {
+    return {
+        blocked: 'Blocked',
+        stalled: 'Stalled',
+        needs_review: 'Needs Review',
+        ready_for_report: 'Ready Report',
+        not_started: 'Not Started',
+        in_progress: 'In Progress',
+        dropped: 'Dropped',
+        done: 'Done',
+    }[status];
+}
+
+function issueTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+        construction_missing_wo: 'Missing WO',
+        site_missing_power: 'Missing Power',
+        revision_pending: 'Revision',
+        stalled_assignment: 'Stalled',
+        ready_for_verification: 'Ready Verify',
+        verified_not_reported: 'Not Reported',
+        no_assignment_started: 'No Assignment',
+        site_dropped: 'Dropped',
+    };
+
+    return labels[type] ?? type.replaceAll('_', ' ');
+}
+
+function siteWorkstream(
+    row: SiteOperationsRow,
+    key: string,
+): SiteWorkstream | null {
+    return row.workstreams[key] ?? null;
+}
+
+function workstreamClass(workstream: SiteWorkstream | null): string {
+    if (!workstream) {
+        return 'border-dashed text-muted-foreground';
+    }
+
+    if (['VERIFIED', 'REPORTED'].includes(workstream.status)) {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300';
+    }
+
+    if (workstream.status === 'REVISION') {
+        return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300';
+    }
+
+    if (workstream.status === 'DROP') {
+        return 'border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300';
+    }
+
+    return 'border-border bg-background text-foreground';
 }
 
 function forecastRiskClass(riskLevel: ForecastItem['risk_level']): string {
@@ -975,6 +1138,343 @@ function timeAgo(isoString: string): string {
                     <div class="h-14 animate-pulse rounded bg-muted" />
                     <div class="h-3 w-32 animate-pulse rounded bg-muted" />
                 </template>
+            </div>
+        </div>
+
+        <!-- Section: Location Operations -->
+        <div
+            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+        >
+            <div
+                class="flex flex-wrap items-start justify-between gap-3 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+            >
+                <div>
+                    <h2 class="text-sm font-semibold">Location Operations</h2>
+                    <p class="text-xs text-muted-foreground">
+                        Site-first view of blocked, stalled, review, and
+                        report-ready locations
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="siteOperations == null"
+                    @click="
+                        askAi(
+                            'Lokasi mana yang belum selesai dan apa blocker utamanya?',
+                        )
+                    "
+                >
+                    <Bot class="size-3.5" />
+                    Ask AI
+                </button>
+            </div>
+
+            <template v-if="siteOperations != null">
+                <div
+                    class="grid grid-cols-2 gap-3 border-b border-sidebar-border/70 p-4 md:grid-cols-3 xl:grid-cols-6 dark:border-sidebar-border"
+                >
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <MapPin class="size-3.5" />
+                            Locations
+                        </div>
+                        <p class="mt-1 text-2xl font-semibold">
+                            {{ siteOperations.metrics.total_sites }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <ShieldAlert class="size-3.5" />
+                            Blocked
+                        </div>
+                        <p class="mt-1 text-2xl font-semibold text-red-600">
+                            {{ siteOperations.metrics.blocked_sites }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <Clock class="size-3.5" />
+                            Stalled
+                        </div>
+                        <p class="mt-1 text-2xl font-semibold text-orange-600">
+                            {{ siteOperations.metrics.stalled_sites }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <Wrench class="size-3.5" />
+                            Review
+                        </div>
+                        <p class="mt-1 text-2xl font-semibold text-blue-600">
+                            {{ siteOperations.metrics.needs_review_sites }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <CheckCircle2 class="size-3.5" />
+                            Ready Report
+                        </div>
+                        <p
+                            class="mt-1 text-2xl font-semibold text-emerald-600"
+                        >
+                            {{ siteOperations.metrics.ready_for_report_sites }}
+                        </p>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <CheckCircle2 class="size-3.5" />
+                            Done
+                        </div>
+                        <p
+                            class="mt-1 text-2xl font-semibold text-emerald-600"
+                        >
+                            {{ siteOperations.metrics.done_sites }}
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    v-if="problemBreakdownRows.length > 0"
+                    class="flex flex-wrap gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
+                >
+                    <span
+                        class="inline-flex items-center text-xs font-medium text-muted-foreground"
+                    >
+                        Main issues
+                    </span>
+                    <span
+                        v-for="item in problemBreakdownRows"
+                        :key="item.type"
+                        class="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs"
+                    >
+                        {{ item.label }}
+                        <span class="font-semibold tabular-nums">{{
+                            item.count
+                        }}</span>
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead
+                            class="bg-muted/40 text-xs tracking-wide uppercase"
+                        >
+                            <tr>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Location
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Status
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Workstreams
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Why Not Done
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Owner / Age
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-left font-medium text-muted-foreground"
+                                >
+                                    Next Action
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-right font-medium text-muted-foreground"
+                                >
+                                    AI
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="row in siteRows"
+                                :key="row.site_id"
+                                class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
+                            >
+                                <td class="min-w-56 px-4 py-3">
+                                    <Link
+                                        :href="row.url"
+                                        class="font-medium hover:underline"
+                                    >
+                                        {{ row.site_code }}
+                                    </Link>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{ row.location_name }}
+                                    </div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{ row.project }} ·
+                                        {{ row.machine_type ?? 'No machine' }}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                                        :class="
+                                            siteStatusClass(row.overall_status)
+                                        "
+                                    >
+                                        {{
+                                            siteStatusLabel(row.overall_status)
+                                        }}
+                                    </span>
+                                    <div
+                                        class="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-muted"
+                                    >
+                                        <div
+                                            class="h-full rounded-full bg-emerald-500"
+                                            :style="{
+                                                width:
+                                                    row.completion_pct + '%',
+                                            }"
+                                        />
+                                    </div>
+                                    <div
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
+                                        {{ row.completion_pct }}% ·
+                                        {{ row.active_assignment_count }}
+                                        active
+                                    </div>
+                                </td>
+                                <td class="min-w-72 px-4 py-3">
+                                    <div class="grid grid-cols-2 gap-1.5">
+                                        <template
+                                            v-for="stream in siteWorkstreamOrder"
+                                            :key="stream.key"
+                                        >
+                                            <Link
+                                                v-if="
+                                                    siteWorkstream(
+                                                        row,
+                                                        stream.key,
+                                                    )
+                                                "
+                                                :href="
+                                                    siteWorkstream(
+                                                        row,
+                                                        stream.key,
+                                                    )!.url
+                                                "
+                                                class="rounded-md border px-2 py-1 text-xs transition hover:bg-accent"
+                                                :class="
+                                                    workstreamClass(
+                                                        siteWorkstream(
+                                                            row,
+                                                            stream.key,
+                                                        ),
+                                                    )
+                                                "
+                                            >
+                                                <span class="font-medium">{{
+                                                    stream.label
+                                                }}</span>
+                                                <span
+                                                    class="ml-1 text-muted-foreground"
+                                                >
+                                                    {{
+                                                        siteWorkstream(
+                                                            row,
+                                                            stream.key,
+                                                        )!.status
+                                                    }}
+                                                </span>
+                                            </Link>
+                                            <span
+                                                v-else
+                                                class="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground"
+                                                :class="
+                                                    workstreamClass(null)
+                                                "
+                                            >
+                                                {{ stream.label }} -
+                                            </span>
+                                        </template>
+                                    </div>
+                                </td>
+                                <td class="min-w-64 px-4 py-3">
+                                    <div class="flex flex-col gap-1">
+                                        <span>{{ row.main_issue }}</span>
+                                        <span
+                                            v-if="row.issue_severity"
+                                            class="w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                                            :class="
+                                                siteSeverityClass(
+                                                    row.issue_severity,
+                                                )
+                                            "
+                                        >
+                                            {{ row.issue_severity }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div>{{ row.owner ?? '-' }}</div>
+                                    <div class="text-xs text-muted-foreground">
+                                        {{
+                                            row.age_days != null
+                                                ? row.age_days + 'd since update'
+                                                : 'No age signal'
+                                        }}
+                                    </div>
+                                </td>
+                                <td class="min-w-64 px-4 py-3">
+                                    {{ row.next_action }}
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs transition hover:bg-accent"
+                                        @click="askAi(row.ai_prompt)"
+                                    >
+                                        <Bot class="size-3" />
+                                        Ask
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="siteRows.length === 0">
+                                <td
+                                    colspan="7"
+                                    class="px-4 py-8 text-center text-sm text-muted-foreground"
+                                >
+                                    No location data available.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+
+            <div v-else class="flex flex-col gap-2 p-4">
+                <div
+                    v-for="n in 5"
+                    :key="n"
+                    class="h-10 animate-pulse rounded bg-muted"
+                />
             </div>
         </div>
 

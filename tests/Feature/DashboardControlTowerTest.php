@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Dashboard\ProjectControlTowerService;
+use App\Services\Dashboard\SiteOperationsDashboardService;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('project control tower surfaces critical actions and enhanced forecast causes', function () {
@@ -66,9 +67,60 @@ test('dashboard exposes the control tower as a deferred prop', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard')
             ->missing('controlTower')
+            ->missing('siteOperations')
             ->loadDeferredProps(fn (Assert $reload) => $reload
                 ->has('controlTower.metrics')
                 ->has('controlTower.priority_queue')
+                ->has('siteOperations.metrics')
+                ->has('siteOperations.problem_breakdown')
+                ->has('siteOperations.site_rows')
             )
         );
+});
+
+test('site operations dashboard explains why a location is not done', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Jakarta']);
+    User::factory()->create([
+        'name' => 'Main Con Admin',
+        'role' => Role::Admin,
+        'main_contractor_id' => $project->main_contractor_id,
+    ]);
+    $site = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'JKT-001',
+        'location_name' => 'SPBU Senayan',
+        'power_kva' => null,
+    ]);
+
+    $blockedConstruction = Assignment::factory()->construction()->create([
+        'site_id' => $site->id,
+        'status' => AssignmentStatus::Pending,
+        'updated_at' => now()->subDays(15),
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $blockedConstruction->id,
+        'cons_wo_number' => null,
+    ]);
+
+    Assignment::factory()->survey()->create([
+        'site_id' => $site->id,
+        'status' => AssignmentStatus::Verified,
+        'verified_at' => now()->subWeek(),
+    ]);
+
+    $payload = app(SiteOperationsDashboardService::class)->build($superAdmin);
+    $row = $payload['site_rows'][0];
+
+    expect($payload['metrics']['total_sites'])->toBe(1)
+        ->and($payload['metrics']['blocked_sites'])->toBe(1)
+        ->and($payload['problem_breakdown'])->toHaveKey('construction_missing_wo')
+        ->and($row['site_code'])->toBe('JKT-001')
+        ->and($row['overall_status'])->toBe('blocked')
+        ->and($row['issue_type'])->toBe('construction_missing_wo')
+        ->and($row['main_issue'])->toContain('WO number is missing')
+        ->and($row['owner'])->toBe('Admin: Main Con Admin')
+        ->and($row['workstreams']['construction']['status'])->toBe(AssignmentStatus::Pending->value)
+        ->and($row['workstreams']['survey']['status'])->toBe(AssignmentStatus::Verified->value)
+        ->and($row['url'])->toBe(route('admin.assignments.site-assignments', $site));
 });

@@ -7,6 +7,7 @@ use App\Models\MainContractor;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Dashboard\ProjectControlTowerService;
+use App\Services\Dashboard\SiteOperationsDashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, ProjectControlTowerService $controlTower): Response|RedirectResponse
+    public function __invoke(Request $request, ProjectControlTowerService $controlTower, SiteOperationsDashboardService $siteOperations): Response|RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -42,6 +43,7 @@ class DashboardController extends Controller
         };
 
         return Inertia::render('Dashboard', [
+            'siteOperations' => Inertia::defer(fn () => $siteOperations->build($user, $mainContractorFilter, $projectFilter)),
             'controlTower' => Inertia::defer(fn () => $controlTower->build($user, $mainContractorFilter, $projectFilter)),
 
             'deadlineRisk' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
