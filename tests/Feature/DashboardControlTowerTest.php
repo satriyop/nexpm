@@ -3,7 +3,10 @@
 use App\Enums\AssignmentStatus;
 use App\Enums\Role;
 use App\Models\Assignment;
+use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
+use App\Models\AssignmentPlnData;
+use App\Models\AssignmentSurveyData;
 use App\Models\Project;
 use App\Models\Site;
 use App\Models\User;
@@ -294,4 +297,81 @@ test('dashboard deferred site operations use URL filters', function () {
                 ->where('siteOperations.active_filters.wo_number', 'WO-TARGET-7788')
             )
         );
+});
+
+test('site operations surfaces workstream-specific blocker rules', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Detail Rules']);
+
+    $surveySite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'SURVEY-GAP',
+        'power_kva' => null,
+    ]);
+    $survey = Assignment::factory()->survey()->create([
+        'site_id' => $surveySite->id,
+        'status' => AssignmentStatus::Survey,
+    ]);
+    AssignmentSurveyData::factory()->create([
+        'assignment_id' => $survey->id,
+        'ss_schedule_date' => null,
+        'power_kva' => null,
+    ]);
+
+    $plnSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'PLN-GAP',
+    ]);
+    $pln = Assignment::factory()->plnConnection()->create([
+        'site_id' => $plnSite->id,
+        'status' => AssignmentStatus::Connection,
+    ]);
+    AssignmentPlnData::factory()->create([
+        'assignment_id' => $pln->id,
+        'kwh_meter_installation_date' => null,
+        'id_pelanggan' => null,
+        'foto_kwh' => null,
+    ]);
+
+    $constructionSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'CONS-GAP',
+    ]);
+    $construction = Assignment::factory()->construction()->create([
+        'site_id' => $constructionSite->id,
+        'status' => AssignmentStatus::Live,
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $construction->id,
+        'cons_wo_number' => 'WO-READY',
+        'cons_actual_start_date' => null,
+        'cons_actual_done_date' => null,
+        'machine_serial_number' => null,
+        'foto_machine_sn' => null,
+    ]);
+
+    $bastSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'BAST-GAP',
+    ]);
+    $bast = Assignment::factory()->bast()->create([
+        'site_id' => $bastSite->id,
+        'status' => AssignmentStatus::Pending,
+    ]);
+    AssignmentBastData::factory()->create([
+        'assignment_id' => $bast->id,
+        'plant_name' => null,
+        'installation_date' => null,
+        'commissioning_date' => null,
+    ]);
+
+    $rows = collect(app(SiteOperationsDashboardService::class)->build($superAdmin, filters: ['per_page' => 100])['site_rows'])
+        ->keyBy('site_code');
+
+    expect($rows->get('SURVEY-GAP')['issue_type'])->toBe('survey_schedule_missing')
+        ->and(collect($rows->get('SURVEY-GAP')['issues'])->pluck('type'))->toContain('site_missing_power', 'survey_evidence_missing')
+        ->and($rows->get('PLN-GAP')['issue_type'])->toBe('pln_kwh_incomplete')
+        ->and($rows->get('CONS-GAP')['issue_type'])->toBe('construction_data_incomplete')
+        ->and(collect($rows->get('CONS-GAP')['issues'])->pluck('type'))->toContain('construction_photos_missing')
+        ->and($rows->get('BAST-GAP')['issue_type'])->toBe('bast_evidence_missing');
 });

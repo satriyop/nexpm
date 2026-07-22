@@ -241,7 +241,10 @@ class SiteOperationsDashboardService
             ->join('main_contractors', 'main_contractors.id', '=', 'projects.main_contractor_id')
             ->leftJoin('assignments', 'assignments.site_id', '=', 'sites.id')
             ->leftJoin('subcontractors', 'subcontractors.id', '=', 'assignments.subcontractor_id')
+            ->leftJoin('assignment_survey_data', 'assignment_survey_data.assignment_id', '=', 'assignments.id')
+            ->leftJoin('assignment_pln_data', 'assignment_pln_data.assignment_id', '=', 'assignments.id')
             ->leftJoin('assignment_construction_data', 'assignment_construction_data.assignment_id', '=', 'assignments.id')
+            ->leftJoin('assignment_bast_data', 'assignment_bast_data.assignment_id', '=', 'assignments.id')
             ->tap(fn (Builder $query) => $this->applyTenantScope($query, $user, $mainContractorFilter))
             ->when($projectFilter, fn (Builder $query) => $query->where('projects.id', $projectFilter))
             ->select([
@@ -258,7 +261,36 @@ class SiteOperationsDashboardService
                 'assignments.verified_at',
                 'assignments.reported_at',
                 'subcontractors.name as subcontractor_name',
+                'assignment_survey_data.ss_schedule_date as survey_schedule_date',
+                'assignment_survey_data.power_kva as survey_power_kva',
+                'assignment_survey_data.photo_overall_site as survey_photo_overall_site',
+                'assignment_survey_data.photo_parking_evcs as survey_photo_parking_evcs',
+                'assignment_survey_data.photo_access_route as survey_photo_access_route',
+                'assignment_survey_data.photo_pln_network as survey_photo_pln_network',
+                'assignment_survey_data.photo_satellite_gmaps as survey_photo_satellite_gmaps',
+                'assignment_survey_data.file_site_plan as survey_file_site_plan',
+                'assignment_survey_data.file_ba_survey as survey_file_ba_survey',
+                'assignment_pln_data.file_reg as pln_file_reg',
+                'assignment_pln_data.file_pk as pln_file_pk',
+                'assignment_pln_data.file_slo as pln_file_slo',
+                'assignment_pln_data.file_nidi as pln_file_nidi',
+                'assignment_pln_data.email_bpujl_req_date as pln_email_bpujl_req_date',
+                'assignment_pln_data.bpujl_acquired_date as pln_bpujl_acquired_date',
+                'assignment_pln_data.kwh_meter_installation_date as pln_kwh_meter_installation_date',
+                'assignment_pln_data.id_pelanggan as pln_id_pelanggan',
+                'assignment_pln_data.foto_kwh as pln_foto_kwh',
                 'assignment_construction_data.cons_wo_number',
+                'assignment_construction_data.cons_actual_start_date',
+                'assignment_construction_data.cons_actual_done_date',
+                'assignment_construction_data.machine_serial_number',
+                'assignment_construction_data.foto_machine_sn',
+                'assignment_construction_data.go_live_date_pln',
+                'assignment_construction_data.go_live_date_pln_pass',
+                'assignment_bast_data.plant_name as bast_plant_name',
+                'assignment_bast_data.installation_date as bast_installation_date',
+                'assignment_bast_data.commissioning_date as bast_commissioning_date',
+                DB::raw('(select count(*) from assignment_construction_photos where assignment_construction_photos.assignment_construction_data_id = assignment_construction_data.id) as construction_photo_count'),
+                DB::raw('(select count(*) from assignment_bast_photos where assignment_bast_photos.assignment_bast_data_id = assignment_bast_data.id) as bast_photo_count'),
             ])
             ->get();
     }
@@ -358,16 +390,20 @@ class SiteOperationsDashboardService
         $ageDays = $row->updated_at ? (int) Carbon::parse($row->updated_at)->diffInDays(now()) : 0;
         $mainContractorOwner = $this->mainContractorOwner($site, $mainContractorAdminOwners);
 
+        $items = [
+            ...$items,
+            ...$this->surveyIssues($site, $row, $mainContractorOwner),
+            ...$this->plnIssues($site, $row),
+            ...$this->constructionIssues($site, $row, $mainContractorOwner),
+            ...$this->bastIssues($site, $row),
+        ];
+
         if (
             $row->activity_type === ActivityType::Construction->value
             && blank($row->cons_wo_number)
             && ! in_array($row->status, [AssignmentStatus::Verified->value, AssignmentStatus::Reported->value], true)
         ) {
             $items[] = $this->issue($site, $row, 'critical', 95, 'construction_missing_wo', 'Construction cannot proceed because WO number is missing.', $mainContractorOwner, 'Fill the construction WO number, then follow up the subcontractor.');
-        }
-
-        if ($row->activity_type === ActivityType::Survey->value && blank($site->power_kva)) {
-            $items[] = $this->issue($site, $row, 'high', 82, 'site_missing_power', 'Survey/location power data is missing.', $mainContractorOwner, 'Complete power_kva on the site before document/report work.');
         }
 
         if ($row->status === AssignmentStatus::Revision->value) {
@@ -387,6 +423,190 @@ class SiteOperationsDashboardService
         }
 
         return $items;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function surveyIssues(object $site, object $row, string $mainContractorOwner): array
+    {
+        if ($row->activity_type !== ActivityType::Survey->value || $this->isTerminal($row)) {
+            return [];
+        }
+
+        $issues = [];
+        $missingSchedule = $this->missingLabels($row, [
+            'survey_schedule_date' => 'survey schedule',
+        ]);
+        $missingSiteData = $this->missingLabels((object) [
+            'site_power_kva' => $site->power_kva,
+            'survey_power_kva' => $row->survey_power_kva,
+        ], [
+            'site_power_kva' => 'site power KVA',
+            'survey_power_kva' => 'survey power KVA',
+        ]);
+        $missingEvidence = $this->missingLabels($row, [
+            'survey_photo_overall_site' => 'overall site photo',
+            'survey_photo_parking_evcs' => 'EV parking photo',
+            'survey_photo_access_route' => 'access route photo',
+            'survey_photo_pln_network' => 'PLN network photo',
+            'survey_photo_satellite_gmaps' => 'satellite map photo',
+            'survey_file_site_plan' => 'site plan',
+            'survey_file_ba_survey' => 'BA survey',
+        ]);
+
+        if ($missingSchedule !== []) {
+            $issues[] = $this->issue($site, $row, 'high', 84, 'survey_schedule_missing', 'Survey schedule is missing.', $row->subcontractor_name ?? 'Subcontractor', 'Ask the subcontractor to set the survey date.');
+        }
+
+        if ($missingSiteData !== []) {
+            $issues[] = $this->issue($site, $row, 'high', 82, 'site_missing_power', 'Survey/location power data is missing: '.$this->labelList($missingSiteData).'.', $mainContractorOwner, 'Complete site and survey power KVA before document/report work.');
+        }
+
+        if ($missingEvidence !== []) {
+            $issues[] = $this->issue($site, $row, 'high', 76, 'survey_evidence_missing', 'Survey evidence is incomplete: '.$this->labelList($missingEvidence).'.', $row->subcontractor_name ?? 'Subcontractor', 'Upload the missing survey photos and documents.');
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function plnIssues(object $site, object $row): array
+    {
+        if ($row->activity_type !== ActivityType::PlnConnection->value || $this->isTerminal($row)) {
+            return [];
+        }
+
+        $issues = [];
+        $owner = $row->subcontractor_name ?? 'Subcontractor';
+
+        $missingRegistration = $this->missingLabels($row, [
+            'pln_file_reg' => 'registration file',
+            'pln_email_bpujl_req_date' => 'BPUJL request date',
+        ]);
+
+        if (in_array($row->status, [AssignmentStatus::Pending->value, AssignmentStatus::Registration->value], true) && $missingRegistration !== []) {
+            $issues[] = $this->issue($site, $row, 'high', 83, 'pln_registration_incomplete', 'PLN registration is incomplete: '.$this->labelList($missingRegistration).'.', $owner, 'Complete PLN registration evidence and BPUJL request.');
+        }
+
+        $missingBilling = $this->missingLabels($row, [
+            'pln_bpujl_acquired_date' => 'BPUJL acquired date',
+            'pln_file_pk' => 'PK file',
+        ]);
+
+        if (in_array($row->status, [AssignmentStatus::Billing->value, AssignmentStatus::Connection->value, AssignmentStatus::KwhDone->value], true) && $missingBilling !== []) {
+            $issues[] = $this->issue($site, $row, 'high', 79, 'pln_billing_incomplete', 'PLN billing/PK evidence is incomplete: '.$this->labelList($missingBilling).'.', $owner, 'Complete BPUJL and PK evidence before connection closeout.');
+        }
+
+        $missingKwh = $this->missingLabels($row, [
+            'pln_kwh_meter_installation_date' => 'kWh installation date',
+            'pln_id_pelanggan' => 'customer ID',
+            'pln_foto_kwh' => 'kWh photo',
+        ]);
+
+        if (in_array($row->status, [AssignmentStatus::Connection->value, AssignmentStatus::KwhDone->value], true) && $missingKwh !== []) {
+            $issues[] = $this->issue($site, $row, 'high', 81, 'pln_kwh_incomplete', 'PLN kWh closeout is incomplete: '.$this->labelList($missingKwh).'.', $owner, 'Complete kWh installation data, customer ID, and kWh photo.');
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function constructionIssues(object $site, object $row, string $mainContractorOwner): array
+    {
+        if ($row->activity_type !== ActivityType::Construction->value || $this->isTerminal($row)) {
+            return [];
+        }
+
+        $issues = [];
+        $owner = $row->subcontractor_name ?? 'Subcontractor';
+
+        if (filled($row->cons_wo_number)) {
+            $missingExecution = $this->missingLabels($row, [
+                'cons_actual_start_date' => 'actual start date',
+                'cons_actual_done_date' => 'actual done date',
+                'machine_serial_number' => 'machine serial number',
+                'foto_machine_sn' => 'machine serial photo',
+            ]);
+
+            if (in_array($row->status, [AssignmentStatus::Construction->value, AssignmentStatus::MachineOnsite->value, AssignmentStatus::Done->value, AssignmentStatus::Live->value], true) && $missingExecution !== []) {
+                $issues[] = $this->issue($site, $row, 'high', 80, 'construction_data_incomplete', 'Construction data is incomplete: '.$this->labelList($missingExecution).'.', $owner, 'Complete construction dates, machine serial data, and serial photo.');
+            }
+
+            if ((int) ($row->construction_photo_count ?? 0) === 0 && in_array($row->status, [AssignmentStatus::Done->value, AssignmentStatus::Live->value], true)) {
+                $issues[] = $this->issue($site, $row, 'high', 77, 'construction_photos_missing', 'Construction is marked advanced but has no construction photos.', $owner, 'Upload construction progress/completion photos.');
+            }
+
+            if ($row->status === AssignmentStatus::Done->value && blank($row->go_live_date_pln) && blank($row->go_live_date_pln_pass)) {
+                $issues[] = $this->issue($site, $row, 'medium', 62, 'construction_not_live', 'Construction is done but go-live dates are missing.', $mainContractorOwner, 'Confirm go-live readiness and fill the PLN go-live date.');
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function bastIssues(object $site, object $row): array
+    {
+        if ($row->activity_type !== ActivityType::Bast->value || $this->isTerminal($row)) {
+            return [];
+        }
+
+        $missingCore = $this->missingLabels($row, [
+            'bast_plant_name' => 'plant name',
+            'bast_installation_date' => 'installation date',
+            'bast_commissioning_date' => 'commissioning date',
+        ]);
+
+        if ($missingCore === [] && (int) ($row->bast_photo_count ?? 0) > 0) {
+            return [];
+        }
+
+        $missing = $missingCore;
+
+        if ((int) ($row->bast_photo_count ?? 0) === 0) {
+            $missing[] = 'BAST photos';
+        }
+
+        return [
+            $this->issue($site, $row, 'high', 75, 'bast_evidence_missing', 'BAST evidence is incomplete: '.$this->labelList($missing).'.', $row->subcontractor_name ?? 'Subcontractor', 'Complete BAST fields and upload required checkpoint photos.'),
+        ];
+    }
+
+    private function isTerminal(object $row): bool
+    {
+        return in_array($row->status, [AssignmentStatus::Verified->value, AssignmentStatus::Reported->value, AssignmentStatus::Drop->value], true);
+    }
+
+    /**
+     * @param  array<string, string>  $labelsByField
+     * @return list<string>
+     */
+    private function missingLabels(object $row, array $labelsByField): array
+    {
+        $missing = [];
+
+        foreach ($labelsByField as $field => $label) {
+            if (blank($row->{$field} ?? null)) {
+                $missing[] = $label;
+            }
+        }
+
+        return $missing;
+    }
+
+    /**
+     * @param  list<string>  $labels
+     */
+    private function labelList(array $labels): string
+    {
+        return collect($labels)->take(4)->join(', ');
     }
 
     private function issue(object $site, ?object $row, string $severity, int $score, string $type, string $problem, string $owner, string $recommendedAction): array
@@ -421,7 +641,16 @@ class SiteOperationsDashboardService
         }
 
         return match ($primaryIssue['type'] ?? null) {
-            'construction_missing_wo' => 'blocked',
+            'construction_missing_wo',
+            'site_missing_power',
+            'survey_schedule_missing',
+            'survey_evidence_missing',
+            'pln_registration_incomplete',
+            'pln_billing_incomplete',
+            'pln_kwh_incomplete',
+            'construction_data_incomplete',
+            'construction_photos_missing',
+            'bast_evidence_missing' => 'blocked',
             'stalled_assignment' => 'stalled',
             'revision_pending' => 'stalled',
             'ready_for_verification' => 'needs_review',
