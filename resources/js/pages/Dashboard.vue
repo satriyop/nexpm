@@ -275,6 +275,7 @@ interface SiteOperations {
         needs_review_sites: number;
         ready_for_report_sites: number;
         not_started_sites: number;
+        matching_sites: number;
     };
     problem_breakdown: Record<string, number>;
     filter_options: {
@@ -283,6 +284,24 @@ interface SiteOperations {
         machine_types: string[];
         owners: string[];
         wo_numbers: string[];
+    };
+    active_filters: {
+        status: string | null;
+        issue_type: string | null;
+        machine_type: string | null;
+        owner: string | null;
+        wo_number: string | null;
+        search: string | null;
+        page: number;
+        per_page: number;
+    };
+    pagination: {
+        page: number;
+        per_page: number;
+        total: number;
+        last_page: number;
+        from: number;
+        to: number;
     };
     site_rows: SiteOperationsRow[];
 }
@@ -303,7 +322,18 @@ const props = defineProps<{
     completionForecast: ForecastItem[] | null;
     mainContractors: MainContractor[] | null;
     projects: Project[] | null;
-    filters: { main_contractor_id?: string | null; project_id?: string | null };
+    filters: {
+        main_contractor_id?: string | null;
+        project_id?: string | null;
+        site_status?: string | null;
+        site_issue_type?: string | null;
+        site_machine_type?: string | null;
+        site_owner?: string | null;
+        site_wo_number?: string | null;
+        site_search?: string | null;
+        site_page?: string | null;
+        site_per_page?: string | null;
+    };
 }>();
 
 usePoll(30_000, {
@@ -632,12 +662,13 @@ function askAi(prompt: string): void {
 }
 
 const siteRows = computed(() => props.siteOperations?.site_rows ?? []);
-const siteStatusFilter = ref<string>(ALL);
-const siteIssueFilter = ref<string>(ALL);
-const siteMachineFilter = ref<string>(ALL);
-const siteOwnerFilter = ref<string>(ALL);
-const siteWoFilter = ref<string>(ALL);
-const siteSearch = ref('');
+const siteStatusFilter = ref<string>(props.filters?.site_status ?? ALL);
+const siteIssueFilter = ref<string>(props.filters?.site_issue_type ?? ALL);
+const siteMachineFilter = ref<string>(props.filters?.site_machine_type ?? ALL);
+const siteOwnerFilter = ref<string>(props.filters?.site_owner ?? ALL);
+const siteWoFilter = ref<string>(props.filters?.site_wo_number ?? ALL);
+const siteSearch = ref(props.filters?.site_search ?? '');
+const sitePerPage = ref<string>(props.filters?.site_per_page ?? '50');
 const selectedSite = ref<SiteOperationsRow | null>(null);
 const siteDetailOpen = ref(false);
 const siteWorkstreamOrder: { key: string; label: string }[] = [
@@ -654,63 +685,6 @@ const problemBreakdownRows = computed(() =>
             count,
             label: issueTypeLabel(type),
         })),
-);
-const filteredSiteRows = computed(() => {
-    const search = siteSearch.value.trim().toLowerCase();
-
-    return siteRows.value.filter((row) => {
-        if (
-            siteStatusFilter.value !== ALL &&
-            row.overall_status !== siteStatusFilter.value
-        ) {
-            return false;
-        }
-
-        if (
-            siteIssueFilter.value !== ALL &&
-            row.issue_type !== siteIssueFilter.value
-        ) {
-            return false;
-        }
-
-        if (
-            siteMachineFilter.value !== ALL &&
-            row.machine_type !== siteMachineFilter.value
-        ) {
-            return false;
-        }
-
-        if (siteOwnerFilter.value !== ALL && row.owner !== siteOwnerFilter.value) {
-            return false;
-        }
-
-        if (
-            siteWoFilter.value !== ALL &&
-            row.construction_wo_number !== siteWoFilter.value
-        ) {
-            return false;
-        }
-
-        if (search === '') {
-            return true;
-        }
-
-        return [
-            row.site_code,
-            row.location_name,
-            row.project,
-            row.main_contractor,
-            row.machine_type,
-            row.construction_wo_number,
-            row.main_issue,
-            row.owner,
-        ]
-            .filter(Boolean)
-            .some((value) => value!.toLowerCase().includes(search));
-    });
-});
-const hiddenSiteCount = computed(
-    () => siteRows.value.length - filteredSiteRows.value.length,
 );
 
 function severityClass(severity: ControlTowerItem['severity']): string {
@@ -809,6 +783,61 @@ function openSiteDetail(row: SiteOperationsRow): void {
     siteDetailOpen.value = true;
 }
 
+function buildSiteQuery(page = 1): Record<string, string> {
+    const q = buildQuery();
+
+    if (siteStatusFilter.value !== ALL) {
+        q.site_status = siteStatusFilter.value;
+    }
+
+    if (siteIssueFilter.value !== ALL) {
+        q.site_issue_type = siteIssueFilter.value;
+    }
+
+    if (siteMachineFilter.value !== ALL) {
+        q.site_machine_type = siteMachineFilter.value;
+    }
+
+    if (siteOwnerFilter.value !== ALL) {
+        q.site_owner = siteOwnerFilter.value;
+    }
+
+    if (siteWoFilter.value !== ALL) {
+        q.site_wo_number = siteWoFilter.value;
+    }
+
+    const search = siteSearch.value.trim();
+
+    if (search !== '') {
+        q.site_search = search;
+    }
+
+    if (sitePerPage.value !== '50') {
+        q.site_per_page = sitePerPage.value;
+    }
+
+    if (page > 1) {
+        q.site_page = page.toString();
+    }
+
+    return q;
+}
+
+function reloadSiteOperations(page = 1): void {
+    router.get(dashboard(), buildSiteQuery(page), {
+        only: ['siteOperations', 'filters'],
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
+function siteOperationsExportUrl(): string {
+    const q = new URLSearchParams(buildSiteQuery(1)).toString();
+
+    return `/dashboard/site-operations/export${q ? '?' + q : ''}`;
+}
+
 function clearSiteFilters(): void {
     siteStatusFilter.value = ALL;
     siteIssueFilter.value = ALL;
@@ -816,6 +845,8 @@ function clearSiteFilters(): void {
     siteOwnerFilter.value = ALL;
     siteWoFilter.value = ALL;
     siteSearch.value = '';
+    sitePerPage.value = '50';
+    reloadSiteOperations();
 }
 
 function forecastRiskClass(riskLevel: ForecastItem['risk_level']): string {
@@ -1380,6 +1411,7 @@ function timeAgo(isoString: string): string {
                         type="search"
                         placeholder="Search site, project, issue, owner"
                         class="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 md:col-span-2 xl:col-span-1"
+                        @keyup.enter="reloadSiteOperations()"
                     />
                     <Select v-model="siteStatusFilter">
                         <SelectTrigger class="h-9">
@@ -1457,6 +1489,29 @@ function timeAgo(isoString: string): string {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
+                        <Select v-model="sitePerPage">
+                            <SelectTrigger class="h-9 w-20">
+                                <SelectValue placeholder="Rows" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="25">25</SelectItem>
+                                <SelectItem value="50">50</SelectItem>
+                                <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <button
+                            type="button"
+                            class="h-9 rounded-md border border-border px-3 text-xs font-medium transition hover:bg-accent"
+                            @click="reloadSiteOperations()"
+                        >
+                            Apply
+                        </button>
+                        <a
+                            :href="siteOperationsExportUrl()"
+                            class="inline-flex h-9 items-center rounded-md border border-border px-3 text-xs font-medium transition hover:bg-accent"
+                        >
+                            Export
+                        </a>
                         <button
                             type="button"
                             class="h-9 rounded-md border border-border px-3 text-xs font-medium transition hover:bg-accent"
@@ -1468,11 +1523,12 @@ function timeAgo(isoString: string): string {
                     <div
                         class="text-xs text-muted-foreground md:col-span-2 xl:col-span-6"
                     >
-                        Showing {{ filteredSiteRows.length }} of
-                        {{ siteRows.length }} priority locations
-                        <span v-if="hiddenSiteCount > 0">
-                            · {{ hiddenSiteCount }} hidden by filters</span
-                        >
+                        Showing {{ siteOperations.pagination.from }}-{{
+                            siteOperations.pagination.to
+                        }}
+                        of {{ siteOperations.pagination.total }} matching
+                        locations · {{ siteOperations.metrics.total_sites }}
+                        total in scope
                     </div>
                 </div>
 
@@ -1521,7 +1577,7 @@ function timeAgo(isoString: string): string {
                         </thead>
                         <tbody>
                             <tr
-                                v-for="row in filteredSiteRows"
+                                v-for="row in siteRows"
                                 :key="row.site_id"
                                 class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
                             >
@@ -1697,7 +1753,7 @@ function timeAgo(isoString: string): string {
                                     </div>
                                 </td>
                             </tr>
-                            <tr v-if="filteredSiteRows.length === 0">
+                            <tr v-if="siteRows.length === 0">
                                 <td
                                     colspan="7"
                                     class="px-4 py-8 text-center text-sm text-muted-foreground"
@@ -1707,6 +1763,44 @@ function timeAgo(isoString: string): string {
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div
+                    class="flex flex-wrap items-center justify-between gap-3 border-t border-sidebar-border/70 px-4 py-3 text-xs text-muted-foreground dark:border-sidebar-border"
+                >
+                    <div>
+                        Page {{ siteOperations.pagination.page }} of
+                        {{ siteOperations.pagination.last_page }}
+                    </div>
+                    <div class="flex gap-2">
+                        <button
+                            type="button"
+                            class="rounded-md border border-border px-3 py-1.5 font-medium transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            :disabled="siteOperations.pagination.page <= 1"
+                            @click="
+                                reloadSiteOperations(
+                                    siteOperations.pagination.page - 1,
+                                )
+                            "
+                        >
+                            Previous
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md border border-border px-3 py-1.5 font-medium transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            :disabled="
+                                siteOperations.pagination.page >=
+                                siteOperations.pagination.last_page
+                            "
+                            @click="
+                                reloadSiteOperations(
+                                    siteOperations.pagination.page + 1,
+                                )
+                            "
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             </template>
 

@@ -16,6 +16,7 @@ Route::inertia('/', 'Welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('dashboard/site-operations/export', [DashboardController::class, 'exportSiteOperations'])->name('dashboard.site-operations.export');
     Route::get('faq', [FaqController::class, 'index'])->name('faq');
 });
 

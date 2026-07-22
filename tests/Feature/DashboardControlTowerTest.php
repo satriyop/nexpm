@@ -74,6 +74,8 @@ test('dashboard exposes the control tower as a deferred prop', function () {
                 ->has('siteOperations.metrics')
                 ->has('siteOperations.problem_breakdown')
                 ->has('siteOperations.filter_options')
+                ->has('siteOperations.active_filters')
+                ->has('siteOperations.pagination')
                 ->has('siteOperations.site_rows')
             )
         );
@@ -114,6 +116,7 @@ test('site operations dashboard explains why a location is not done', function (
     $row = $payload['site_rows'][0];
 
     expect($payload['metrics']['total_sites'])->toBe(1)
+        ->and($payload['metrics']['matching_sites'])->toBe(1)
         ->and($payload['metrics']['blocked_sites'])->toBe(1)
         ->and($payload['problem_breakdown'])->toHaveKey('construction_missing_wo')
         ->and($row['site_code'])->toBe('JKT-001')
@@ -155,4 +158,140 @@ test('site operations dashboard exposes construction WO for filtering', function
     expect($row['construction_wo_number'])->toBe('WO-7788')
         ->and($row['workstreams']['construction']['wo_number'])->toBe('WO-7788')
         ->and($payload['filter_options']['wo_numbers'])->toContain('WO-7788');
+});
+
+test('site operations filters by WO across the full scoped location set', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Bandung']);
+
+    for ($i = 1; $i <= 55; $i++) {
+        $site = Site::factory()->create([
+            'project_id' => $project->id,
+            'site_code' => sprintf('BLOCKED-%03d', $i),
+        ]);
+        $construction = Assignment::factory()->construction()->create([
+            'site_id' => $site->id,
+            'status' => AssignmentStatus::Pending,
+            'updated_at' => now()->subDays(20),
+        ]);
+        AssignmentConstructionData::factory()->create([
+            'assignment_id' => $construction->id,
+            'cons_wo_number' => null,
+        ]);
+    }
+
+    $targetSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'TARGET-WO',
+    ]);
+    $targetConstruction = Assignment::factory()->construction()->create([
+        'site_id' => $targetSite->id,
+        'status' => AssignmentStatus::Construction,
+        'updated_at' => now()->subDays(2),
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $targetConstruction->id,
+        'cons_wo_number' => 'WO-TARGET-7788',
+    ]);
+
+    $payload = app(SiteOperationsDashboardService::class)->build($superAdmin, filters: [
+        'wo_number' => 'WO-TARGET-7788',
+        'per_page' => 25,
+    ]);
+
+    expect($payload['metrics']['total_sites'])->toBe(56)
+        ->and($payload['metrics']['matching_sites'])->toBe(1)
+        ->and($payload['pagination']['total'])->toBe(1)
+        ->and($payload['site_rows'])->toHaveCount(1)
+        ->and($payload['site_rows'][0]['site_code'])->toBe('TARGET-WO')
+        ->and($payload['active_filters']['wo_number'])->toBe('WO-TARGET-7788');
+});
+
+test('site operations export uses the same WO filter', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Bandung']);
+
+    $otherSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'OTHER-WO',
+    ]);
+    $otherConstruction = Assignment::factory()->construction()->create([
+        'site_id' => $otherSite->id,
+        'status' => AssignmentStatus::Construction,
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $otherConstruction->id,
+        'cons_wo_number' => 'WO-OTHER',
+    ]);
+
+    $targetSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'TARGET-WO',
+    ]);
+    $targetConstruction = Assignment::factory()->construction()->create([
+        'site_id' => $targetSite->id,
+        'status' => AssignmentStatus::Construction,
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $targetConstruction->id,
+        'cons_wo_number' => 'WO-TARGET-7788',
+    ]);
+
+    $response = $this->actingAs($superAdmin)->get(route('dashboard.site-operations.export', [
+        'site_wo_number' => 'WO-TARGET-7788',
+    ]));
+
+    $response->assertOk();
+
+    $csv = $response->streamedContent();
+
+    expect($csv)
+        ->toContain('TARGET-WO')
+        ->toContain('WO-TARGET-7788')
+        ->not->toContain('OTHER-WO');
+});
+
+test('dashboard deferred site operations use URL filters', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Bandung']);
+
+    $otherSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'OTHER-WO',
+    ]);
+    $otherConstruction = Assignment::factory()->construction()->create([
+        'site_id' => $otherSite->id,
+        'status' => AssignmentStatus::Construction,
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $otherConstruction->id,
+        'cons_wo_number' => 'WO-OTHER',
+    ]);
+
+    $targetSite = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'TARGET-WO',
+    ]);
+    $targetConstruction = Assignment::factory()->construction()->create([
+        'site_id' => $targetSite->id,
+        'status' => AssignmentStatus::Construction,
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $targetConstruction->id,
+        'cons_wo_number' => 'WO-TARGET-7788',
+    ]);
+
+    $this->actingAs($superAdmin)
+        ->get(route('dashboard', ['site_wo_number' => 'WO-TARGET-7788']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->missing('siteOperations')
+            ->loadDeferredProps(fn (Assert $reload) => $reload
+                ->where('siteOperations.metrics.matching_sites', 1)
+                ->where('siteOperations.pagination.total', 1)
+                ->where('siteOperations.site_rows.0.site_code', 'TARGET-WO')
+                ->where('siteOperations.active_filters.wo_number', 'WO-TARGET-7788')
+            )
+        );
 });

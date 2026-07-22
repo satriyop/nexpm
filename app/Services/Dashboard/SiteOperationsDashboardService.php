@@ -16,13 +16,16 @@ class SiteOperationsDashboardService
     /**
      * @return array<string, mixed>
      */
-    public function build(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null): array
+    public function build(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null, array $filters = []): array
     {
-        $rows = $this->siteRows($user, $mainContractorFilter, $projectFilter);
-        $priorityRows = $rows
-            ->sortByDesc(fn (array $row): int => (int) $row['severity_score'])
-            ->take(50)
+        $filters = $this->normalizeFilters($filters);
+        $rows = $this->prioritizedRows($user, $mainContractorFilter, $projectFilter);
+        $filteredRows = $this->applyFilters($rows, $filters)->values();
+        $pageRows = $filteredRows
+            ->forPage($filters['page'], $filters['per_page'])
             ->values();
+        $totalFilteredRows = $filteredRows->count();
+        $lastPage = max(1, (int) ceil($totalFilteredRows / $filters['per_page']));
 
         return [
             'generated_at' => now()->toIso8601String(),
@@ -34,6 +37,7 @@ class SiteOperationsDashboardService
                 'needs_review_sites' => $rows->where('overall_status', 'needs_review')->count(),
                 'ready_for_report_sites' => $rows->where('overall_status', 'ready_for_report')->count(),
                 'not_started_sites' => $rows->where('overall_status', 'not_started')->count(),
+                'matching_sites' => $totalFilteredRows,
             ],
             'problem_breakdown' => $rows
                 ->whereNotNull('issue_type')
@@ -41,14 +45,112 @@ class SiteOperationsDashboardService
                 ->sortDesc()
                 ->all(),
             'filter_options' => [
-                'statuses' => $priorityRows->pluck('overall_status')->filter()->unique()->sort()->values()->all(),
-                'issue_types' => $priorityRows->pluck('issue_type')->filter()->unique()->sort()->values()->all(),
-                'machine_types' => $priorityRows->pluck('machine_type')->filter()->unique()->sort()->values()->all(),
-                'owners' => $priorityRows->pluck('owner')->filter()->unique()->sort()->values()->all(),
-                'wo_numbers' => $priorityRows->pluck('construction_wo_number')->filter()->unique()->sort()->values()->all(),
+                'statuses' => $rows->pluck('overall_status')->filter()->unique()->sort()->values()->all(),
+                'issue_types' => $rows->pluck('issue_type')->filter()->unique()->sort()->values()->all(),
+                'machine_types' => $rows->pluck('machine_type')->filter()->unique()->sort()->values()->all(),
+                'owners' => $rows->pluck('owner')->filter()->unique()->sort()->values()->all(),
+                'wo_numbers' => $rows->pluck('construction_wo_number')->filter()->unique()->sort()->values()->all(),
             ],
-            'site_rows' => $priorityRows->all(),
+            'active_filters' => $filters,
+            'pagination' => [
+                'page' => $filters['page'],
+                'per_page' => $filters['per_page'],
+                'total' => $totalFilteredRows,
+                'last_page' => $lastPage,
+                'from' => $totalFilteredRows === 0 ? 0 : (($filters['page'] - 1) * $filters['per_page']) + 1,
+                'to' => min($filters['page'] * $filters['per_page'], $totalFilteredRows),
+            ],
+            'site_rows' => $pageRows->all(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function exportRows(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null, array $filters = []): Collection
+    {
+        $filters = $this->normalizeFilters($filters);
+
+        return $this->applyFilters(
+            $this->prioritizedRows($user, $mainContractorFilter, $projectFilter),
+            $filters
+        )->values();
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function prioritizedRows(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null): Collection
+    {
+        return $this->siteRows($user, $mainContractorFilter, $projectFilter)
+            ->sortByDesc(fn (array $row): int => (int) $row['severity_score'])
+            ->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{status: ?string, issue_type: ?string, machine_type: ?string, owner: ?string, wo_number: ?string, search: ?string, page: int, per_page: int}
+     */
+    private function normalizeFilters(array $filters): array
+    {
+        $perPage = (int) ($filters['per_page'] ?? 50);
+        $perPage = in_array($perPage, [25, 50, 100], true) ? $perPage : 50;
+
+        return [
+            'status' => $this->filterValue($filters['status'] ?? null),
+            'issue_type' => $this->filterValue($filters['issue_type'] ?? null),
+            'machine_type' => $this->filterValue($filters['machine_type'] ?? null),
+            'owner' => $this->filterValue($filters['owner'] ?? null),
+            'wo_number' => $this->filterValue($filters['wo_number'] ?? null),
+            'search' => $this->filterValue($filters['search'] ?? null),
+            'page' => max(1, (int) ($filters['page'] ?? 1)),
+            'per_page' => $perPage,
+        ];
+    }
+
+    private function filterValue(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' || $value === '__all__' ? null : $value;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  array{status: ?string, issue_type: ?string, machine_type: ?string, owner: ?string, wo_number: ?string, search: ?string, page: int, per_page: int}  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function applyFilters(Collection $rows, array $filters): Collection
+    {
+        return $rows
+            ->when($filters['status'], fn (Collection $items, string $status): Collection => $items->where('overall_status', $status))
+            ->when($filters['issue_type'], fn (Collection $items, string $issueType): Collection => $items->where('issue_type', $issueType))
+            ->when($filters['machine_type'], fn (Collection $items, string $machineType): Collection => $items->where('machine_type', $machineType))
+            ->when($filters['owner'], fn (Collection $items, string $owner): Collection => $items->where('owner', $owner))
+            ->when($filters['wo_number'], fn (Collection $items, string $woNumber): Collection => $items->where('construction_wo_number', $woNumber))
+            ->when($filters['search'], function (Collection $items, string $search): Collection {
+                $needle = mb_strtolower($search);
+
+                return $items->filter(function (array $row) use ($needle): bool {
+                    $haystack = mb_strtolower(implode(' ', array_filter([
+                        $row['site_code'] ?? null,
+                        $row['location_name'] ?? null,
+                        $row['project'] ?? null,
+                        $row['main_contractor'] ?? null,
+                        $row['machine_type'] ?? null,
+                        $row['construction_wo_number'] ?? null,
+                        $row['main_issue'] ?? null,
+                        $row['owner'] ?? null,
+                    ])));
+
+                    return str_contains($haystack, $needle);
+                });
+            });
     }
 
     /**

@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DashboardController extends Controller
 {
@@ -34,6 +35,8 @@ class DashboardController extends Controller
             ? $request->integer('project_id')
             : null;
 
+        $siteOperationsFilters = $this->siteOperationsFilters($request);
+
         $applyTenantScope = function ($q) use ($user, $mainContractorFilter): void {
             if (! $user->isSuperAdmin()) {
                 $q->where('projects.main_contractor_id', $user->main_contractor_id);
@@ -43,7 +46,7 @@ class DashboardController extends Controller
         };
 
         return Inertia::render('Dashboard', [
-            'siteOperations' => Inertia::defer(fn () => $siteOperations->build($user, $mainContractorFilter, $projectFilter)),
+            'siteOperations' => Inertia::defer(fn () => $siteOperations->build($user, $mainContractorFilter, $projectFilter, $siteOperationsFilters)),
             'controlTower' => Inertia::defer(fn () => $controlTower->build($user, $mainContractorFilter, $projectFilter)),
 
             'deadlineRisk' => Inertia::defer(function () use ($projectFilter, $applyTenantScope) {
@@ -456,7 +459,102 @@ class DashboardController extends Controller
                     ->orderBy('name')
                     ->get(['id', 'name'])
                 : null,
-            'filters' => (object) $request->only(['main_contractor_id', 'project_id']),
+            'filters' => (object) $request->only([
+                'main_contractor_id',
+                'project_id',
+                'site_status',
+                'site_issue_type',
+                'site_machine_type',
+                'site_owner',
+                'site_wo_number',
+                'site_search',
+                'site_page',
+                'site_per_page',
+            ]),
         ]);
+    }
+
+    public function exportSiteOperations(Request $request, SiteOperationsDashboardService $siteOperations): StreamedResponse|RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->isDrafter()) {
+            return redirect()->route('drafter.assignments.index');
+        }
+
+        $mainContractorFilter = $user->isSuperAdmin() && $request->filled('main_contractor_id')
+            ? $request->integer('main_contractor_id')
+            : null;
+
+        $projectFilter = $user->isSuperAdmin() && $request->filled('project_id')
+            ? $request->integer('project_id')
+            : null;
+
+        $rows = $siteOperations->exportRows($user, $mainContractorFilter, $projectFilter, $this->siteOperationsFilters($request));
+        $filename = 'location-operations-'.now()->format('Ymd-His').'.csv';
+
+        return response()->streamDownload(function () use ($rows): void {
+            $handle = fopen('php://output', 'w');
+
+            fputcsv($handle, [
+                'Site Code',
+                'Location',
+                'Project',
+                'Main Contractor',
+                'Machine Type',
+                'WO Number',
+                'Status',
+                'Completion %',
+                'Main Issue',
+                'Issue Type',
+                'Severity',
+                'Owner',
+                'Age Days',
+                'Next Action',
+                'URL',
+            ]);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, [
+                    $row['site_code'],
+                    $row['location_name'],
+                    $row['project'],
+                    $row['main_contractor'],
+                    $row['machine_type'],
+                    $row['construction_wo_number'],
+                    $row['overall_status'],
+                    $row['completion_pct'],
+                    $row['main_issue'],
+                    $row['issue_type'],
+                    $row['issue_severity'],
+                    $row['owner'],
+                    $row['age_days'],
+                    $row['next_action'],
+                    $row['url'],
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function siteOperationsFilters(Request $request): array
+    {
+        return [
+            'status' => $request->query('site_status'),
+            'issue_type' => $request->query('site_issue_type'),
+            'machine_type' => $request->query('site_machine_type'),
+            'owner' => $request->query('site_owner'),
+            'wo_number' => $request->query('site_wo_number'),
+            'search' => $request->query('site_search'),
+            'page' => $request->integer('site_page', 1),
+            'per_page' => $request->integer('site_per_page', 50),
+        ];
     }
 }
