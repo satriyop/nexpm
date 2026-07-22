@@ -46,7 +46,7 @@ class SiteOperationsDashboardService
                 ->all(),
             'filter_options' => [
                 'statuses' => $rows->pluck('overall_status')->filter()->unique()->sort()->values()->all(),
-                'issue_types' => $rows->pluck('issue_type')->filter()->unique()->sort()->values()->all(),
+                'issue_types' => $this->issueTypeOptions($rows),
                 'machine_types' => $rows->pluck('machine_type')->filter()->unique()->sort()->values()->all(),
                 'owners' => $rows->pluck('owner')->filter()->unique()->sort()->values()->all(),
                 'wo_numbers' => $rows->pluck('construction_wo_number')->filter()->unique()->sort()->values()->all(),
@@ -129,7 +129,9 @@ class SiteOperationsDashboardService
     {
         return $rows
             ->when($filters['status'], fn (Collection $items, string $status): Collection => $items->where('overall_status', $status))
-            ->when($filters['issue_type'], fn (Collection $items, string $issueType): Collection => $items->where('issue_type', $issueType))
+            ->when($filters['issue_type'], fn (Collection $items, string $issueType): Collection => $items->filter(
+                fn (array $row): bool => collect($row['issues'] ?? [])->pluck('type')->contains($issueType)
+            ))
             ->when($filters['machine_type'], fn (Collection $items, string $machineType): Collection => $items->where('machine_type', $machineType))
             ->when($filters['owner'], fn (Collection $items, string $owner): Collection => $items->where('owner', $owner))
             ->when($filters['wo_number'], fn (Collection $items, string $woNumber): Collection => $items->where('construction_wo_number', $woNumber))
@@ -151,6 +153,21 @@ class SiteOperationsDashboardService
                     return str_contains($haystack, $needle);
                 });
             });
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return list<string>
+     */
+    private function issueTypeOptions(Collection $rows): array
+    {
+        return $rows
+            ->flatMap(fn (array $row): array => collect($row['issues'] ?? [])->pluck('type')->all())
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 
     /**
@@ -236,6 +253,20 @@ class SiteOperationsDashboardService
      */
     private function assignmentRows(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null): Collection
     {
+        $constructionPhotoCounts = DB::table('assignment_construction_photos')
+            ->select([
+                'assignment_construction_data_id',
+                DB::raw('count(*) as construction_photo_count'),
+            ])
+            ->groupBy('assignment_construction_data_id');
+        $bastPhotoCounts = DB::table('assignment_bast_photos')
+            ->select([
+                'assignment_bast_data_id',
+                DB::raw('count(*) as bast_photo_count'),
+                DB::raw("sum(case when checkpoint_key in ('sim_kartu_perdana', 'sim_installed_sim_card') then 1 else 0 end) as bast_sim_photo_count"),
+            ])
+            ->groupBy('assignment_bast_data_id');
+
         return DB::table('sites')
             ->join('projects', 'projects.id', '=', 'sites.project_id')
             ->join('main_contractors', 'main_contractors.id', '=', 'projects.main_contractor_id')
@@ -245,6 +276,8 @@ class SiteOperationsDashboardService
             ->leftJoin('assignment_pln_data', 'assignment_pln_data.assignment_id', '=', 'assignments.id')
             ->leftJoin('assignment_construction_data', 'assignment_construction_data.assignment_id', '=', 'assignments.id')
             ->leftJoin('assignment_bast_data', 'assignment_bast_data.assignment_id', '=', 'assignments.id')
+            ->leftJoinSub($constructionPhotoCounts, 'construction_photo_counts', fn ($join) => $join->on('construction_photo_counts.assignment_construction_data_id', '=', 'assignment_construction_data.id'))
+            ->leftJoinSub($bastPhotoCounts, 'bast_photo_counts', fn ($join) => $join->on('bast_photo_counts.assignment_bast_data_id', '=', 'assignment_bast_data.id'))
             ->tap(fn (Builder $query) => $this->applyTenantScope($query, $user, $mainContractorFilter))
             ->when($projectFilter, fn (Builder $query) => $query->where('projects.id', $projectFilter))
             ->select([
@@ -287,10 +320,13 @@ class SiteOperationsDashboardService
                 'assignment_construction_data.go_live_date_pln',
                 'assignment_construction_data.go_live_date_pln_pass',
                 'assignment_bast_data.plant_name as bast_plant_name',
+                'assignment_bast_data.sim_provider as bast_sim_provider',
+                'assignment_bast_data.nomor_simcard as bast_nomor_simcard',
                 'assignment_bast_data.installation_date as bast_installation_date',
                 'assignment_bast_data.commissioning_date as bast_commissioning_date',
-                DB::raw('(select count(*) from assignment_construction_photos where assignment_construction_photos.assignment_construction_data_id = assignment_construction_data.id) as construction_photo_count'),
-                DB::raw('(select count(*) from assignment_bast_photos where assignment_bast_photos.assignment_bast_data_id = assignment_bast_data.id) as bast_photo_count'),
+                DB::raw('coalesce(construction_photo_counts.construction_photo_count, 0) as construction_photo_count'),
+                DB::raw('coalesce(bast_photo_counts.bast_photo_count, 0) as bast_photo_count'),
+                DB::raw('coalesce(bast_photo_counts.bast_sim_photo_count, 0) as bast_sim_photo_count'),
             ])
             ->get();
     }
@@ -558,6 +594,20 @@ class SiteOperationsDashboardService
             return [];
         }
 
+        $issues = [];
+        $missingSim = $this->missingLabels($row, [
+            'bast_sim_provider' => 'SIM provider',
+            'bast_nomor_simcard' => 'SIM number',
+        ]);
+
+        if ((int) ($row->bast_sim_photo_count ?? 0) < 2) {
+            $missingSim[] = 'SIM card photos';
+        }
+
+        if ($missingSim !== []) {
+            $issues[] = $this->issue($site, $row, 'high', 78, 'bast_sim_missing', 'SIM card data/evidence is incomplete: '.$this->labelList($missingSim).'.', $row->subcontractor_name ?? 'Subcontractor', 'Complete SIM provider, SIM number, and SIM card checkpoint photos.');
+        }
+
         $missingCore = $this->missingLabels($row, [
             'bast_plant_name' => 'plant name',
             'bast_installation_date' => 'installation date',
@@ -565,7 +615,7 @@ class SiteOperationsDashboardService
         ]);
 
         if ($missingCore === [] && (int) ($row->bast_photo_count ?? 0) > 0) {
-            return [];
+            return $issues;
         }
 
         $missing = $missingCore;
@@ -574,9 +624,9 @@ class SiteOperationsDashboardService
             $missing[] = 'BAST photos';
         }
 
-        return [
-            $this->issue($site, $row, 'high', 75, 'bast_evidence_missing', 'BAST evidence is incomplete: '.$this->labelList($missing).'.', $row->subcontractor_name ?? 'Subcontractor', 'Complete BAST fields and upload required checkpoint photos.'),
-        ];
+        $issues[] = $this->issue($site, $row, 'high', 75, 'bast_evidence_missing', 'BAST evidence is incomplete: '.$this->labelList($missing).'.', $row->subcontractor_name ?? 'Subcontractor', 'Complete BAST fields and upload required checkpoint photos.');
+
+        return $issues;
     }
 
     private function isTerminal(object $row): bool
@@ -650,6 +700,7 @@ class SiteOperationsDashboardService
             'pln_kwh_incomplete',
             'construction_data_incomplete',
             'construction_photos_missing',
+            'bast_sim_missing',
             'bast_evidence_missing' => 'blocked',
             'stalled_assignment' => 'stalled',
             'revision_pending' => 'stalled',

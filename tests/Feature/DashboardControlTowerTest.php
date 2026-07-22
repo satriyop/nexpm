@@ -365,13 +365,22 @@ test('site operations surfaces workstream-specific blocker rules', function () {
         'commissioning_date' => null,
     ]);
 
-    $rows = collect(app(SiteOperationsDashboardService::class)->build($superAdmin, filters: ['per_page' => 100])['site_rows'])
+    $payload = app(SiteOperationsDashboardService::class)->build($superAdmin, filters: ['per_page' => 100]);
+    $rows = collect($payload['site_rows'])
         ->keyBy('site_code');
+    $surveyEvidencePayload = app(SiteOperationsDashboardService::class)->build($superAdmin, filters: [
+        'issue_type' => 'survey_evidence_missing',
+        'per_page' => 100,
+    ]);
 
     expect($rows->get('SURVEY-GAP')['issue_type'])->toBe('survey_schedule_missing')
         ->and(collect($rows->get('SURVEY-GAP')['issues'])->pluck('type'))->toContain('site_missing_power', 'survey_evidence_missing')
         ->and($rows->get('PLN-GAP')['issue_type'])->toBe('pln_kwh_incomplete')
         ->and($rows->get('CONS-GAP')['issue_type'])->toBe('construction_data_incomplete')
         ->and(collect($rows->get('CONS-GAP')['issues'])->pluck('type'))->toContain('construction_photos_missing')
-        ->and($rows->get('BAST-GAP')['issue_type'])->toBe('bast_evidence_missing');
+        ->and($rows->get('BAST-GAP')['issue_type'])->toBe('bast_sim_missing')
+        ->and(collect($rows->get('BAST-GAP')['issues'])->pluck('type'))->toContain('bast_evidence_missing')
+        ->and($payload['filter_options']['issue_types'])->toContain('survey_evidence_missing', 'construction_photos_missing', 'bast_evidence_missing')
+        ->and($surveyEvidencePayload['site_rows'])->toHaveCount(1)
+        ->and($surveyEvidencePayload['site_rows'][0]['site_code'])->toBe('SURVEY-GAP');
 });

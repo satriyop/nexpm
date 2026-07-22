@@ -16,7 +16,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import type { AcceptableValue } from 'reka-ui';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ActivityMatrixChart from '@/components/ActivityMatrixChart.vue';
 import ActivityTypeBadge from '@/components/ActivityTypeBadge.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
@@ -240,6 +240,13 @@ interface SiteIssue {
     site_id: number;
 }
 
+interface SiteIssueGroup {
+    key: string;
+    label: string;
+    count: number;
+    severity: Exclude<SiteIssueSeverity, null>;
+}
+
 interface SiteOperationsRow {
     site_id: number;
     site_code: string;
@@ -337,21 +344,7 @@ const props = defineProps<{
 }>();
 
 usePoll(30_000, {
-    only: [
-        'statusCounts',
-        'activityMatrix',
-        'projectBreakdowns',
-        'recentActivity',
-        'activityChart',
-        'siteOperations',
-        'controlTower',
-        'deadlineRisk',
-        'subcontractorLeaderboard',
-        'velocityTrend',
-        'agingHeatmap',
-        'workloadDistribution',
-        'completionForecast',
-    ],
+    only: ['siteOperations', 'controlTower', 'deadlineRisk'],
 });
 
 defineOptions({
@@ -718,9 +711,60 @@ const oldestLocationRows = computed(() =>
         .slice(0, 5),
 );
 
+watch(siteRows, (rows) => {
+    if (!siteDetailOpen.value || !selectedSite.value) {
+        return;
+    }
+
+    const freshSelectedSite = rows.find(
+        (row) => row.site_id === selectedSite.value?.site_id,
+    );
+
+    if (freshSelectedSite) {
+        selectedSite.value = freshSelectedSite;
+
+        return;
+    }
+
+    siteDetailOpen.value = false;
+    selectedSite.value = null;
+});
+
+const selectedSiteIssueGroups = computed<SiteIssueGroup[]>(() => {
+    if (!selectedSite.value) {
+        return [];
+    }
+
+    const groups = new Map<string, SiteIssueGroup>();
+
+    for (const issue of selectedSite.value.issues) {
+        const group = issueGroup(issue.type);
+        const current = groups.get(group.key);
+
+        if (!current) {
+            groups.set(group.key, {
+                key: group.key,
+                label: group.label,
+                count: 1,
+                severity: issue.severity,
+            });
+
+            continue;
+        }
+
+        current.count += 1;
+        current.severity = higherSeverity(current.severity, issue.severity);
+    }
+
+    return Array.from(groups.values()).sort(
+        (a, b) => severityRank(b.severity) - severityRank(a.severity),
+    );
+});
+
 function severityClass(severity: ControlTowerItem['severity']): string {
     return {
-        critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+        critical:
+            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
         high: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
         medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     }[severity];
@@ -728,7 +772,8 @@ function severityClass(severity: ControlTowerItem['severity']): string {
 
 function siteSeverityClass(severity: SiteIssueSeverity): string {
     return {
-        critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+        critical:
+            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
         high: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
         medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
         low: 'bg-muted text-muted-foreground',
@@ -771,6 +816,16 @@ function issueTypeLabel(type: string): string {
     const labels: Record<string, string> = {
         construction_missing_wo: 'Missing WO',
         site_missing_power: 'Missing Power',
+        survey_schedule_missing: 'Missing Survey Schedule',
+        survey_evidence_missing: 'Missing Survey Evidence',
+        pln_registration_incomplete: 'PLN Registration Gap',
+        pln_billing_incomplete: 'PLN Billing Gap',
+        pln_kwh_incomplete: 'PLN kWh Gap',
+        construction_data_incomplete: 'Construction Data Gap',
+        construction_photos_missing: 'Construction Photos',
+        construction_not_live: 'Go-Live Missing',
+        bast_sim_missing: 'Missing SIM Card',
+        bast_evidence_missing: 'BAST Evidence Gap',
         revision_pending: 'Revision',
         stalled_assignment: 'Stalled',
         ready_for_verification: 'Ready Verify',
@@ -782,11 +837,93 @@ function issueTypeLabel(type: string): string {
     return labels[type] ?? type.replaceAll('_', ' ');
 }
 
+function issueGroup(type: string): { key: string; label: string } {
+    if (type === 'construction_missing_wo') {
+        return { key: 'missing_wo', label: 'Missing WO' };
+    }
+
+    if (type === 'bast_sim_missing') {
+        return { key: 'missing_sim_card', label: 'Missing SIM Card' };
+    }
+
+    if (type === 'site_missing_power') {
+        return { key: 'missing_site_data', label: 'Missing Site Data' };
+    }
+
+    if (
+        [
+            'survey_schedule_missing',
+            'survey_evidence_missing',
+            'pln_registration_incomplete',
+            'pln_billing_incomplete',
+            'pln_kwh_incomplete',
+            'construction_data_incomplete',
+            'construction_photos_missing',
+            'bast_evidence_missing',
+        ].includes(type)
+    ) {
+        return { key: 'missing_evidence', label: 'Missing Data/Evidence' };
+    }
+
+    if (type === 'revision_pending') {
+        return { key: 'revision', label: 'Revision Needed' };
+    }
+
+    if (type === 'stalled_assignment') {
+        return { key: 'stalled', label: 'Stalled' };
+    }
+
+    if (type === 'ready_for_verification') {
+        return { key: 'waiting_verification', label: 'Waiting Verification' };
+    }
+
+    if (type === 'verified_not_reported') {
+        return { key: 'ready_report', label: 'Ready for Report' };
+    }
+
+    if (type === 'no_assignment_started') {
+        return { key: 'not_started', label: 'Not Started' };
+    }
+
+    return { key: 'other', label: 'Other' };
+}
+
+function issueGroupClass(group: SiteIssueGroup): string {
+    if (group.key === 'missing_sim_card') {
+        return 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300';
+    }
+
+    return siteSeverityClass(group.severity);
+}
+
+function severityRank(severity: Exclude<SiteIssueSeverity, null>): number {
+    return { low: 1, medium: 2, high: 3, critical: 4 }[severity];
+}
+
+function higherSeverity(
+    a: Exclude<SiteIssueSeverity, null>,
+    b: Exclude<SiteIssueSeverity, null>,
+): Exclude<SiteIssueSeverity, null> {
+    return severityRank(a) >= severityRank(b) ? a : b;
+}
+
 function siteWorkstream(
     row: SiteOperationsRow,
     key: string,
 ): SiteWorkstream | null {
     return row.workstreams[key] ?? null;
+}
+
+function issuesForWorkstream(row: SiteOperationsRow, key: string): SiteIssue[] {
+    const workstream = siteWorkstream(row, key);
+
+    if (!workstream) {
+        return [];
+    }
+
+    return row.issues.filter(
+        (issue) => issue.activity_type === workstream.activity_type,
+    );
 }
 
 function workstreamClass(workstream: SiteWorkstream | null): string {
@@ -1396,9 +1533,7 @@ function timeAgo(isoString: string): string {
                             <CheckCircle2 class="size-3.5" />
                             Ready Report
                         </div>
-                        <p
-                            class="mt-1 text-2xl font-semibold text-emerald-600"
-                        >
+                        <p class="mt-1 text-2xl font-semibold text-emerald-600">
                             {{ siteOperations.metrics.ready_for_report_sites }}
                         </p>
                     </div>
@@ -1409,9 +1544,7 @@ function timeAgo(isoString: string): string {
                             <CheckCircle2 class="size-3.5" />
                             Done
                         </div>
-                        <p
-                            class="mt-1 text-2xl font-semibold text-emerald-600"
-                        >
+                        <p class="mt-1 text-2xl font-semibold text-emerald-600">
                             {{ siteOperations.metrics.done_sites }}
                         </p>
                     </div>
@@ -1487,7 +1620,9 @@ function timeAgo(isoString: string): string {
                                 class="flex w-full items-center justify-between gap-3 text-left text-sm hover:underline"
                                 @click="openSiteDetail(row)"
                             >
-                                <span class="truncate">{{ row.site_code }}</span>
+                                <span class="truncate">{{
+                                    row.site_code
+                                }}</span>
                                 <span
                                     class="shrink-0 text-muted-foreground tabular-nums"
                                     >{{ row.age_days }}d</span
@@ -1531,7 +1666,7 @@ function timeAgo(isoString: string): string {
                         v-model="siteSearch"
                         type="search"
                         placeholder="Search site, project, issue, owner"
-                        class="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 md:col-span-2 xl:col-span-1"
+                        class="h-9 rounded-md border border-border bg-background px-3 text-sm transition outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 md:col-span-2 xl:col-span-1"
                         @keyup.enter="reloadSiteOperations()"
                     />
                     <Select v-model="siteStatusFilter">
@@ -1541,7 +1676,8 @@ function timeAgo(isoString: string): string {
                         <SelectContent>
                             <SelectItem :value="ALL">All statuses</SelectItem>
                             <SelectItem
-                                v-for="status in siteOperations.filter_options.statuses"
+                                v-for="status in siteOperations.filter_options
+                                    .statuses"
                                 :key="status"
                                 :value="status"
                             >
@@ -1556,7 +1692,8 @@ function timeAgo(isoString: string): string {
                         <SelectContent>
                             <SelectItem :value="ALL">All issues</SelectItem>
                             <SelectItem
-                                v-for="issue in siteOperations.filter_options.issue_types"
+                                v-for="issue in siteOperations.filter_options
+                                    .issue_types"
                                 :key="issue"
                                 :value="issue"
                             >
@@ -1571,7 +1708,8 @@ function timeAgo(isoString: string): string {
                         <SelectContent>
                             <SelectItem :value="ALL">All machines</SelectItem>
                             <SelectItem
-                                v-for="machine in siteOperations.filter_options.machine_types"
+                                v-for="machine in siteOperations.filter_options
+                                    .machine_types"
                                 :key="machine"
                                 :value="machine"
                             >
@@ -1586,7 +1724,8 @@ function timeAgo(isoString: string): string {
                         <SelectContent>
                             <SelectItem :value="ALL">All WO</SelectItem>
                             <SelectItem
-                                v-for="woNumber in siteOperations.filter_options.wo_numbers"
+                                v-for="woNumber in siteOperations.filter_options
+                                    .wo_numbers"
                                 :key="woNumber"
                                 :value="woNumber"
                             >
@@ -1602,7 +1741,8 @@ function timeAgo(isoString: string): string {
                             <SelectContent>
                                 <SelectItem :value="ALL">All owners</SelectItem>
                                 <SelectItem
-                                    v-for="owner in siteOperations.filter_options.owners"
+                                    v-for="owner in siteOperations
+                                        .filter_options.owners"
                                     :key="owner"
                                     :value="owner"
                                 >
@@ -1740,8 +1880,7 @@ function timeAgo(isoString: string): string {
                                         <div
                                             class="h-full rounded-full bg-emerald-500"
                                             :style="{
-                                                width:
-                                                    row.completion_pct + '%',
+                                                width: row.completion_pct + '%',
                                             }"
                                         />
                                     </div>
@@ -1816,9 +1955,7 @@ function timeAgo(isoString: string): string {
                                             <span
                                                 v-else
                                                 class="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground"
-                                                :class="
-                                                    workstreamClass(null)
-                                                "
+                                                :class="workstreamClass(null)"
                                             >
                                                 {{ stream.label }} -
                                             </span>
@@ -1846,7 +1983,8 @@ function timeAgo(isoString: string): string {
                                     <div class="text-xs text-muted-foreground">
                                         {{
                                             row.age_days != null
-                                                ? row.age_days + 'd since update'
+                                                ? row.age_days +
+                                                  'd since update'
                                                 : 'No age signal'
                                         }}
                                     </div>
@@ -1944,7 +2082,9 @@ function timeAgo(isoString: string): string {
                     project, assignment, and subcontractor analysis.
                 </p>
             </div>
-            <div class="flex flex-wrap gap-1 rounded-md border border-border p-1">
+            <div
+                class="flex flex-wrap gap-1 rounded-md border border-border p-1"
+            >
                 <button
                     v-for="tab in dashboardTabs"
                     :key="tab.key"
@@ -1971,9 +2111,7 @@ function timeAgo(isoString: string): string {
                 class="flex flex-wrap items-start justify-between gap-3 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
             >
                 <div>
-                    <h2 class="text-sm font-semibold">
-                        Project Control Tower
-                    </h2>
+                    <h2 class="text-sm font-semibold">Project Control Tower</h2>
                     <p class="text-xs text-muted-foreground">
                         Today's highest-impact blockers, owners, and next
                         actions
@@ -2020,9 +2158,7 @@ function timeAgo(isoString: string): string {
                             <CheckCircle2 class="size-3.5" />
                             Ready for Report
                         </div>
-                        <p
-                            class="mt-1 text-2xl font-semibold text-emerald-600"
-                        >
+                        <p class="mt-1 text-2xl font-semibold text-emerald-600">
                             {{ controlTower.metrics.ready_for_report }}
                         </p>
                     </div>
@@ -2462,7 +2598,10 @@ function timeAgo(isoString: string): string {
                                         >Insufficient data</span
                                     >
                                     <div
-                                        v-if="item.delay_days && item.delay_days > 0"
+                                        v-if="
+                                            item.delay_days &&
+                                            item.delay_days > 0
+                                        "
                                         class="text-xs text-red-600 dark:text-red-400"
                                     >
                                         +{{ item.delay_days }}d delay
@@ -2483,7 +2622,9 @@ function timeAgo(isoString: string): string {
                                             item.risk_level.replace('_', ' ')
                                         }}</span
                                     >
-                                    <div class="mt-1 text-xs text-muted-foreground">
+                                    <div
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
                                         {{ item.confidence }} confidence
                                     </div>
                                 </td>
@@ -3371,9 +3512,7 @@ function timeAgo(isoString: string): string {
                         </div>
                     </div>
                     <div class="rounded-md border border-border p-3">
-                        <div class="text-xs text-muted-foreground">
-                            Machine
-                        </div>
+                        <div class="text-xs text-muted-foreground">Machine</div>
                         <div class="mt-1 text-sm font-medium">
                             {{ selectedSite.machine_type ?? 'No machine' }}
                         </div>
@@ -3381,21 +3520,42 @@ function timeAgo(isoString: string): string {
                     <div class="rounded-md border border-border p-3">
                         <div class="text-xs text-muted-foreground">WO</div>
                         <div class="mt-1 text-sm font-medium">
-                            {{
-                                selectedSite.construction_wo_number ??
-                                'No WO'
-                            }}
+                            {{ selectedSite.construction_wo_number ?? 'No WO' }}
                         </div>
+                    </div>
+                </div>
+
+                <div
+                    v-if="selectedSiteIssueGroups.length > 0"
+                    class="rounded-md border border-border"
+                >
+                    <div
+                        class="border-b border-border px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
+                        Blocker Groups
+                    </div>
+                    <div class="flex flex-wrap gap-2 p-3">
+                        <span
+                            v-for="group in selectedSiteIssueGroups"
+                            :key="group.key"
+                            class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium"
+                            :class="issueGroupClass(group)"
+                        >
+                            {{ group.label }}
+                            <span class="font-semibold tabular-nums">{{
+                                group.count
+                            }}</span>
+                        </span>
                     </div>
                 </div>
 
                 <div class="rounded-md border border-border">
                     <div
-                        class="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                        class="border-b border-border px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                     >
-                        Workstreams
+                        Location Timeline
                     </div>
-                    <div class="grid gap-2 p-3 md:grid-cols-2">
+                    <div class="grid gap-3 p-3 md:grid-cols-2">
                         <template
                             v-for="stream in siteWorkstreamOrder"
                             :key="stream.key"
@@ -3421,16 +3581,18 @@ function timeAgo(isoString: string): string {
                                         stream.label
                                     }}</span>
                                     <span class="text-xs">{{
-                                        siteWorkstream(selectedSite, stream.key)!
-                                            .status
+                                        siteWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        )!.status
                                     }}</span>
                                 </div>
-                                <div
-                                    class="mt-1 text-xs text-muted-foreground"
-                                >
+                                <div class="mt-1 text-xs text-muted-foreground">
                                     {{
-                                        siteWorkstream(selectedSite, stream.key)!
-                                            .subcontractor ?? 'No subcontractor'
+                                        siteWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        )!.subcontractor ?? 'No subcontractor'
                                     }}
                                     <span
                                         v-if="
@@ -3465,6 +3627,59 @@ function timeAgo(isoString: string): string {
                                         }}d
                                     </span>
                                 </div>
+                                <div
+                                    v-if="
+                                        issuesForWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        ).length > 0
+                                    "
+                                    class="mt-3 space-y-2 border-t border-current/15 pt-2"
+                                >
+                                    <div
+                                        v-for="issue in issuesForWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        ).slice(0, 2)"
+                                        :key="`${stream.key}-${issue.type}-${issue.assignment_id}`"
+                                        class="text-xs"
+                                    >
+                                        <div class="font-medium">
+                                            {{ issueTypeLabel(issue.type) }}
+                                        </div>
+                                        <div
+                                            class="mt-0.5 text-muted-foreground"
+                                        >
+                                            {{ issue.problem }}
+                                        </div>
+                                        <div class="mt-1 text-muted-foreground">
+                                            Owner: {{ issue.owner }}
+                                        </div>
+                                    </div>
+                                    <div
+                                        v-if="
+                                            issuesForWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            ).length > 2
+                                        "
+                                        class="text-xs text-muted-foreground"
+                                    >
+                                        +{{
+                                            issuesForWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            ).length - 2
+                                        }}
+                                        more issue(s)
+                                    </div>
+                                </div>
+                                <div
+                                    v-else
+                                    class="mt-3 border-t border-current/15 pt-2 text-xs text-muted-foreground"
+                                >
+                                    No blocker detected in this workstream.
+                                </div>
                             </Link>
                             <div
                                 v-else
@@ -3483,7 +3698,7 @@ function timeAgo(isoString: string): string {
 
                 <div class="rounded-md border border-border">
                     <div
-                        class="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                        class="border-b border-border px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                     >
                         Why Not Done
                     </div>
@@ -3496,15 +3711,11 @@ function timeAgo(isoString: string): string {
                             <div>
                                 <span
                                     class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
-                                    :class="
-                                        siteSeverityClass(issue.severity)
-                                    "
+                                    :class="siteSeverityClass(issue.severity)"
                                 >
                                     {{ issue.severity }}
                                 </span>
-                                <div
-                                    class="mt-1 text-xs text-muted-foreground"
-                                >
+                                <div class="mt-1 text-xs text-muted-foreground">
                                     {{ issueTypeLabel(issue.type) }}
                                 </div>
                             </div>

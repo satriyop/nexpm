@@ -26,6 +26,8 @@ class AssignmentBastDataFactory extends Factory
     {
         return $this->state(fn () => [
             'plant_name' => fake()->company(),
+            'sim_provider' => 'Telkomsel',
+            'nomor_simcard' => fake()->numerify('0812########'),
             'installation_date' => fake()->date(),
             'commissioning_date' => fake()->date(),
         ])->afterCreating(function (AssignmentBastData $bast) {
