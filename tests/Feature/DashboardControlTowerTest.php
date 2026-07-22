@@ -73,6 +73,7 @@ test('dashboard exposes the control tower as a deferred prop', function () {
                 ->has('controlTower.priority_queue')
                 ->has('siteOperations.metrics')
                 ->has('siteOperations.problem_breakdown')
+                ->has('siteOperations.filter_options')
                 ->has('siteOperations.site_rows')
             )
         );
@@ -119,8 +120,39 @@ test('site operations dashboard explains why a location is not done', function (
         ->and($row['overall_status'])->toBe('blocked')
         ->and($row['issue_type'])->toBe('construction_missing_wo')
         ->and($row['main_issue'])->toContain('WO number is missing')
+        ->and($row['issues'])->not->toBeEmpty()
+        ->and($row['issues'][0]['type'])->toBe('construction_missing_wo')
         ->and($row['owner'])->toBe('Admin: Main Con Admin')
         ->and($row['workstreams']['construction']['status'])->toBe(AssignmentStatus::Pending->value)
         ->and($row['workstreams']['survey']['status'])->toBe(AssignmentStatus::Verified->value)
-        ->and($row['url'])->toBe(route('admin.assignments.site-assignments', $site));
+        ->and($row['url'])->toBe(route('admin.assignments.site-assignments', $site))
+        ->and($payload['filter_options']['statuses'])->toContain('blocked')
+        ->and($payload['filter_options']['issue_types'])->toContain('construction_missing_wo')
+        ->and($payload['filter_options']['owners'])->toContain('Admin: Main Con Admin');
+});
+
+test('site operations dashboard exposes construction WO for filtering', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Bandung']);
+    $site = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'BDG-001',
+    ]);
+
+    $construction = Assignment::factory()->construction()->create([
+        'site_id' => $site->id,
+        'status' => AssignmentStatus::Construction,
+        'updated_at' => now()->subDays(2),
+    ]);
+    AssignmentConstructionData::factory()->create([
+        'assignment_id' => $construction->id,
+        'cons_wo_number' => 'WO-7788',
+    ]);
+
+    $payload = app(SiteOperationsDashboardService::class)->build($superAdmin);
+    $row = $payload['site_rows'][0];
+
+    expect($row['construction_wo_number'])->toBe('WO-7788')
+        ->and($row['workstreams']['construction']['wo_number'])->toBe('WO-7788')
+        ->and($payload['filter_options']['wo_numbers'])->toContain('WO-7788');
 });

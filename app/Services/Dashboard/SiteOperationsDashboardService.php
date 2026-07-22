@@ -19,6 +19,10 @@ class SiteOperationsDashboardService
     public function build(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null): array
     {
         $rows = $this->siteRows($user, $mainContractorFilter, $projectFilter);
+        $priorityRows = $rows
+            ->sortByDesc(fn (array $row): int => (int) $row['severity_score'])
+            ->take(50)
+            ->values();
 
         return [
             'generated_at' => now()->toIso8601String(),
@@ -36,11 +40,14 @@ class SiteOperationsDashboardService
                 ->countBy('issue_type')
                 ->sortDesc()
                 ->all(),
-            'site_rows' => $rows
-                ->sortByDesc(fn (array $row): int => (int) $row['severity_score'])
-                ->take(50)
-                ->values()
-                ->all(),
+            'filter_options' => [
+                'statuses' => $priorityRows->pluck('overall_status')->filter()->unique()->sort()->values()->all(),
+                'issue_types' => $priorityRows->pluck('issue_type')->filter()->unique()->sort()->values()->all(),
+                'machine_types' => $priorityRows->pluck('machine_type')->filter()->unique()->sort()->values()->all(),
+                'owners' => $priorityRows->pluck('owner')->filter()->unique()->sort()->values()->all(),
+                'wo_numbers' => $priorityRows->pluck('construction_wo_number')->filter()->unique()->sort()->values()->all(),
+            ],
+            'site_rows' => $priorityRows->all(),
         ];
     }
 
@@ -66,6 +73,7 @@ class SiteOperationsDashboardService
                 $primaryIssue = $issues->first();
                 $overallStatus = $this->overallStatus($assignments, $activeAssignments, $primaryIssue);
                 $activeCount = $activeAssignments->count();
+                $constructionWoNumber = $this->constructionWoNumber($assignments);
 
                 return [
                     'site_id' => (int) $site->site_id,
@@ -75,6 +83,7 @@ class SiteOperationsDashboardService
                     'project' => $site->project_name,
                     'main_contractor' => $site->main_contractor_name,
                     'machine_type' => $site->machine_type_name,
+                    'construction_wo_number' => $constructionWoNumber,
                     'overall_status' => $overallStatus,
                     'completion_pct' => $activeCount > 0 ? (int) round($completedAssignments->count() / $activeCount * 100) : 0,
                     'active_assignment_count' => $activeCount,
@@ -82,6 +91,7 @@ class SiteOperationsDashboardService
                     'main_issue' => $primaryIssue['problem'] ?? $this->defaultIssueText($overallStatus),
                     'issue_type' => $primaryIssue['type'] ?? null,
                     'issue_severity' => $primaryIssue['severity'] ?? null,
+                    'issues' => $issues->take(5)->values()->all(),
                     'severity_score' => $primaryIssue['severity_score'] ?? $this->statusSortScore($overallStatus),
                     'owner' => $primaryIssue['owner'] ?? null,
                     'age_days' => $primaryIssue['age_days'] ?? null,
@@ -191,9 +201,22 @@ class SiteOperationsDashboardService
             'label' => $activity->label(),
             'status' => $row->status,
             'subcontractor' => $row->subcontractor_name,
+            'wo_number' => $activity === ActivityType::Construction ? $row->cons_wo_number : null,
             'age_days' => $row->updated_at ? (int) Carbon::parse($row->updated_at)->diffInDays(now()) : null,
             'url' => route('admin.assignments.show', $row->assignment_id),
         ];
+    }
+
+    /**
+     * @param  Collection<int, object>  $assignments
+     */
+    private function constructionWoNumber(Collection $assignments): ?string
+    {
+        return $assignments
+            ->where('activity_type', ActivityType::Construction->value)
+            ->pluck('cons_wo_number')
+            ->filter()
+            ->first();
     }
 
     /**

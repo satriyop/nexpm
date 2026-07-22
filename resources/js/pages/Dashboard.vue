@@ -221,8 +221,23 @@ interface SiteWorkstream {
     label: string;
     status: string;
     subcontractor: string | null;
+    wo_number: string | null;
     age_days: number | null;
     url: string;
+}
+
+interface SiteIssue {
+    severity: Exclude<SiteIssueSeverity, null>;
+    severity_score: number;
+    type: string;
+    problem: string;
+    owner: string;
+    recommended_action: string;
+    assignment_id: number | null;
+    activity_type: string | null;
+    status: string | null;
+    age_days: number | null;
+    site_id: number;
 }
 
 interface SiteOperationsRow {
@@ -233,6 +248,7 @@ interface SiteOperationsRow {
     project: string;
     main_contractor: string;
     machine_type: string | null;
+    construction_wo_number: string | null;
     overall_status: SiteOverallStatus;
     completion_pct: number;
     active_assignment_count: number;
@@ -240,6 +256,7 @@ interface SiteOperationsRow {
     main_issue: string;
     issue_type: string | null;
     issue_severity: SiteIssueSeverity;
+    issues: SiteIssue[];
     severity_score: number;
     owner: string | null;
     age_days: number | null;
@@ -260,6 +277,13 @@ interface SiteOperations {
         not_started_sites: number;
     };
     problem_breakdown: Record<string, number>;
+    filter_options: {
+        statuses: string[];
+        issue_types: string[];
+        machine_types: string[];
+        owners: string[];
+        wo_numbers: string[];
+    };
     site_rows: SiteOperationsRow[];
 }
 
@@ -608,6 +632,14 @@ function askAi(prompt: string): void {
 }
 
 const siteRows = computed(() => props.siteOperations?.site_rows ?? []);
+const siteStatusFilter = ref<string>(ALL);
+const siteIssueFilter = ref<string>(ALL);
+const siteMachineFilter = ref<string>(ALL);
+const siteOwnerFilter = ref<string>(ALL);
+const siteWoFilter = ref<string>(ALL);
+const siteSearch = ref('');
+const selectedSite = ref<SiteOperationsRow | null>(null);
+const siteDetailOpen = ref(false);
 const siteWorkstreamOrder: { key: string; label: string }[] = [
     { key: 'survey', label: 'Survey' },
     { key: 'pln', label: 'PLN' },
@@ -622,6 +654,63 @@ const problemBreakdownRows = computed(() =>
             count,
             label: issueTypeLabel(type),
         })),
+);
+const filteredSiteRows = computed(() => {
+    const search = siteSearch.value.trim().toLowerCase();
+
+    return siteRows.value.filter((row) => {
+        if (
+            siteStatusFilter.value !== ALL &&
+            row.overall_status !== siteStatusFilter.value
+        ) {
+            return false;
+        }
+
+        if (
+            siteIssueFilter.value !== ALL &&
+            row.issue_type !== siteIssueFilter.value
+        ) {
+            return false;
+        }
+
+        if (
+            siteMachineFilter.value !== ALL &&
+            row.machine_type !== siteMachineFilter.value
+        ) {
+            return false;
+        }
+
+        if (siteOwnerFilter.value !== ALL && row.owner !== siteOwnerFilter.value) {
+            return false;
+        }
+
+        if (
+            siteWoFilter.value !== ALL &&
+            row.construction_wo_number !== siteWoFilter.value
+        ) {
+            return false;
+        }
+
+        if (search === '') {
+            return true;
+        }
+
+        return [
+            row.site_code,
+            row.location_name,
+            row.project,
+            row.main_contractor,
+            row.machine_type,
+            row.construction_wo_number,
+            row.main_issue,
+            row.owner,
+        ]
+            .filter(Boolean)
+            .some((value) => value!.toLowerCase().includes(search));
+    });
+});
+const hiddenSiteCount = computed(
+    () => siteRows.value.length - filteredSiteRows.value.length,
 );
 
 function severityClass(severity: ControlTowerItem['severity']): string {
@@ -658,8 +747,8 @@ function siteStatusClass(status: SiteOverallStatus): string {
     }[status];
 }
 
-function siteStatusLabel(status: SiteOverallStatus): string {
-    return {
+function siteStatusLabel(status: SiteOverallStatus | string): string {
+    const labels: Record<string, string> = {
         blocked: 'Blocked',
         stalled: 'Stalled',
         needs_review: 'Needs Review',
@@ -668,7 +757,9 @@ function siteStatusLabel(status: SiteOverallStatus): string {
         in_progress: 'In Progress',
         dropped: 'Dropped',
         done: 'Done',
-    }[status];
+    };
+
+    return labels[status] ?? status;
 }
 
 function issueTypeLabel(type: string): string {
@@ -711,6 +802,20 @@ function workstreamClass(workstream: SiteWorkstream | null): string {
     }
 
     return 'border-border bg-background text-foreground';
+}
+
+function openSiteDetail(row: SiteOperationsRow): void {
+    selectedSite.value = row;
+    siteDetailOpen.value = true;
+}
+
+function clearSiteFilters(): void {
+    siteStatusFilter.value = ALL;
+    siteIssueFilter.value = ALL;
+    siteMachineFilter.value = ALL;
+    siteOwnerFilter.value = ALL;
+    siteWoFilter.value = ALL;
+    siteSearch.value = '';
 }
 
 function forecastRiskClass(riskLevel: ForecastItem['risk_level']): string {
@@ -1267,6 +1372,110 @@ function timeAgo(isoString: string): string {
                     </span>
                 </div>
 
+                <div
+                    class="grid gap-2 border-b border-sidebar-border/70 p-4 md:grid-cols-2 xl:grid-cols-6 dark:border-sidebar-border"
+                >
+                    <input
+                        v-model="siteSearch"
+                        type="search"
+                        placeholder="Search site, project, issue, owner"
+                        class="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20 md:col-span-2 xl:col-span-1"
+                    />
+                    <Select v-model="siteStatusFilter">
+                        <SelectTrigger class="h-9">
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All statuses</SelectItem>
+                            <SelectItem
+                                v-for="status in siteOperations.filter_options.statuses"
+                                :key="status"
+                                :value="status"
+                            >
+                                {{ siteStatusLabel(status) }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select v-model="siteIssueFilter">
+                        <SelectTrigger class="h-9">
+                            <SelectValue placeholder="Issue" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All issues</SelectItem>
+                            <SelectItem
+                                v-for="issue in siteOperations.filter_options.issue_types"
+                                :key="issue"
+                                :value="issue"
+                            >
+                                {{ issueTypeLabel(issue) }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select v-model="siteMachineFilter">
+                        <SelectTrigger class="h-9">
+                            <SelectValue placeholder="Machine" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All machines</SelectItem>
+                            <SelectItem
+                                v-for="machine in siteOperations.filter_options.machine_types"
+                                :key="machine"
+                                :value="machine"
+                            >
+                                {{ machine }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select v-model="siteWoFilter">
+                        <SelectTrigger class="h-9">
+                            <SelectValue placeholder="WO" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All WO</SelectItem>
+                            <SelectItem
+                                v-for="woNumber in siteOperations.filter_options.wo_numbers"
+                                :key="woNumber"
+                                :value="woNumber"
+                            >
+                                {{ woNumber }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <div class="flex gap-2">
+                        <Select v-model="siteOwnerFilter">
+                            <SelectTrigger class="h-9 min-w-0 flex-1">
+                                <SelectValue placeholder="Owner" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem :value="ALL">All owners</SelectItem>
+                                <SelectItem
+                                    v-for="owner in siteOperations.filter_options.owners"
+                                    :key="owner"
+                                    :value="owner"
+                                >
+                                    {{ owner }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <button
+                            type="button"
+                            class="h-9 rounded-md border border-border px-3 text-xs font-medium transition hover:bg-accent"
+                            @click="clearSiteFilters"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    <div
+                        class="text-xs text-muted-foreground md:col-span-2 xl:col-span-6"
+                    >
+                        Showing {{ filteredSiteRows.length }} of
+                        {{ siteRows.length }} priority locations
+                        <span v-if="hiddenSiteCount > 0">
+                            · {{ hiddenSiteCount }} hidden by filters</span
+                        >
+                    </div>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead
@@ -1306,13 +1515,13 @@ function timeAgo(isoString: string): string {
                                 <th
                                     class="px-4 py-3 text-right font-medium text-muted-foreground"
                                 >
-                                    AI
+                                    Actions
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr
-                                v-for="row in siteRows"
+                                v-for="row in filteredSiteRows"
                                 :key="row.site_id"
                                 class="border-t border-sidebar-border/70 transition-colors hover:bg-muted/30 dark:border-sidebar-border"
                             >
@@ -1329,6 +1538,12 @@ function timeAgo(isoString: string): string {
                                     <div class="text-xs text-muted-foreground">
                                         {{ row.project }} ·
                                         {{ row.machine_type ?? 'No machine' }}
+                                    </div>
+                                    <div
+                                        v-if="row.construction_wo_number"
+                                        class="text-xs text-muted-foreground"
+                                    >
+                                        WO {{ row.construction_wo_number }}
                                     </div>
                                 </td>
                                 <td class="px-4 py-3">
@@ -1403,6 +1618,23 @@ function timeAgo(isoString: string): string {
                                                         )!.status
                                                     }}
                                                 </span>
+                                                <span
+                                                    v-if="
+                                                        siteWorkstream(
+                                                            row,
+                                                            stream.key,
+                                                        )!.wo_number
+                                                    "
+                                                    class="ml-1 text-muted-foreground"
+                                                >
+                                                    · WO
+                                                    {{
+                                                        siteWorkstream(
+                                                            row,
+                                                            stream.key,
+                                                        )!.wo_number
+                                                    }}
+                                                </span>
                                             </Link>
                                             <span
                                                 v-else
@@ -1446,17 +1678,26 @@ function timeAgo(isoString: string): string {
                                     {{ row.next_action }}
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <button
-                                        type="button"
-                                        class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs transition hover:bg-accent"
-                                        @click="askAi(row.ai_prompt)"
-                                    >
-                                        <Bot class="size-3" />
-                                        Ask
-                                    </button>
+                                    <div class="flex justify-end gap-1.5">
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs transition hover:bg-accent"
+                                            @click="openSiteDetail(row)"
+                                        >
+                                            Detail
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs transition hover:bg-accent"
+                                            @click="askAi(row.ai_prompt)"
+                                        >
+                                            <Bot class="size-3" />
+                                            Ask
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
-                            <tr v-if="siteRows.length === 0">
+                            <tr v-if="filteredSiteRows.length === 0">
                                 <td
                                     colspan="7"
                                     class="px-4 py-8 text-center text-sm text-muted-foreground"
@@ -2837,6 +3078,229 @@ function timeAgo(isoString: string): string {
     </div>
 
     <!-- Status legend dialog -->
+    <Dialog :open="siteDetailOpen" @update:open="siteDetailOpen = $event">
+        <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>
+                    {{ selectedSite?.site_code }} ·
+                    {{ selectedSite?.location_name }}
+                </DialogTitle>
+            </DialogHeader>
+
+            <div v-if="selectedSite" class="grid gap-4">
+                <div class="grid gap-3 md:grid-cols-5">
+                    <div class="rounded-md border border-border p-3">
+                        <div class="text-xs text-muted-foreground">Status</div>
+                        <span
+                            class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                            :class="
+                                siteStatusClass(selectedSite.overall_status)
+                            "
+                        >
+                            {{ siteStatusLabel(selectedSite.overall_status) }}
+                        </span>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div class="text-xs text-muted-foreground">
+                            Completion
+                        </div>
+                        <div class="mt-1 text-xl font-semibold">
+                            {{ selectedSite.completion_pct }}%
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div class="text-xs text-muted-foreground">Project</div>
+                        <div class="mt-1 text-sm font-medium">
+                            {{ selectedSite.project }}
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div class="text-xs text-muted-foreground">
+                            Machine
+                        </div>
+                        <div class="mt-1 text-sm font-medium">
+                            {{ selectedSite.machine_type ?? 'No machine' }}
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div class="text-xs text-muted-foreground">WO</div>
+                        <div class="mt-1 text-sm font-medium">
+                            {{
+                                selectedSite.construction_wo_number ??
+                                'No WO'
+                            }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-md border border-border">
+                    <div
+                        class="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                        Workstreams
+                    </div>
+                    <div class="grid gap-2 p-3 md:grid-cols-2">
+                        <template
+                            v-for="stream in siteWorkstreamOrder"
+                            :key="stream.key"
+                        >
+                            <Link
+                                v-if="siteWorkstream(selectedSite, stream.key)"
+                                :href="
+                                    siteWorkstream(selectedSite, stream.key)!
+                                        .url
+                                "
+                                class="rounded-md border p-3 text-sm transition hover:bg-accent"
+                                :class="
+                                    workstreamClass(
+                                        siteWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        ),
+                                    )
+                                "
+                            >
+                                <div class="flex items-center justify-between">
+                                    <span class="font-medium">{{
+                                        stream.label
+                                    }}</span>
+                                    <span class="text-xs">{{
+                                        siteWorkstream(selectedSite, stream.key)!
+                                            .status
+                                    }}</span>
+                                </div>
+                                <div
+                                    class="mt-1 text-xs text-muted-foreground"
+                                >
+                                    {{
+                                        siteWorkstream(selectedSite, stream.key)!
+                                            .subcontractor ?? 'No subcontractor'
+                                    }}
+                                    <span
+                                        v-if="
+                                            siteWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            )!.wo_number
+                                        "
+                                    >
+                                        · WO
+                                        {{
+                                            siteWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            )!.wo_number
+                                        }}
+                                    </span>
+                                    <span
+                                        v-if="
+                                            siteWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            )!.age_days != null
+                                        "
+                                    >
+                                        ·
+                                        {{
+                                            siteWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            )!.age_days
+                                        }}d
+                                    </span>
+                                </div>
+                            </Link>
+                            <div
+                                v-else
+                                class="rounded-md border border-dashed p-3 text-sm text-muted-foreground"
+                            >
+                                <div class="font-medium">
+                                    {{ stream.label }}
+                                </div>
+                                <div class="mt-1 text-xs">
+                                    Assignment not started
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="rounded-md border border-border">
+                    <div
+                        class="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                        Why Not Done
+                    </div>
+                    <div class="divide-y divide-border">
+                        <div
+                            v-for="issue in selectedSite.issues"
+                            :key="`${issue.type}-${issue.assignment_id ?? 'site'}`"
+                            class="grid gap-2 p-3 md:grid-cols-[8rem_1fr_12rem]"
+                        >
+                            <div>
+                                <span
+                                    class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                                    :class="
+                                        siteSeverityClass(issue.severity)
+                                    "
+                                >
+                                    {{ issue.severity }}
+                                </span>
+                                <div
+                                    class="mt-1 text-xs text-muted-foreground"
+                                >
+                                    {{ issueTypeLabel(issue.type) }}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-sm">
+                                    {{ issue.problem }}
+                                </div>
+                                <div class="mt-1 text-xs text-muted-foreground">
+                                    {{ issue.recommended_action }}
+                                </div>
+                            </div>
+                            <div class="text-xs text-muted-foreground">
+                                <div>{{ issue.owner }}</div>
+                                <div>
+                                    {{
+                                        issue.age_days != null
+                                            ? issue.age_days + 'd since update'
+                                            : 'No age signal'
+                                    }}
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            v-if="selectedSite.issues.length === 0"
+                            class="p-3 text-sm text-muted-foreground"
+                        >
+                            No blocker signal detected for this location.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap justify-end gap-2">
+                    <Link
+                        :href="selectedSite.url"
+                        class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium transition hover:bg-accent"
+                    >
+                        Open Location
+                        <ArrowRight class="size-3" />
+                    </Link>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium transition hover:bg-accent"
+                        @click="askAi(selectedSite.ai_prompt)"
+                    >
+                        <Bot class="size-3.5" />
+                        Ask AI
+                    </button>
+                </div>
+            </div>
+        </DialogContent>
+    </Dialog>
+
     <Dialog :open="legendOpen" @update:open="legendOpen = $event">
         <DialogContent class="max-w-lg">
             <DialogHeader>
