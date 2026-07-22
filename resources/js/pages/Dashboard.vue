@@ -361,8 +361,10 @@ defineOptions({
 });
 
 const ALL = '__all__';
+type DashboardTab = 'locations' | 'projects' | 'assignments' | 'subcontractors';
 const mainContractorId = ref<string>(props.filters?.main_contractor_id ?? ALL);
 const projectId = ref<string>(props.filters?.project_id ?? ALL);
+const activeDashboardTab = ref<DashboardTab>('locations');
 
 const selectedContractorName = computed(
     () =>
@@ -376,6 +378,13 @@ const selectedProjectName = computed(
         props.projects?.find((p) => p.id.toString() === projectId.value)
             ?.name ?? null,
 );
+
+const dashboardTabs: { key: DashboardTab; label: string }[] = [
+    { key: 'locations', label: 'Locations' },
+    { key: 'projects', label: 'Projects' },
+    { key: 'assignments', label: 'Assignments' },
+    { key: 'subcontractors', label: 'Subcontractors' },
+];
 
 function buildQuery(): Record<string, string> {
     const q: Record<string, string> = {};
@@ -685,6 +694,28 @@ const problemBreakdownRows = computed(() =>
             count,
             label: issueTypeLabel(type),
         })),
+);
+const locationOwnerRows = computed(() => {
+    const counts = new Map<string, number>();
+
+    for (const row of siteRows.value) {
+        if (!row.owner || row.overall_status === 'done') {
+            continue;
+        }
+
+        counts.set(row.owner, (counts.get(row.owner) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+        .map(([owner, count]) => ({ owner, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+});
+const oldestLocationRows = computed(() =>
+    siteRows.value
+        .filter((row) => row.age_days != null && row.overall_status !== 'done')
+        .sort((a, b) => (b.age_days ?? 0) - (a.age_days ?? 0))
+        .slice(0, 5),
 );
 
 function severityClass(severity: ControlTowerItem['severity']): string {
@@ -1084,7 +1115,8 @@ function timeAgo(isoString: string): string {
             <div class="flex flex-col gap-1">
                 <h1 class="text-xl font-semibold tracking-tight">Dashboard</h1>
                 <p class="text-sm text-muted-foreground">
-                    Overview of EV charging station deployment progress
+                    Site/location command center for blockers, owners, and next
+                    actions
                     <span
                         v-if="selectedContractorName"
                         class="font-medium text-foreground"
@@ -1144,7 +1176,10 @@ function timeAgo(isoString: string): string {
         </div>
 
         <!-- KPI Strip -->
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
+        <div
+            v-show="activeDashboardTab === 'assignments'"
+            class="order-30 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5"
+        >
             <template v-if="statusCounts != null">
                 <div
                     class="flex flex-col gap-1 rounded-xl border border-sidebar-border/70 bg-card p-4 dark:border-sidebar-border"
@@ -1279,7 +1314,7 @@ function timeAgo(isoString: string): string {
 
         <!-- Section: Location Operations -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            class="order-10 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="flex flex-wrap items-start justify-between gap-3 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -1379,6 +1414,92 @@ function timeAgo(isoString: string): string {
                         >
                             {{ siteOperations.metrics.done_sites }}
                         </p>
+                    </div>
+                </div>
+
+                <div
+                    class="grid gap-3 border-b border-sidebar-border/70 p-4 lg:grid-cols-3 dark:border-sidebar-border"
+                >
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                        >
+                            <ShieldAlert class="size-3.5" />
+                            Top Blockers
+                        </div>
+                        <div class="mt-3 space-y-2">
+                            <div
+                                v-for="item in problemBreakdownRows.slice(0, 3)"
+                                :key="item.type"
+                                class="flex items-center justify-between gap-3 text-sm"
+                            >
+                                <span>{{ item.label }}</span>
+                                <span class="font-semibold tabular-nums">{{
+                                    item.count
+                                }}</span>
+                            </div>
+                            <div
+                                v-if="problemBreakdownRows.length === 0"
+                                class="text-sm text-muted-foreground"
+                            >
+                                No blocker signal detected.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                        >
+                            <Wrench class="size-3.5" />
+                            Owner Queue
+                        </div>
+                        <div class="mt-3 space-y-2">
+                            <div
+                                v-for="item in locationOwnerRows.slice(0, 3)"
+                                :key="item.owner"
+                                class="flex items-center justify-between gap-3 text-sm"
+                            >
+                                <span class="truncate">{{ item.owner }}</span>
+                                <span class="font-semibold tabular-nums">{{
+                                    item.count
+                                }}</span>
+                            </div>
+                            <div
+                                v-if="locationOwnerRows.length === 0"
+                                class="text-sm text-muted-foreground"
+                            >
+                                No owner queue right now.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
+                        <div
+                            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                        >
+                            <Clock class="size-3.5" />
+                            Oldest Stuck Locations
+                        </div>
+                        <div class="mt-3 space-y-2">
+                            <button
+                                v-for="row in oldestLocationRows.slice(0, 3)"
+                                :key="row.site_id"
+                                type="button"
+                                class="flex w-full items-center justify-between gap-3 text-left text-sm hover:underline"
+                                @click="openSiteDetail(row)"
+                            >
+                                <span class="truncate">{{ row.site_code }}</span>
+                                <span
+                                    class="shrink-0 text-muted-foreground tabular-nums"
+                                    >{{ row.age_days }}d</span
+                                >
+                            </button>
+                            <div
+                                v-if="oldestLocationRows.length === 0"
+                                class="text-sm text-muted-foreground"
+                            >
+                                No stalled age signal detected.
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1813,9 +1934,38 @@ function timeAgo(isoString: string): string {
             </div>
         </div>
 
+        <div
+            class="order-20 flex flex-wrap items-center justify-between gap-3 border-b border-sidebar-border/70 pb-2 dark:border-sidebar-border"
+        >
+            <div>
+                <h2 class="text-sm font-semibold">Secondary Analytics</h2>
+                <p class="text-xs text-muted-foreground">
+                    Location operations stay primary; use these views for deeper
+                    project, assignment, and subcontractor analysis.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-1 rounded-md border border-border p-1">
+                <button
+                    v-for="tab in dashboardTabs"
+                    :key="tab.key"
+                    type="button"
+                    class="rounded px-3 py-1.5 text-xs font-medium transition"
+                    :class="
+                        activeDashboardTab === tab.key
+                            ? 'bg-foreground text-background'
+                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    "
+                    @click="activeDashboardTab = tab.key"
+                >
+                    {{ tab.label }}
+                </button>
+            </div>
+        </div>
+
         <!-- Section: Project Control Tower -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'projects'"
+            class="order-40 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="flex flex-wrap items-start justify-between gap-3 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -1997,7 +2147,8 @@ function timeAgo(isoString: string): string {
 
         <!-- Section: Deadline Risk -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'projects'"
+            class="order-40 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -2206,7 +2357,8 @@ function timeAgo(isoString: string): string {
 
         <!-- Section: Completion Forecast -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'projects'"
+            class="order-40 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -2364,7 +2516,10 @@ function timeAgo(isoString: string): string {
         </div>
 
         <!-- Section 1: Status Summary Cards (clickable, zero-count cards hidden) -->
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
+        <div
+            v-show="activeDashboardTab === 'assignments'"
+            class="order-30 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8"
+        >
             <template v-if="statusCounts != null">
                 <template v-for="stat in statuses" :key="stat.key">
                     <Link
@@ -2405,7 +2560,8 @@ function timeAgo(isoString: string): string {
 
         <!-- Section: Assignment Aging Heatmap -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'assignments'"
+            class="order-30 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -2527,7 +2683,8 @@ function timeAgo(isoString: string): string {
 
         <!-- Section 2: Activity × Status Pipeline Matrix -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'assignments'"
+            class="order-30 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="flex items-center justify-between border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -2678,7 +2835,8 @@ function timeAgo(isoString: string): string {
 
         <!-- Section 3: Per-project breakdown -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'projects'"
+            class="order-40 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -2861,7 +3019,8 @@ function timeAgo(isoString: string): string {
 
         <!-- Section 4: Activity Chart -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'assignments'"
+            class="order-30 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -2902,7 +3061,8 @@ function timeAgo(isoString: string): string {
                 subcontractorLeaderboard == null ||
                 subcontractorLeaderboard.length > 0
             "
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'subcontractors'"
+            class="order-50 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -3066,7 +3226,8 @@ function timeAgo(isoString: string): string {
             v-if="
                 workloadDistribution == null || workloadDistribution.length > 0
             "
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'subcontractors'"
+            class="order-50 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
@@ -3088,7 +3249,8 @@ function timeAgo(isoString: string): string {
 
         <!-- Section 5: Recent Activity -->
         <div
-            class="overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
+            v-show="activeDashboardTab === 'assignments'"
+            class="order-30 overflow-hidden rounded-xl border border-sidebar-border/70 bg-card dark:border-sidebar-border"
         >
             <div
                 class="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
