@@ -255,6 +255,18 @@ interface SiteIssue {
     status: string | null;
     age_days: number | null;
     site_id: number;
+    stage: string;
+    category: string;
+    source: string;
+    blocks_stage: string;
+    blocks_downstream: string[];
+    evidence: Record<string, unknown>;
+}
+
+interface SiteCurrentStage {
+    key: string;
+    label: string;
+    source: string;
 }
 
 interface SiteIssueGroup {
@@ -278,6 +290,8 @@ interface SiteOperationsRow {
     active_assignment_count: number;
     workstreams: Record<string, SiteWorkstream | null>;
     latest_note: SiteLatestNote | null;
+    current_stage: SiteCurrentStage | null;
+    flow_explanation: string;
     main_issue: string;
     issue_type: string | null;
     issue_severity: SiteIssueSeverity;
@@ -1886,6 +1900,12 @@ function timeAgo(isoString: string): string {
                                         WO {{ row.construction_wo_number }}
                                     </div>
                                     <div
+                                        v-if="row.current_stage"
+                                        class="mt-1 text-xs text-muted-foreground"
+                                    >
+                                        Stage {{ row.current_stage.label }}
+                                    </div>
+                                    <div
                                         v-if="row.latest_note"
                                         class="mt-2 max-w-xs rounded-md border border-border bg-muted/30 px-2 py-1.5 text-xs"
                                     >
@@ -2007,6 +2027,11 @@ function timeAgo(isoString: string): string {
                                 <td class="min-w-64 px-4 py-3">
                                     <div class="flex flex-col gap-1">
                                         <span>{{ row.main_issue }}</span>
+                                        <span
+                                            class="line-clamp-2 text-xs text-muted-foreground"
+                                        >
+                                            {{ row.flow_explanation }}
+                                        </span>
                                         <span
                                             v-if="row.issue_severity"
                                             class="w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
@@ -3527,7 +3552,7 @@ function timeAgo(isoString: string): string {
             </DialogHeader>
 
             <div v-if="selectedSite" class="grid gap-4">
-                <div class="grid gap-3 md:grid-cols-5">
+                <div class="grid gap-3 md:grid-cols-6">
                     <div class="rounded-md border border-border p-3">
                         <div class="text-xs text-muted-foreground">Status</div>
                         <span
@@ -3548,6 +3573,14 @@ function timeAgo(isoString: string): string {
                         </div>
                     </div>
                     <div class="rounded-md border border-border p-3">
+                        <div class="text-xs text-muted-foreground">
+                            Current Stage
+                        </div>
+                        <div class="mt-1 text-sm font-medium">
+                            {{ selectedSite.current_stage?.label ?? '-' }}
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-border p-3">
                         <div class="text-xs text-muted-foreground">Project</div>
                         <div class="mt-1 text-sm font-medium">
                             {{ selectedSite.project }}
@@ -3565,6 +3598,17 @@ function timeAgo(isoString: string): string {
                             {{ selectedSite.construction_wo_number ?? 'No WO' }}
                         </div>
                     </div>
+                </div>
+
+                <div class="rounded-md border border-border p-3">
+                    <div
+                        class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
+                        Why This Site Is Not Done
+                    </div>
+                    <p class="mt-2 text-sm text-muted-foreground">
+                        {{ selectedSite.flow_explanation }}
+                    </p>
                 </div>
 
                 <div
@@ -3737,6 +3781,34 @@ function timeAgo(isoString: string): string {
                                         </div>
                                         <div class="mt-1 text-muted-foreground">
                                             Owner: {{ issue.owner }}
+                                        </div>
+                                        <div
+                                            class="mt-1 flex flex-wrap gap-1 text-[10px] tracking-wide uppercase"
+                                        >
+                                            <span
+                                                class="rounded-full border border-current/20 px-1.5 py-0.5"
+                                            >
+                                                {{ issue.source }}
+                                            </span>
+                                            <span
+                                                class="rounded-full border border-current/20 px-1.5 py-0.5"
+                                            >
+                                                {{ issue.category }}
+                                            </span>
+                                            <span
+                                                v-if="
+                                                    issue.blocks_downstream
+                                                        .length > 0
+                                                "
+                                                class="rounded-full border border-current/20 px-1.5 py-0.5"
+                                            >
+                                                blocks
+                                                {{
+                                                    issue.blocks_downstream.join(
+                                                        ', ',
+                                                    )
+                                                }}
+                                            </span>
                                         </div>
                                     </div>
                                     <div

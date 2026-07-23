@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\DB;
 
 class SiteOperationsDashboardService
 {
+    public function __construct(private SiteFlowEvaluator $siteFlowEvaluator) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -149,6 +151,7 @@ class SiteOperationsDashboardService
                         $row['main_issue'] ?? null,
                         $row['owner'] ?? null,
                         $row['latest_note']['body'] ?? null,
+                        $row['flow_explanation'] ?? null,
                     ])));
 
                     return str_contains($haystack, $needle);
@@ -198,9 +201,10 @@ class SiteOperationsDashboardService
                     AssignmentStatus::Verified->value,
                     AssignmentStatus::Reported->value,
                 ]);
-                $issues = $this->siteIssues($site, $assignments, $mainContractorAdminOwners);
-                $primaryIssue = $issues->first();
-                $overallStatus = $this->overallStatus($assignments, $activeAssignments, $primaryIssue);
+                $flow = $this->siteFlowEvaluator->evaluate($site, $assignments, $mainContractorAdminOwners);
+                $issues = $flow['issues'];
+                $primaryIssue = $flow['primary_issue'];
+                $overallStatus = $flow['overall_status'];
                 $activeCount = $activeAssignments->count();
                 $constructionWoNumber = $this->constructionWoNumber($assignments);
 
@@ -218,14 +222,16 @@ class SiteOperationsDashboardService
                     'active_assignment_count' => $activeCount,
                     'workstreams' => $workstreams,
                     'latest_note' => $latestNote,
-                    'main_issue' => $primaryIssue['problem'] ?? $this->defaultIssueText($overallStatus),
+                    'current_stage' => $flow['current_stage'],
+                    'flow_explanation' => $flow['flow_explanation'],
+                    'main_issue' => $primaryIssue['problem'] ?? $this->siteFlowEvaluator->defaultIssueText($overallStatus),
                     'issue_type' => $primaryIssue['type'] ?? null,
                     'issue_severity' => $primaryIssue['severity'] ?? null,
                     'issues' => $issues->values()->all(),
-                    'severity_score' => $primaryIssue['severity_score'] ?? $this->statusSortScore($overallStatus),
+                    'severity_score' => $primaryIssue['severity_score'] ?? $this->siteFlowEvaluator->statusSortScore($overallStatus),
                     'owner' => $primaryIssue['owner'] ?? null,
                     'age_days' => $primaryIssue['age_days'] ?? null,
-                    'next_action' => $primaryIssue['recommended_action'] ?? $this->defaultActionText($overallStatus),
+                    'next_action' => $primaryIssue['recommended_action'] ?? $this->siteFlowEvaluator->defaultActionText($overallStatus),
                     'url' => route('admin.assignments.site-assignments', $site->site_id),
                     'ai_prompt' => "Kenapa site {$site->site_code} belum selesai dan apa masalah utamanya?",
                 ];
@@ -485,396 +491,6 @@ class SiteOperationsDashboardService
             ->pluck('cons_wo_number')
             ->filter()
             ->first();
-    }
-
-    /**
-     * @param  Collection<int, object>  $assignments
-     * @param  Collection<int, string>  $mainContractorAdminOwners
-     * @return Collection<int, array<string, mixed>>
-     */
-    private function siteIssues(object $site, Collection $assignments, Collection $mainContractorAdminOwners): Collection
-    {
-        if ($assignments->whereNotNull('assignment_id')->isEmpty()) {
-            return collect([
-                $this->issue($site, null, 'medium', 45, 'no_assignment_started', 'No assignment has started for this location.', 'Main Contractor Admin', 'Create or assign the required workstreams for this site.'),
-            ]);
-        }
-
-        $activeAssignments = $assignments->whereNotIn('status', [AssignmentStatus::Drop->value]);
-
-        if ($activeAssignments->isEmpty()) {
-            return collect([
-                $this->issue($site, $assignments->first(), 'low', 10, 'site_dropped', 'All assignments for this site are dropped.', 'Main Contractor Admin', 'Confirm whether the site should remain dropped or be restored.'),
-            ]);
-        }
-
-        return $activeAssignments
-            ->flatMap(fn (object $row): array => $this->issuesForAssignment($site, $row, $mainContractorAdminOwners))
-            ->sortByDesc('severity_score')
-            ->values();
-    }
-
-    /**
-     * @param  Collection<int, string>  $mainContractorAdminOwners
-     * @return list<array<string, mixed>>
-     */
-    private function issuesForAssignment(object $site, object $row, Collection $mainContractorAdminOwners): array
-    {
-        $items = [];
-        $ageDays = $row->updated_at ? (int) Carbon::parse($row->updated_at)->diffInDays(now()) : 0;
-        $mainContractorOwner = $this->mainContractorOwner($site, $mainContractorAdminOwners);
-
-        $items = [
-            ...$items,
-            ...$this->surveyIssues($site, $row, $mainContractorOwner),
-            ...$this->plnIssues($site, $row),
-            ...$this->constructionIssues($site, $row, $mainContractorOwner),
-            ...$this->bastIssues($site, $row),
-            ...$this->noteIssues($site, $row),
-        ];
-
-        if (
-            $row->activity_type === ActivityType::Construction->value
-            && blank($row->cons_wo_number)
-            && ! in_array($row->status, [AssignmentStatus::Verified->value, AssignmentStatus::Reported->value], true)
-        ) {
-            $items[] = $this->issue($site, $row, 'critical', 95, 'construction_missing_wo', 'Construction cannot proceed because WO number is missing.', $mainContractorOwner, 'Fill the construction WO number, then follow up the subcontractor.');
-        }
-
-        if ($row->status === AssignmentStatus::Revision->value) {
-            $items[] = $this->issue($site, $row, 'high', 78, 'revision_pending', 'Assignment is in revision and needs correction.', $row->subcontractor_name ?? 'Subcontractor', 'Close the revision comments and resubmit for review.');
-        }
-
-        if (in_array($row->status, [AssignmentStatus::Pending->value, AssignmentStatus::Revision->value], true) && $ageDays >= 7) {
-            $items[] = $this->issue($site, $row, $ageDays >= 14 ? 'critical' : 'high', $ageDays >= 14 ? 90 : 72, 'stalled_assignment', "{$row->status} has had no update for {$ageDays} days.", $row->status === AssignmentStatus::Revision->value ? ($row->subcontractor_name ?? 'Subcontractor') : $mainContractorOwner, 'Follow up the owner and force a progress update this week.');
-        }
-
-        if (in_array($row->status, array_map(fn (AssignmentStatus $status): string => $status->value, AssignmentStatus::verifiableStatuses()), true)) {
-            $items[] = $this->issue($site, $row, 'medium', 58, 'ready_for_verification', "{$row->activity_type} is ready for admin verification.", $mainContractorOwner, 'Review data quality and verify when valid.');
-        }
-
-        if ($row->status === AssignmentStatus::Verified->value) {
-            $items[] = $this->issue($site, $row, 'medium', 52, 'verified_not_reported', "{$row->activity_type} is verified but not reported.", $mainContractorOwner, 'Include this assignment in the next report generation.');
-        }
-
-        return $items;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function noteIssues(object $site, object $row): array
-    {
-        if ($this->isTerminal($row) || ! is_array($row->latest_comment ?? null)) {
-            return [];
-        }
-
-        $body = (string) ($row->latest_comment['body'] ?? '');
-
-        if (! $this->looksLikeBlockerNote($body)) {
-            return [];
-        }
-
-        return [
-            $this->issue($site, $row, 'medium', 64, 'note_blocker_signal', 'Latest note may explain the blocker: '.$body, $row->latest_comment['user']['name'] ?? ($row->subcontractor_name ?? 'Owner'), 'Review the latest note and update the structured blocker/status if needed.'),
-        ];
-    }
-
-    private function looksLikeBlockerNote(string $body): bool
-    {
-        $normalized = mb_strtolower($body);
-
-        foreach (['block', 'blocked', 'issue', 'problem', 'waiting', 'wait', 'hold', 'stuck', 'late', 'delay', 'akses', 'access', 'izin', 'tutup', 'pln', 'wo', 'revisi', 'kendala', 'belum', 'pending'] as $keyword) {
-            if (str_contains($normalized, $keyword)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function surveyIssues(object $site, object $row, string $mainContractorOwner): array
-    {
-        if ($row->activity_type !== ActivityType::Survey->value || $this->isTerminal($row)) {
-            return [];
-        }
-
-        $issues = [];
-        $missingSchedule = $this->missingLabels($row, [
-            'survey_schedule_date' => 'survey schedule',
-        ]);
-        $missingSiteData = $this->missingLabels((object) [
-            'site_power_kva' => $site->power_kva,
-            'survey_power_kva' => $row->survey_power_kva,
-        ], [
-            'site_power_kva' => 'site power KVA',
-            'survey_power_kva' => 'survey power KVA',
-        ]);
-        $missingEvidence = $this->missingLabels($row, [
-            'survey_photo_overall_site' => 'overall site photo',
-            'survey_photo_parking_evcs' => 'EV parking photo',
-            'survey_photo_access_route' => 'access route photo',
-            'survey_photo_pln_network' => 'PLN network photo',
-            'survey_photo_satellite_gmaps' => 'satellite map photo',
-            'survey_file_site_plan' => 'site plan',
-            'survey_file_ba_survey' => 'BA survey',
-        ]);
-
-        if ($missingSchedule !== []) {
-            $issues[] = $this->issue($site, $row, 'high', 84, 'survey_schedule_missing', 'Survey schedule is missing.', $row->subcontractor_name ?? 'Subcontractor', 'Ask the subcontractor to set the survey date.');
-        }
-
-        if ($missingSiteData !== []) {
-            $issues[] = $this->issue($site, $row, 'high', 82, 'site_missing_power', 'Survey/location power data is missing: '.$this->labelList($missingSiteData).'.', $mainContractorOwner, 'Complete site and survey power KVA before document/report work.');
-        }
-
-        if ($missingEvidence !== []) {
-            $issues[] = $this->issue($site, $row, 'high', 76, 'survey_evidence_missing', 'Survey evidence is incomplete: '.$this->labelList($missingEvidence).'.', $row->subcontractor_name ?? 'Subcontractor', 'Upload the missing survey photos and documents.');
-        }
-
-        return $issues;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function plnIssues(object $site, object $row): array
-    {
-        if ($row->activity_type !== ActivityType::PlnConnection->value || $this->isTerminal($row)) {
-            return [];
-        }
-
-        $issues = [];
-        $owner = $row->subcontractor_name ?? 'Subcontractor';
-
-        $missingRegistration = $this->missingLabels($row, [
-            'pln_file_reg' => 'registration file',
-            'pln_email_bpujl_req_date' => 'BPUJL request date',
-        ]);
-
-        if (in_array($row->status, [AssignmentStatus::Pending->value, AssignmentStatus::Registration->value], true) && $missingRegistration !== []) {
-            $issues[] = $this->issue($site, $row, 'high', 83, 'pln_registration_incomplete', 'PLN registration is incomplete: '.$this->labelList($missingRegistration).'.', $owner, 'Complete PLN registration evidence and BPUJL request.');
-        }
-
-        $missingBilling = $this->missingLabels($row, [
-            'pln_bpujl_acquired_date' => 'BPUJL acquired date',
-            'pln_file_pk' => 'PK file',
-        ]);
-
-        if (in_array($row->status, [AssignmentStatus::Billing->value, AssignmentStatus::Connection->value, AssignmentStatus::KwhDone->value], true) && $missingBilling !== []) {
-            $issues[] = $this->issue($site, $row, 'high', 79, 'pln_billing_incomplete', 'PLN billing/PK evidence is incomplete: '.$this->labelList($missingBilling).'.', $owner, 'Complete BPUJL and PK evidence before connection closeout.');
-        }
-
-        $missingKwh = $this->missingLabels($row, [
-            'pln_kwh_meter_installation_date' => 'kWh installation date',
-            'pln_id_pelanggan' => 'customer ID',
-            'pln_foto_kwh' => 'kWh photo',
-        ]);
-
-        if (in_array($row->status, [AssignmentStatus::Connection->value, AssignmentStatus::KwhDone->value], true) && $missingKwh !== []) {
-            $issues[] = $this->issue($site, $row, 'high', 81, 'pln_kwh_incomplete', 'PLN kWh closeout is incomplete: '.$this->labelList($missingKwh).'.', $owner, 'Complete kWh installation data, customer ID, and kWh photo.');
-        }
-
-        return $issues;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function constructionIssues(object $site, object $row, string $mainContractorOwner): array
-    {
-        if ($row->activity_type !== ActivityType::Construction->value || $this->isTerminal($row)) {
-            return [];
-        }
-
-        $issues = [];
-        $owner = $row->subcontractor_name ?? 'Subcontractor';
-
-        if (filled($row->cons_wo_number)) {
-            $missingExecution = $this->missingLabels($row, [
-                'cons_actual_start_date' => 'actual start date',
-                'cons_actual_done_date' => 'actual done date',
-                'machine_serial_number' => 'machine serial number',
-                'foto_machine_sn' => 'machine serial photo',
-            ]);
-
-            if (in_array($row->status, [AssignmentStatus::Construction->value, AssignmentStatus::MachineOnsite->value, AssignmentStatus::Done->value, AssignmentStatus::Live->value], true) && $missingExecution !== []) {
-                $issues[] = $this->issue($site, $row, 'high', 80, 'construction_data_incomplete', 'Construction data is incomplete: '.$this->labelList($missingExecution).'.', $owner, 'Complete construction dates, machine serial data, and serial photo.');
-            }
-
-            if ((int) ($row->construction_photo_count ?? 0) === 0 && in_array($row->status, [AssignmentStatus::Done->value, AssignmentStatus::Live->value], true)) {
-                $issues[] = $this->issue($site, $row, 'high', 77, 'construction_photos_missing', 'Construction is marked advanced but has no construction photos.', $owner, 'Upload construction progress/completion photos.');
-            }
-
-            if ($row->status === AssignmentStatus::Done->value && blank($row->go_live_date_pln) && blank($row->go_live_date_pln_pass)) {
-                $issues[] = $this->issue($site, $row, 'medium', 62, 'construction_not_live', 'Construction is done but go-live dates are missing.', $mainContractorOwner, 'Confirm go-live readiness and fill the PLN go-live date.');
-            }
-        }
-
-        return $issues;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function bastIssues(object $site, object $row): array
-    {
-        if ($row->activity_type !== ActivityType::Bast->value || $this->isTerminal($row)) {
-            return [];
-        }
-
-        $issues = [];
-        $missingSim = $this->missingLabels($row, [
-            'bast_sim_provider' => 'SIM provider',
-            'bast_nomor_simcard' => 'SIM number',
-        ]);
-
-        if ((int) ($row->bast_sim_photo_count ?? 0) < 2) {
-            $missingSim[] = 'SIM card photos';
-        }
-
-        if ($missingSim !== []) {
-            $issues[] = $this->issue($site, $row, 'high', 78, 'bast_sim_missing', 'SIM card data/evidence is incomplete: '.$this->labelList($missingSim).'.', $row->subcontractor_name ?? 'Subcontractor', 'Complete SIM provider, SIM number, and SIM card checkpoint photos.');
-        }
-
-        $missingCore = $this->missingLabels($row, [
-            'bast_plant_name' => 'plant name',
-            'bast_installation_date' => 'installation date',
-            'bast_commissioning_date' => 'commissioning date',
-        ]);
-
-        if ($missingCore === [] && (int) ($row->bast_photo_count ?? 0) > 0) {
-            return $issues;
-        }
-
-        $missing = $missingCore;
-
-        if ((int) ($row->bast_photo_count ?? 0) === 0) {
-            $missing[] = 'BAST photos';
-        }
-
-        $issues[] = $this->issue($site, $row, 'high', 75, 'bast_evidence_missing', 'BAST evidence is incomplete: '.$this->labelList($missing).'.', $row->subcontractor_name ?? 'Subcontractor', 'Complete BAST fields and upload required checkpoint photos.');
-
-        return $issues;
-    }
-
-    private function isTerminal(object $row): bool
-    {
-        return in_array($row->status, [AssignmentStatus::Verified->value, AssignmentStatus::Reported->value, AssignmentStatus::Drop->value], true);
-    }
-
-    /**
-     * @param  array<string, string>  $labelsByField
-     * @return list<string>
-     */
-    private function missingLabels(object $row, array $labelsByField): array
-    {
-        $missing = [];
-
-        foreach ($labelsByField as $field => $label) {
-            if (blank($row->{$field} ?? null)) {
-                $missing[] = $label;
-            }
-        }
-
-        return $missing;
-    }
-
-    /**
-     * @param  list<string>  $labels
-     */
-    private function labelList(array $labels): string
-    {
-        return collect($labels)->take(4)->join(', ');
-    }
-
-    private function issue(object $site, ?object $row, string $severity, int $score, string $type, string $problem, string $owner, string $recommendedAction): array
-    {
-        return [
-            'severity' => $severity,
-            'severity_score' => $score,
-            'type' => $type,
-            'problem' => $problem,
-            'owner' => $owner,
-            'recommended_action' => $recommendedAction,
-            'assignment_id' => $row !== null && isset($row->assignment_id) ? (int) $row->assignment_id : null,
-            'activity_type' => $row?->activity_type,
-            'status' => $row?->status,
-            'age_days' => $row?->updated_at ? (int) Carbon::parse($row->updated_at)->diffInDays(now()) : null,
-            'site_id' => (int) $site->site_id,
-        ];
-    }
-
-    private function overallStatus(Collection $assignments, Collection $activeAssignments, ?array $primaryIssue): string
-    {
-        if ($assignments->whereNotNull('assignment_id')->isEmpty()) {
-            return 'not_started';
-        }
-
-        if ($activeAssignments->isEmpty()) {
-            return 'dropped';
-        }
-
-        if ($activeAssignments->every(fn (object $row): bool => in_array($row->status, [AssignmentStatus::Verified->value, AssignmentStatus::Reported->value], true))) {
-            return 'done';
-        }
-
-        return match ($primaryIssue['type'] ?? null) {
-            'construction_missing_wo',
-            'site_missing_power',
-            'survey_schedule_missing',
-            'survey_evidence_missing',
-            'pln_registration_incomplete',
-            'pln_billing_incomplete',
-            'pln_kwh_incomplete',
-            'construction_data_incomplete',
-            'construction_photos_missing',
-            'bast_sim_missing',
-            'bast_evidence_missing' => 'blocked',
-            'stalled_assignment' => 'stalled',
-            'revision_pending' => 'stalled',
-            'ready_for_verification' => 'needs_review',
-            'verified_not_reported' => 'ready_for_report',
-            default => 'in_progress',
-        };
-    }
-
-    private function defaultIssueText(string $overallStatus): string
-    {
-        return match ($overallStatus) {
-            'done' => 'All active assignments for this location are verified or reported.',
-            'dropped' => 'All assignments for this location are dropped.',
-            'in_progress' => 'Work is in progress with no critical blocker detected.',
-            default => 'No active issue detected.',
-        };
-    }
-
-    private function defaultActionText(string $overallStatus): string
-    {
-        return match ($overallStatus) {
-            'done' => 'No action needed.',
-            'dropped' => 'Confirm site scope if it should be restored.',
-            'in_progress' => 'Monitor workstream updates.',
-            default => 'Review this location.',
-        };
-    }
-
-    private function statusSortScore(string $overallStatus): int
-    {
-        return match ($overallStatus) {
-            'blocked' => 95,
-            'stalled' => 80,
-            'needs_review' => 58,
-            'ready_for_report' => 52,
-            'not_started' => 45,
-            'in_progress' => 30,
-            'dropped' => 10,
-            'done' => 0,
-            default => 0,
-        };
     }
 
     /**

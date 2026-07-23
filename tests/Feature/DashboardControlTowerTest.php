@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ActivityType;
 use App\Enums\AssignmentStatus;
 use App\Enums\Role;
 use App\Models\Assignment;
@@ -137,10 +138,17 @@ test('site operations dashboard explains why a location is not done', function (
         ->and($payload['problem_breakdown'])->toHaveKey('construction_missing_wo')
         ->and($row['site_code'])->toBe('JKT-001')
         ->and($row['overall_status'])->toBe('blocked')
+        ->and($row['current_stage']['key'])->toBe('construction')
+        ->and($row['flow_explanation'])->toContain('Construction cannot proceed')
+        ->and($row['flow_explanation'])->toContain('BAST')
         ->and($row['issue_type'])->toBe('construction_missing_wo')
         ->and($row['main_issue'])->toContain('WO number is missing')
         ->and($row['issues'])->not->toBeEmpty()
         ->and($row['issues'][0]['type'])->toBe('construction_missing_wo')
+        ->and($row['issues'][0]['source'])->toBe('structured_data')
+        ->and($row['issues'][0]['category'])->toBe('data_gap')
+        ->and($row['issues'][0]['blocks_stage'])->toBe('construction')
+        ->and($row['issues'][0]['blocks_downstream'])->toContain(ActivityType::Bast->value)
         ->and($row['owner'])->toBe('Admin: Main Con Admin')
         ->and($row['workstreams']['construction']['status'])->toBe(AssignmentStatus::Pending->value)
         ->and($row['workstreams']['construction']['latest_comment']['body'])->toBe('Access blocked by site security gate.')
