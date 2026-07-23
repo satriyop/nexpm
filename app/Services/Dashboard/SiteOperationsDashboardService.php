@@ -148,6 +148,7 @@ class SiteOperationsDashboardService
                         $row['construction_wo_number'] ?? null,
                         $row['main_issue'] ?? null,
                         $row['owner'] ?? null,
+                        $row['latest_note']['body'] ?? null,
                     ])));
 
                     return str_contains($haystack, $needle);
@@ -176,6 +177,14 @@ class SiteOperationsDashboardService
     private function siteRows(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null): Collection
     {
         $assignmentRows = $this->assignmentRows($user, $mainContractorFilter, $projectFilter);
+        $latestCommentsByAssignment = $this->latestCommentsByAssignment($assignmentRows);
+        $assignmentRows = $assignmentRows->map(function (object $row) use ($latestCommentsByAssignment): object {
+            $row->latest_comment = $row->assignment_id !== null
+                ? $latestCommentsByAssignment->get((int) $row->assignment_id)
+                : null;
+
+            return $row;
+        });
         $assignmentsBySite = $assignmentRows->whereNotNull('assignment_id')->groupBy('site_id');
         $mainContractorAdminOwners = $this->mainContractorAdminOwners($assignmentRows);
 
@@ -183,6 +192,7 @@ class SiteOperationsDashboardService
             ->map(function (object $site) use ($assignmentsBySite, $mainContractorAdminOwners): array {
                 $assignments = $assignmentsBySite->get($site->site_id, collect());
                 $workstreams = $this->workstreams($assignments);
+                $latestNote = $this->latestNote($assignments);
                 $activeAssignments = $assignments->whereNotIn('status', [AssignmentStatus::Drop->value]);
                 $completedAssignments = $activeAssignments->whereIn('status', [
                     AssignmentStatus::Verified->value,
@@ -207,10 +217,11 @@ class SiteOperationsDashboardService
                     'completion_pct' => $activeCount > 0 ? (int) round($completedAssignments->count() / $activeCount * 100) : 0,
                     'active_assignment_count' => $activeCount,
                     'workstreams' => $workstreams,
+                    'latest_note' => $latestNote,
                     'main_issue' => $primaryIssue['problem'] ?? $this->defaultIssueText($overallStatus),
                     'issue_type' => $primaryIssue['type'] ?? null,
                     'issue_severity' => $primaryIssue['severity'] ?? null,
-                    'issues' => $issues->take(5)->values()->all(),
+                    'issues' => $issues->values()->all(),
                     'severity_score' => $primaryIssue['severity_score'] ?? $this->statusSortScore($overallStatus),
                     'owner' => $primaryIssue['owner'] ?? null,
                     'age_days' => $primaryIssue['age_days'] ?? null,
@@ -293,6 +304,8 @@ class SiteOperationsDashboardService
                 'assignments.updated_at',
                 'assignments.verified_at',
                 'assignments.reported_at',
+                'assignments.revision_comment',
+                'assignments.unverify_reason',
                 'subcontractors.name as subcontractor_name',
                 'assignment_survey_data.ss_schedule_date as survey_schedule_date',
                 'assignment_survey_data.power_kva as survey_power_kva',
@@ -329,6 +342,64 @@ class SiteOperationsDashboardService
                 DB::raw('coalesce(bast_photo_counts.bast_sim_photo_count, 0) as bast_sim_photo_count'),
             ])
             ->get();
+    }
+
+    /**
+     * @param  Collection<int, object>  $assignmentRows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function latestCommentsByAssignment(Collection $assignmentRows): Collection
+    {
+        $assignmentIds = $assignmentRows
+            ->pluck('assignment_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($assignmentIds->isEmpty()) {
+            return collect();
+        }
+
+        $latestCommentIds = DB::table('assignment_comments')
+            ->whereIn('assignment_id', $assignmentIds)
+            ->select([
+                'assignment_id',
+                DB::raw('max(id) as latest_comment_id'),
+            ])
+            ->groupBy('assignment_id');
+
+        return DB::table('assignment_comments')
+            ->joinSub($latestCommentIds, 'latest_comments', fn ($join) => $join->on('latest_comments.latest_comment_id', '=', 'assignment_comments.id'))
+            ->leftJoin('users', 'users.id', '=', 'assignment_comments.user_id')
+            ->select([
+                'assignment_comments.id',
+                'assignment_comments.assignment_id',
+                'assignment_comments.body',
+                'assignment_comments.created_at',
+                'users.name as user_name',
+                'users.role as user_role',
+            ])
+            ->get()
+            ->mapWithKeys(fn (object $comment): array => [
+                (int) $comment->assignment_id => $this->commentPayload($comment),
+            ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function commentPayload(object $comment): array
+    {
+        return [
+            'id' => (int) $comment->id,
+            'assignment_id' => (int) $comment->assignment_id,
+            'body' => $comment->body,
+            'created_at' => $comment->created_at,
+            'user' => [
+                'name' => $comment->user_name,
+                'role' => $comment->user_role,
+            ],
+        ];
     }
 
     /**
@@ -373,6 +444,33 @@ class SiteOperationsDashboardService
             'subcontractor' => $row->subcontractor_name,
             'wo_number' => $activity === ActivityType::Construction ? $row->cons_wo_number : null,
             'age_days' => $row->updated_at ? (int) Carbon::parse($row->updated_at)->diffInDays(now()) : null,
+            'revision_comment' => $row->revision_comment,
+            'unverify_reason' => $row->unverify_reason,
+            'latest_comment' => $row->latest_comment,
+            'url' => route('admin.assignments.show', $row->assignment_id),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, object>  $assignments
+     * @return array<string, mixed>|null
+     */
+    private function latestNote(Collection $assignments): ?array
+    {
+        /** @var object|null $row */
+        $row = $assignments
+            ->whereNotNull('latest_comment')
+            ->sortByDesc(fn (object $assignment): string => (string) ($assignment->latest_comment['created_at'] ?? ''))
+            ->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        return [
+            ...$row->latest_comment,
+            'activity_type' => $row->activity_type,
+            'status' => $row->status,
             'url' => route('admin.assignments.show', $row->assignment_id),
         ];
     }
@@ -432,6 +530,7 @@ class SiteOperationsDashboardService
             ...$this->plnIssues($site, $row),
             ...$this->constructionIssues($site, $row, $mainContractorOwner),
             ...$this->bastIssues($site, $row),
+            ...$this->noteIssues($site, $row),
         ];
 
         if (
@@ -459,6 +558,39 @@ class SiteOperationsDashboardService
         }
 
         return $items;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function noteIssues(object $site, object $row): array
+    {
+        if ($this->isTerminal($row) || ! is_array($row->latest_comment ?? null)) {
+            return [];
+        }
+
+        $body = (string) ($row->latest_comment['body'] ?? '');
+
+        if (! $this->looksLikeBlockerNote($body)) {
+            return [];
+        }
+
+        return [
+            $this->issue($site, $row, 'medium', 64, 'note_blocker_signal', 'Latest note may explain the blocker: '.$body, $row->latest_comment['user']['name'] ?? ($row->subcontractor_name ?? 'Owner'), 'Review the latest note and update the structured blocker/status if needed.'),
+        ];
+    }
+
+    private function looksLikeBlockerNote(string $body): bool
+    {
+        $normalized = mb_strtolower($body);
+
+        foreach (['block', 'blocked', 'issue', 'problem', 'waiting', 'wait', 'hold', 'stuck', 'late', 'delay', 'akses', 'access', 'izin', 'tutup', 'pln', 'wo', 'revisi', 'kendala', 'belum', 'pending'] as $keyword) {
+            if (str_contains($normalized, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

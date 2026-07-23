@@ -215,6 +215,20 @@ type SiteOverallStatus =
 
 type SiteIssueSeverity = 'critical' | 'high' | 'medium' | 'low' | null;
 
+interface SiteLatestNote {
+    id: number;
+    assignment_id: number;
+    body: string;
+    created_at: string;
+    user: {
+        name: string | null;
+        role: string | null;
+    };
+    activity_type?: string;
+    status?: string;
+    url?: string;
+}
+
 interface SiteWorkstream {
     assignment_id: number;
     activity_type: string;
@@ -223,6 +237,9 @@ interface SiteWorkstream {
     subcontractor: string | null;
     wo_number: string | null;
     age_days: number | null;
+    revision_comment: string | null;
+    unverify_reason: string | null;
+    latest_comment: SiteLatestNote | null;
     url: string;
 }
 
@@ -260,6 +277,7 @@ interface SiteOperationsRow {
     completion_pct: number;
     active_assignment_count: number;
     workstreams: Record<string, SiteWorkstream | null>;
+    latest_note: SiteLatestNote | null;
     main_issue: string;
     issue_type: string | null;
     issue_severity: SiteIssueSeverity;
@@ -826,6 +844,7 @@ function issueTypeLabel(type: string): string {
         construction_not_live: 'Go-Live Missing',
         bast_sim_missing: 'Missing SIM Card',
         bast_evidence_missing: 'BAST Evidence Gap',
+        note_blocker_signal: 'Latest Note Signal',
         revision_pending: 'Revision',
         stalled_assignment: 'Stalled',
         ready_for_verification: 'Ready Verify',
@@ -867,6 +886,10 @@ function issueGroup(type: string): { key: string; label: string } {
 
     if (type === 'revision_pending') {
         return { key: 'revision', label: 'Revision Needed' };
+    }
+
+    if (type === 'note_blocker_signal') {
+        return { key: 'field_note', label: 'Field Note' };
     }
 
     if (type === 'stalled_assignment') {
@@ -1861,6 +1884,25 @@ function timeAgo(isoString: string): string {
                                         class="text-xs text-muted-foreground"
                                     >
                                         WO {{ row.construction_wo_number }}
+                                    </div>
+                                    <div
+                                        v-if="row.latest_note"
+                                        class="mt-2 max-w-xs rounded-md border border-border bg-muted/30 px-2 py-1.5 text-xs"
+                                    >
+                                        <div
+                                            class="font-medium text-foreground"
+                                        >
+                                            Latest note ·
+                                            {{
+                                                row.latest_note.activity_type ??
+                                                'Assignment'
+                                            }}
+                                        </div>
+                                        <div
+                                            class="mt-0.5 line-clamp-2 text-muted-foreground"
+                                        >
+                                            {{ row.latest_note.body }}
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3">
@@ -3549,6 +3591,47 @@ function timeAgo(isoString: string): string {
                     </div>
                 </div>
 
+                <div
+                    v-if="selectedSite.latest_note"
+                    class="rounded-md border border-border"
+                >
+                    <div
+                        class="border-b border-border px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
+                        Latest Field Note
+                    </div>
+                    <div class="p-3 text-sm">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-medium">
+                                {{
+                                    selectedSite.latest_note.user.name ??
+                                    'Deleted user'
+                                }}
+                            </span>
+                            <span class="text-xs text-muted-foreground">
+                                {{
+                                    selectedSite.latest_note.activity_type ??
+                                    'Assignment'
+                                }}
+                                ·
+                                {{
+                                    timeAgo(selectedSite.latest_note.created_at)
+                                }}
+                            </span>
+                        </div>
+                        <p class="mt-2 text-muted-foreground">
+                            {{ selectedSite.latest_note.body }}
+                        </p>
+                        <Link
+                            v-if="selectedSite.latest_note.url"
+                            :href="selectedSite.latest_note.url"
+                            class="mt-2 inline-flex text-xs font-medium hover:underline"
+                        >
+                            Open related assignment
+                        </Link>
+                    </div>
+                </div>
+
                 <div class="rounded-md border border-border">
                     <div
                         class="border-b border-border px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
@@ -3679,6 +3762,84 @@ function timeAgo(isoString: string): string {
                                     class="mt-3 border-t border-current/15 pt-2 text-xs text-muted-foreground"
                                 >
                                     No blocker detected in this workstream.
+                                </div>
+                                <div
+                                    v-if="
+                                        siteWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        )!.revision_comment ||
+                                        siteWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        )!.unverify_reason ||
+                                        siteWorkstream(
+                                            selectedSite,
+                                            stream.key,
+                                        )!.latest_comment
+                                    "
+                                    class="mt-3 space-y-2 border-t border-current/15 pt-2 text-xs"
+                                >
+                                    <div
+                                        v-if="
+                                            siteWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            )!.revision_comment
+                                        "
+                                    >
+                                        <div class="font-medium">
+                                            Revision comment
+                                        </div>
+                                        <div class="text-muted-foreground">
+                                            {{
+                                                siteWorkstream(
+                                                    selectedSite,
+                                                    stream.key,
+                                                )!.revision_comment
+                                            }}
+                                        </div>
+                                    </div>
+                                    <div
+                                        v-if="
+                                            siteWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            )!.unverify_reason
+                                        "
+                                    >
+                                        <div class="font-medium">
+                                            Unverify reason
+                                        </div>
+                                        <div class="text-muted-foreground">
+                                            {{
+                                                siteWorkstream(
+                                                    selectedSite,
+                                                    stream.key,
+                                                )!.unverify_reason
+                                            }}
+                                        </div>
+                                    </div>
+                                    <div
+                                        v-if="
+                                            siteWorkstream(
+                                                selectedSite,
+                                                stream.key,
+                                            )!.latest_comment
+                                        "
+                                    >
+                                        <div class="font-medium">
+                                            Latest note
+                                        </div>
+                                        <div class="text-muted-foreground">
+                                            {{
+                                                siteWorkstream(
+                                                    selectedSite,
+                                                    stream.key,
+                                                )!.latest_comment?.body
+                                            }}
+                                        </div>
+                                    </div>
                                 </div>
                             </Link>
                             <div

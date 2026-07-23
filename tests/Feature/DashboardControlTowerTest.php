@@ -4,6 +4,7 @@ use App\Enums\AssignmentStatus;
 use App\Enums\Role;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
+use App\Models\AssignmentComment;
 use App\Models\AssignmentConstructionData;
 use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
@@ -108,6 +109,12 @@ test('site operations dashboard explains why a location is not done', function (
         'assignment_id' => $blockedConstruction->id,
         'cons_wo_number' => null,
     ]);
+    AssignmentComment::factory()->create([
+        'assignment_id' => $blockedConstruction->id,
+        'user_id' => $superAdmin->id,
+        'body' => 'Access blocked by site security gate.',
+        'created_at' => now()->subHour(),
+    ]);
 
     Assignment::factory()->survey()->create([
         'site_id' => $site->id,
@@ -117,6 +124,12 @@ test('site operations dashboard explains why a location is not done', function (
 
     $payload = app(SiteOperationsDashboardService::class)->build($superAdmin);
     $row = $payload['site_rows'][0];
+    $noteSearchPayload = app(SiteOperationsDashboardService::class)->build($superAdmin, filters: [
+        'search' => 'security gate',
+    ]);
+    $noteIssuePayload = app(SiteOperationsDashboardService::class)->build($superAdmin, filters: [
+        'issue_type' => 'note_blocker_signal',
+    ]);
 
     expect($payload['metrics']['total_sites'])->toBe(1)
         ->and($payload['metrics']['matching_sites'])->toBe(1)
@@ -130,11 +143,18 @@ test('site operations dashboard explains why a location is not done', function (
         ->and($row['issues'][0]['type'])->toBe('construction_missing_wo')
         ->and($row['owner'])->toBe('Admin: Main Con Admin')
         ->and($row['workstreams']['construction']['status'])->toBe(AssignmentStatus::Pending->value)
+        ->and($row['workstreams']['construction']['latest_comment']['body'])->toBe('Access blocked by site security gate.')
+        ->and($row['latest_note']['body'])->toBe('Access blocked by site security gate.')
+        ->and(collect($row['issues'])->pluck('type'))->toContain('note_blocker_signal')
         ->and($row['workstreams']['survey']['status'])->toBe(AssignmentStatus::Verified->value)
         ->and($row['url'])->toBe(route('admin.assignments.site-assignments', $site))
         ->and($payload['filter_options']['statuses'])->toContain('blocked')
-        ->and($payload['filter_options']['issue_types'])->toContain('construction_missing_wo')
-        ->and($payload['filter_options']['owners'])->toContain('Admin: Main Con Admin');
+        ->and($payload['filter_options']['issue_types'])->toContain('construction_missing_wo', 'note_blocker_signal')
+        ->and($payload['filter_options']['owners'])->toContain('Admin: Main Con Admin')
+        ->and($noteSearchPayload['site_rows'])->toHaveCount(1)
+        ->and($noteSearchPayload['site_rows'][0]['site_code'])->toBe('JKT-001')
+        ->and($noteIssuePayload['site_rows'])->toHaveCount(1)
+        ->and($noteIssuePayload['site_rows'][0]['site_code'])->toBe('JKT-001');
 });
 
 test('site operations dashboard exposes construction WO for filtering', function () {
