@@ -295,6 +295,10 @@ interface SiteOperationsRow {
     main_issue: string;
     issue_type: string | null;
     issue_severity: SiteIssueSeverity;
+    root_blocker_type: string | null;
+    root_blocker: SiteIssue | null;
+    primary_symptom_type: string | null;
+    primary_symptom: SiteIssue | null;
     issues: SiteIssue[];
     severity_score: number;
     owner: string | null;
@@ -317,6 +321,8 @@ interface SiteOperations {
         matching_sites: number;
     };
     problem_breakdown: Record<string, number>;
+    root_blocker_breakdown: Record<string, number>;
+    symptom_breakdown: Record<string, number>;
     filter_options: {
         statuses: string[];
         issue_types: string[];
@@ -711,8 +717,21 @@ const siteWorkstreamOrder: { key: string; label: string }[] = [
     { key: 'construction', label: 'Construction' },
     { key: 'bast', label: 'BAST' },
 ];
-const problemBreakdownRows = computed(() =>
-    Object.entries(props.siteOperations?.problem_breakdown ?? {})
+const rootBlockerRows = computed(() =>
+    Object.entries(
+        props.siteOperations?.root_blocker_breakdown ??
+            props.siteOperations?.problem_breakdown ??
+            {},
+    )
+        .slice(0, 5)
+        .map(([type, count]) => ({
+            type,
+            count,
+            label: issueTypeLabel(type),
+        })),
+);
+const symptomBreakdownRows = computed(() =>
+    Object.entries(props.siteOperations?.symptom_breakdown ?? {})
         .slice(0, 5)
         .map(([type, count]) => ({
             type,
@@ -1599,7 +1618,7 @@ function timeAgo(isoString: string): string {
                         </div>
                         <div class="mt-3 space-y-2">
                             <div
-                                v-for="item in problemBreakdownRows.slice(0, 3)"
+                                v-for="item in rootBlockerRows.slice(0, 3)"
                                 :key="item.type"
                                 class="flex items-center justify-between gap-3 text-sm"
                             >
@@ -1609,10 +1628,35 @@ function timeAgo(isoString: string): string {
                                 }}</span>
                             </div>
                             <div
-                                v-if="problemBreakdownRows.length === 0"
+                                v-if="rootBlockerRows.length === 0"
                                 class="text-sm text-muted-foreground"
                             >
                                 No blocker signal detected.
+                            </div>
+                            <div
+                                v-if="symptomBreakdownRows.length > 0"
+                                class="border-t border-border pt-2"
+                            >
+                                <div
+                                    class="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+                                >
+                                    Symptoms
+                                </div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span
+                                        v-for="item in symptomBreakdownRows.slice(
+                                            0,
+                                            3,
+                                        )"
+                                        :key="item.type"
+                                        class="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+                                    >
+                                        {{ item.label }}
+                                        <span class="font-semibold">{{
+                                            item.count
+                                        }}</span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1676,16 +1720,16 @@ function timeAgo(isoString: string): string {
                 </div>
 
                 <div
-                    v-if="problemBreakdownRows.length > 0"
+                    v-if="rootBlockerRows.length > 0"
                     class="flex flex-wrap gap-2 border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border"
                 >
                     <span
                         class="inline-flex items-center text-xs font-medium text-muted-foreground"
                     >
-                        Main issues
+                        Root blockers
                     </span>
                     <span
-                        v-for="item in problemBreakdownRows"
+                        v-for="item in rootBlockerRows"
                         :key="item.type"
                         class="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs"
                     >

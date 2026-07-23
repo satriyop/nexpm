@@ -78,6 +78,8 @@ test('dashboard exposes the control tower as a deferred prop', function () {
                 ->has('controlTower.priority_queue')
                 ->has('siteOperations.metrics')
                 ->has('siteOperations.problem_breakdown')
+                ->has('siteOperations.root_blocker_breakdown')
+                ->has('siteOperations.symptom_breakdown')
                 ->has('siteOperations.filter_options')
                 ->has('siteOperations.active_filters')
                 ->has('siteOperations.pagination')
@@ -136,6 +138,8 @@ test('site operations dashboard explains why a location is not done', function (
         ->and($payload['metrics']['matching_sites'])->toBe(1)
         ->and($payload['metrics']['blocked_sites'])->toBe(1)
         ->and($payload['problem_breakdown'])->toHaveKey('construction_missing_wo')
+        ->and($payload['root_blocker_breakdown'])->toHaveKey('construction_missing_wo')
+        ->and($payload['symptom_breakdown'])->toHaveKey('stalled_assignment')
         ->and($row['site_code'])->toBe('JKT-001')
         ->and($row['overall_status'])->toBe('blocked')
         ->and($row['current_stage']['key'])->toBe('construction')
@@ -149,6 +153,8 @@ test('site operations dashboard explains why a location is not done', function (
         ->and($row['issues'][0]['category'])->toBe('data_gap')
         ->and($row['issues'][0]['blocks_stage'])->toBe('construction')
         ->and($row['issues'][0]['blocks_downstream'])->toContain(ActivityType::Bast->value)
+        ->and($row['root_blocker_type'])->toBe('construction_missing_wo')
+        ->and($row['primary_symptom_type'])->toBe('stalled_assignment')
         ->and($row['owner'])->toBe('Admin: Main Con Admin')
         ->and($row['workstreams']['construction']['status'])->toBe(AssignmentStatus::Pending->value)
         ->and($row['workstreams']['construction']['latest_comment']['body'])->toBe('Access blocked by site security gate.')
@@ -163,6 +169,37 @@ test('site operations dashboard explains why a location is not done', function (
         ->and($noteSearchPayload['site_rows'][0]['site_code'])->toBe('JKT-001')
         ->and($noteIssuePayload['site_rows'])->toHaveCount(1)
         ->and($noteIssuePayload['site_rows'][0]['site_code'])->toBe('JKT-001');
+});
+
+test('site operations root blocker wins over operational symptom', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Jakarta']);
+    $site = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'ROOT-WINS',
+        'power_kva' => null,
+    ]);
+    $survey = Assignment::factory()->survey()->create([
+        'site_id' => $site->id,
+        'status' => AssignmentStatus::Revision,
+    ]);
+    AssignmentSurveyData::factory()->create([
+        'assignment_id' => $survey->id,
+        'ss_schedule_date' => now()->toDateString(),
+        'power_kva' => null,
+    ]);
+
+    $payload = app(SiteOperationsDashboardService::class)->build($superAdmin);
+    $row = $payload['site_rows'][0];
+
+    expect($row['issue_type'])->toBe('site_missing_power')
+        ->and($row['root_blocker_type'])->toBe('site_missing_power')
+        ->and($row['primary_symptom_type'])->toBe('revision_pending')
+        ->and($row['overall_status'])->toBe('blocked')
+        ->and($payload['problem_breakdown'])->toHaveKey('site_missing_power')
+        ->and($payload['problem_breakdown'])->not->toHaveKey('revision_pending')
+        ->and($payload['root_blocker_breakdown'])->toHaveKey('site_missing_power')
+        ->and($payload['symptom_breakdown'])->toHaveKey('revision_pending');
 });
 
 test('site operations dashboard exposes construction WO for filtering', function () {

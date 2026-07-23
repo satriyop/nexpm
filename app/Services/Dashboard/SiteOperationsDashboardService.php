@@ -41,11 +41,9 @@ class SiteOperationsDashboardService
                 'not_started_sites' => $rows->where('overall_status', 'not_started')->count(),
                 'matching_sites' => $totalFilteredRows,
             ],
-            'problem_breakdown' => $rows
-                ->whereNotNull('issue_type')
-                ->countBy('issue_type')
-                ->sortDesc()
-                ->all(),
+            'problem_breakdown' => $this->breakdownByField($rows, 'root_blocker_type'),
+            'root_blocker_breakdown' => $this->breakdownByField($rows, 'root_blocker_type'),
+            'symptom_breakdown' => $this->breakdownByField($rows, 'primary_symptom_type'),
             'filter_options' => [
                 'statuses' => $rows->pluck('overall_status')->filter()->unique()->sort()->values()->all(),
                 'issue_types' => $this->issueTypeOptions($rows),
@@ -175,6 +173,20 @@ class SiteOperationsDashboardService
     }
 
     /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array<string, int>
+     */
+    private function breakdownByField(Collection $rows, string $field): array
+    {
+        return $rows
+            ->pluck($field)
+            ->filter()
+            ->countBy()
+            ->sortDesc()
+            ->all();
+    }
+
+    /**
      * @return Collection<int, array<string, mixed>>
      */
     private function siteRows(User $user, ?int $mainContractorFilter = null, ?int $projectFilter = null): Collection
@@ -204,6 +216,8 @@ class SiteOperationsDashboardService
                 $flow = $this->siteFlowEvaluator->evaluate($site, $assignments, $mainContractorAdminOwners);
                 $issues = $flow['issues'];
                 $primaryIssue = $flow['primary_issue'];
+                $rootIssue = $flow['root_issue'];
+                $primarySymptom = $flow['primary_symptom'];
                 $overallStatus = $flow['overall_status'];
                 $activeCount = $activeAssignments->count();
                 $constructionWoNumber = $this->constructionWoNumber($assignments);
@@ -227,6 +241,10 @@ class SiteOperationsDashboardService
                     'main_issue' => $primaryIssue['problem'] ?? $this->siteFlowEvaluator->defaultIssueText($overallStatus),
                     'issue_type' => $primaryIssue['type'] ?? null,
                     'issue_severity' => $primaryIssue['severity'] ?? null,
+                    'root_blocker_type' => $rootIssue['type'] ?? null,
+                    'root_blocker' => $rootIssue,
+                    'primary_symptom_type' => $primarySymptom['type'] ?? null,
+                    'primary_symptom' => $primarySymptom,
                     'issues' => $issues->values()->all(),
                     'severity_score' => $primaryIssue['severity_score'] ?? $this->siteFlowEvaluator->statusSortScore($overallStatus),
                     'owner' => $primaryIssue['owner'] ?? null,

@@ -12,19 +12,23 @@ class SiteFlowEvaluator
     /**
      * @param  Collection<int, object>  $assignments
      * @param  Collection<int, string>  $mainContractorAdminOwners
-     * @return array{issues: Collection<int, array<string, mixed>>, primary_issue: ?array<string, mixed>, overall_status: string, current_stage: ?array<string, mixed>, flow_explanation: string}
+     * @return array{issues: Collection<int, array<string, mixed>>, primary_issue: ?array<string, mixed>, root_issue: ?array<string, mixed>, primary_symptom: ?array<string, mixed>, overall_status: string, current_stage: ?array<string, mixed>, flow_explanation: string}
      */
     public function evaluate(object $site, Collection $assignments, Collection $mainContractorAdminOwners): array
     {
         $activeAssignments = $assignments->whereNotIn('status', [AssignmentStatus::Drop->value]);
         $issues = $this->siteIssues($site, $assignments, $mainContractorAdminOwners);
-        $primaryIssue = $issues->first();
+        $rootIssue = $issues->first(fn (array $issue): bool => $this->isRootIssue($issue));
+        $primarySymptom = $issues->first(fn (array $issue): bool => $this->isSymptomIssue($issue));
+        $primaryIssue = $rootIssue ?? $primarySymptom ?? $issues->first();
         $overallStatus = $this->overallStatus($assignments, $activeAssignments, $primaryIssue);
         $currentStage = $this->currentStage($assignments, $primaryIssue);
 
         return [
             'issues' => $issues,
             'primary_issue' => $primaryIssue,
+            'root_issue' => $rootIssue,
+            'primary_symptom' => $primarySymptom,
             'overall_status' => $overallStatus,
             'current_stage' => $currentStage,
             'flow_explanation' => $this->flowExplanation($assignments, $primaryIssue, $currentStage, $overallStatus),
@@ -75,7 +79,7 @@ class SiteFlowEvaluator
     {
         if ($assignments->whereNotNull('assignment_id')->isEmpty()) {
             return collect([
-                $this->issue($site, null, 'medium', 45, 'no_assignment_started', 'No assignment has started for this location.', 'Main Contractor Admin', 'Create or assign the required workstreams for this site.', 'setup', 'workflow', 'assignment_absence', 'site', [ActivityType::Survey->value, ActivityType::PlnConnection->value, ActivityType::Construction->value, ActivityType::Bast->value]),
+                $this->issue($site, null, 'medium', 45, 'no_assignment_started', 'No assignment has started for this location.', 'Main Contractor Admin', 'Create or assign the required workstreams for this site.', 'setup', 'assignment_absence', 'workflow', 'site', [ActivityType::Survey->value, ActivityType::PlnConnection->value, ActivityType::Construction->value, ActivityType::Bast->value]),
             ]);
         }
 
@@ -430,6 +434,33 @@ class SiteFlowEvaluator
             'verified_not_reported' => 'ready_for_report',
             default => 'in_progress',
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $issue
+     */
+    private function isRootIssue(array $issue): bool
+    {
+        return in_array($issue['category'] ?? null, [
+            'assignment_absence',
+            'data_gap',
+            'evidence_gap',
+            'field_note',
+            'workflow_gap',
+        ], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $issue
+     */
+    private function isSymptomIssue(array $issue): bool
+    {
+        return in_array($issue['category'] ?? null, [
+            'report_queue',
+            'review_queue',
+            'revision',
+            'staleness',
+        ], true);
     }
 
     /**
