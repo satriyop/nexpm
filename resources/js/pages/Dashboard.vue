@@ -693,10 +693,10 @@ function assignmentFilterUrl(params: Record<string, string>): string {
     return `/admin/assignments${q ? '?' + q : ''}`;
 }
 
-function askAi(prompt: string): void {
+function askAi(prompt: string, context: Record<string, unknown> = {}): void {
     window.dispatchEvent(
         new CustomEvent('nexpm:ai-assistant:ask', {
-            detail: { prompt },
+            detail: { prompt, context },
         }),
     );
 }
@@ -968,6 +968,36 @@ function siteWorkstream(
     key: string,
 ): SiteWorkstream | null {
     return row.workstreams[key] ?? null;
+}
+
+function siteAiContext(row: SiteOperationsRow): Record<string, unknown> {
+    return {
+        type: 'site',
+        id: row.site_id,
+        site_id: row.site_id,
+        project_id: row.project_id,
+        label: `${row.site_code} ${row.location_name}`,
+        url: row.url,
+        component: 'Dashboard/SiteOperations',
+        site_operations_context: {
+            site_code: row.site_code,
+            location_name: row.location_name,
+            project: row.project,
+            main_contractor: row.main_contractor,
+            machine_type: row.machine_type,
+            construction_wo_number: row.construction_wo_number,
+            overall_status: row.overall_status,
+            completion_pct: row.completion_pct,
+            current_stage: row.current_stage,
+            root_blocker: row.root_blocker,
+            primary_symptom: row.primary_symptom,
+            flow_explanation: row.flow_explanation,
+            owner: row.owner,
+            next_action: row.next_action,
+            latest_note: row.latest_note,
+            workstreams: row.workstreams,
+        },
+    };
 }
 
 function issuesForWorkstream(row: SiteOperationsRow, key: string): SiteIssue[] {
@@ -2115,7 +2145,12 @@ function timeAgo(isoString: string): string {
                                         <button
                                             type="button"
                                             class="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs transition hover:bg-accent"
-                                            @click="askAi(row.ai_prompt)"
+                                            @click="
+                                                askAi(
+                                                    row.ai_prompt,
+                                                    siteAiContext(row),
+                                                )
+                                            "
                                         >
                                             <Bot class="size-3" />
                                             Ask
@@ -4035,7 +4070,12 @@ function timeAgo(isoString: string): string {
                     <button
                         type="button"
                         class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium transition hover:bg-accent"
-                        @click="askAi(selectedSite.ai_prompt)"
+                        @click="
+                            askAi(
+                                selectedSite.ai_prompt,
+                                siteAiContext(selectedSite),
+                            )
+                        "
                     >
                         <Bot class="size-3.5" />
                         Ask AI

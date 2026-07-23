@@ -108,6 +108,7 @@ class AiAssistantController extends Controller
             'context.project_id' => ['nullable', 'integer'],
             'context.site_id' => ['nullable', 'integer'],
             'context.assignment_id' => ['nullable', 'integer'],
+            'context.site_operations_context' => ['nullable', 'array'],
             'clarification_context' => ['nullable', 'array'],
             'clarification_context.prompt' => ['nullable', 'string', 'max:2000'],
             'clarification_context.suggestions' => ['nullable', 'array'],
@@ -264,6 +265,7 @@ class AiAssistantController extends Controller
     private function shouldBypassModel(string $toolName): bool
     {
         return in_array($toolName, [
+            'contextual_page_summary',
             'query_entity_stats',
             'summarize_assignment_operations',
             'generate_subcontractor_reminder',

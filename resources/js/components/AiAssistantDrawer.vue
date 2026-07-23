@@ -79,6 +79,18 @@ type PromptGroup = {
     prompts: string[];
 };
 
+type AiRequestContext = {
+    type?: string;
+    id?: number;
+    assignment_id?: number;
+    site_id?: number;
+    project_id?: number;
+    label?: string;
+    url?: string;
+    component?: string;
+    site_operations_context?: Record<string, unknown>;
+};
+
 type PromptExamplesPayload = {
     groups?: Partial<Record<PromptCategory, string[]>>;
 };
@@ -140,7 +152,7 @@ const scrollToBottom = async () => {
 const numericId = (value: unknown): number | undefined =>
     typeof value === 'number' ? value : undefined;
 
-const currentContext = () => {
+const currentContext = (): AiRequestContext => {
     const props = page.props as Record<string, unknown>;
     const assignment = props.assignment as Record<string, unknown> | undefined;
     const site = (props.site ?? assignment?.site) as
@@ -433,7 +445,7 @@ const primaryBreakdownRows = (payload?: ToolPayload) => {
 const visibleItems = (payload?: ToolPayload) =>
     (payload?.items ?? []).slice(0, 5);
 
-const ask = async (prompt?: string) => {
+const ask = async (prompt?: string, contextOverride: AiRequestContext = {}) => {
     const message = (prompt ?? input.value).trim();
 
     if (!message || processing.value || streaming.value) {
@@ -459,7 +471,7 @@ const ask = async (prompt?: string) => {
                 message,
                 conversation_id: conversationId.value,
                 mode: aiMode.value,
-                context: { ...currentContext() },
+                context: { ...currentContext(), ...contextOverride },
                 clarification_context: latestClarificationContext(),
             }),
         });
@@ -570,14 +582,17 @@ const handleExternalAsk = (event: Event) => {
         return;
     }
 
-    const prompt = (event.detail as { prompt?: string } | undefined)?.prompt;
+    const detail = event.detail as
+        | { prompt?: string; context?: AiRequestContext }
+        | undefined;
+    const prompt = detail?.prompt;
 
     if (!prompt) {
         return;
     }
 
     open.value = true;
-    void nextTick(() => ask(prompt));
+    void nextTick(() => ask(prompt, detail?.context ?? {}));
 };
 
 onMounted(() => {

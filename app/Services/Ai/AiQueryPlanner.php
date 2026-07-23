@@ -21,6 +21,10 @@ class AiQueryPlanner
             return $this->tool('generate_subcontractor_reminder', 'reminder', 0.95, 'curated', $entities, 'Reminder language maps directly to subcontractor reminder.');
         }
 
+        if ($this->hasRecordContext($context) && $this->containsAny($normalized, ['halaman ini', 'record ini', 'assignment ini', 'site ini', 'project ini', 'proyek ini', 'apa masalah', 'masalahnya', 'statusnya', 'apa status'])) {
+            return $this->tool('contextual_page_summary', 'context_summary', 0.9, 'curated', $entities, 'Question references the current record/page context.');
+        }
+
         if ($this->isAssignmentRecapQuestion($normalized)) {
             return $this->tool('summarize_assignment_operations', 'assignment_recap', 0.92, 'curated', $entities, 'Assignment recap/summary question maps to assignment operations.');
         }
@@ -51,10 +55,6 @@ class AiQueryPlanner
 
         if ($this->containsAny($normalized, ['arti', 'maksud', 'alur', 'workflow', 'flow', 'status', 'document', 'verified', 'reported', 'field wajib', 'wajib diisi', 'required field', 'siapa yang input', 'siapa input'])) {
             return $this->tool('workflow_knowledge', 'workflow_knowledge', 0.87, 'curated', $entities, 'Workflow/status/process question maps to workflow knowledge.');
-        }
-
-        if ($this->hasRecordContext($context) && $this->containsAny($normalized, ['halaman ini', 'record ini', 'assignment ini', 'site ini', 'project ini', 'proyek ini', 'apa masalah', 'masalahnya', 'statusnya', 'apa status'])) {
-            return $this->tool('contextual_page_summary', 'context_summary', 0.9, 'curated', $entities, 'Question references the current record/page context.');
         }
 
         if ($this->containsAny($normalized, ['risiko proyek', 'risiko terbesar', 'project risk', 'project mana', 'proyek mana', 'paling lambat', 'lambat', 'project lambat', 'proyek lambat'])) {

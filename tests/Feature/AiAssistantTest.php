@@ -425,6 +425,66 @@ test('assistant summarizes assignment context with workflow gaps and next action
     Http::assertNothingSent();
 });
 
+test('assistant summarizes dashboard site context through contextual page summary', function () {
+    config(['ai.providers.deepseek.key' => null]);
+    Http::fake();
+
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Jakarta']);
+    $site = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'JKT-001',
+        'location_name' => 'SPBU Senayan',
+    ]);
+
+    $response = $this->actingAs($superAdmin)
+        ->postJson(route('admin.ai.messages.store'), [
+            'message' => "Jelaskan kenapa site ini belum selesai dan apa masalah utamanya: {$site->site_code}",
+            'context' => [
+                'type' => 'site',
+                'id' => $site->id,
+                'site_id' => $site->id,
+                'project_id' => $project->id,
+                'label' => 'JKT-001 SPBU Senayan',
+                'url' => route('admin.assignments.site-assignments', $site),
+                'component' => 'Dashboard/SiteOperations',
+                'site_operations_context' => [
+                    'site_code' => 'JKT-001',
+                    'location_name' => 'SPBU Senayan',
+                    'project' => 'EVCS Jakarta',
+                    'overall_status' => 'blocked',
+                    'root_blocker' => [
+                        'type' => 'construction_missing_wo',
+                        'problem' => 'Construction cannot proceed because WO number is missing.',
+                    ],
+                    'primary_symptom' => [
+                        'type' => 'stalled_assignment',
+                        'problem' => 'Construction assignment has had no update for 15 days.',
+                    ],
+                    'flow_explanation' => 'Construction cannot proceed because WO number is missing. It also blocks BAST.',
+                    'owner' => 'Admin: Main Con Admin',
+                    'next_action' => 'Fill the construction WO number.',
+                    'latest_note' => [
+                        'body' => 'Access blocked by site security gate.',
+                    ],
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/event-stream; charset=utf-8');
+
+    $events = parseSseEvents($response->streamedContent());
+
+    expect($events['tool_data']['tool_name'])->toBe('contextual_page_summary')
+        ->and($events['tool_data']['tool_payload']['dashboard_site_context']['root_blocker']['type'])->toBe('construction_missing_wo')
+        ->and($events['tool_data']['tool_payload']['dashboard_site_context']['primary_symptom']['type'])->toBe('stalled_assignment')
+        ->and($events['text']['delta'])->toContain('Akar masalah')
+        ->and($events['text']['delta'])->toContain('Construction cannot proceed because WO number is missing')
+        ->and($events['text']['delta'])->toContain('Catatan terakhir: Access blocked by site security gate');
+
+    Http::assertNothingSent();
+});
+
 test('assistant detects workflow gaps across core workflows', function () {
     config(['ai.providers.deepseek.key' => null]);
     Http::fake();

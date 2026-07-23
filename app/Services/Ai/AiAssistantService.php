@@ -91,8 +91,8 @@ class AiAssistantService
                 count($toolPayload['machine_types'] ?? []),
             ),
             'contextual_page_summary' => sprintf(
-                'Context summary: %d workflow gaps found for this page.',
-                count($toolPayload['gaps'] ?? [])
+                'Context summary: %s',
+                $this->contextualPageSummaryFallback($toolPayload, 'en')
             ),
             'detect_workflow_gaps' => sprintf(
                 'Workflow gap scan: %d gaps found. Gap split: %s.',
@@ -590,6 +590,7 @@ class AiAssistantService
             return [
                 'generated_at' => now()->toIso8601String(),
                 'context' => $this->normalizedContext($context),
+                'dashboard_site_context' => $this->dashboardSiteContext($context),
                 'assignment_count' => $assignments->count(),
                 'status_counts' => $this->countAssignmentsBy($assignments, 'status'),
                 'activity_counts' => $this->countAssignmentsBy($assignments, 'activity_type'),
@@ -2029,6 +2030,66 @@ class AiAssistantService
     }
 
     /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function dashboardSiteContext(array $context): array
+    {
+        $value = $context['site_operations_context'] ?? [];
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $toolPayload
+     */
+    private function contextualPageSummaryFallback(array $toolPayload, string $language): string
+    {
+        $dashboard = $toolPayload['dashboard_site_context'] ?? [];
+
+        if (is_array($dashboard) && $dashboard !== []) {
+            $rootBlocker = is_array($dashboard['root_blocker'] ?? null) ? $dashboard['root_blocker'] : [];
+            $primarySymptom = is_array($dashboard['primary_symptom'] ?? null) ? $dashboard['primary_symptom'] : [];
+            $latestNote = is_array($dashboard['latest_note'] ?? null) ? $dashboard['latest_note'] : [];
+            $noteBody = filled($latestNote['body'] ?? null)
+                ? Str::limit((string) $latestNote['body'], 180)
+                : null;
+
+            if ($language === 'id') {
+                return sprintf(
+                    'Site %s berstatus %s. Akar masalah: %s. Gejala operasional: %s. Dampak workflow: %s. Owner: %s. Tindakan berikutnya: %s.%s',
+                    $dashboard['site_code'] ?? '-',
+                    $dashboard['overall_status'] ?? '-',
+                    $rootBlocker['problem'] ?? ($dashboard['flow_explanation'] ?? '-'),
+                    $primarySymptom['problem'] ?? '-',
+                    $dashboard['flow_explanation'] ?? '-',
+                    $dashboard['owner'] ?? '-',
+                    $dashboard['next_action'] ?? '-',
+                    $noteBody ? ' Catatan terakhir: '.$noteBody.'.' : '',
+                );
+            }
+
+            return sprintf(
+                'Site %s is %s. Root issue: %s. Operational symptom: %s. Workflow impact: %s. Owner: %s. Next action: %s.%s',
+                $dashboard['site_code'] ?? '-',
+                $dashboard['overall_status'] ?? '-',
+                $rootBlocker['problem'] ?? ($dashboard['flow_explanation'] ?? '-'),
+                $primarySymptom['problem'] ?? '-',
+                $dashboard['flow_explanation'] ?? '-',
+                $dashboard['owner'] ?? '-',
+                $dashboard['next_action'] ?? '-',
+                $noteBody ? ' Latest note: '.$noteBody.'.' : '',
+            );
+        }
+
+        if ($language === 'id') {
+            return sprintf('ditemukan %d gap workflow untuk halaman ini.', count($toolPayload['gaps'] ?? []));
+        }
+
+        return sprintf('%d workflow gaps found for this page.', count($toolPayload['gaps'] ?? []));
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
@@ -2406,8 +2467,8 @@ class AiAssistantService
                 count($toolPayload['machine_types'] ?? []),
             ),
             'contextual_page_summary' => sprintf(
-                'Ringkasan konteks: ditemukan %d gap workflow untuk halaman ini.',
-                count($toolPayload['gaps'] ?? [])
+                'Ringkasan konteks: %s',
+                $this->contextualPageSummaryFallback($toolPayload, 'id')
             ),
             'detect_workflow_gaps' => sprintf(
                 'Pemeriksaan gap workflow: ditemukan %d gap. Pembagian gap: %s.',

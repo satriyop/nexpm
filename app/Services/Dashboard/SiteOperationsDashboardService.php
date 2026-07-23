@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SiteOperationsDashboardService
 {
@@ -251,7 +252,17 @@ class SiteOperationsDashboardService
                     'age_days' => $primaryIssue['age_days'] ?? null,
                     'next_action' => $primaryIssue['recommended_action'] ?? $this->siteFlowEvaluator->defaultActionText($overallStatus),
                     'url' => route('admin.assignments.site-assignments', $site->site_id),
-                    'ai_prompt' => "Kenapa site {$site->site_code} belum selesai dan apa masalah utamanya?",
+                    'ai_prompt' => $this->siteAiPrompt(
+                        site: $site,
+                        overallStatus: $overallStatus,
+                        currentStage: $flow['current_stage'],
+                        rootIssue: $rootIssue,
+                        primarySymptom: $primarySymptom,
+                        flowExplanation: $flow['flow_explanation'],
+                        owner: $primaryIssue['owner'] ?? null,
+                        nextAction: $primaryIssue['recommended_action'] ?? $this->siteFlowEvaluator->defaultActionText($overallStatus),
+                        latestNote: $latestNote,
+                    ),
                 ];
             });
     }
@@ -509,6 +520,31 @@ class SiteOperationsDashboardService
             ->pluck('cons_wo_number')
             ->filter()
             ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $currentStage
+     * @param  array<string, mixed>|null  $rootIssue
+     * @param  array<string, mixed>|null  $primarySymptom
+     * @param  array<string, mixed>|null  $latestNote
+     */
+    private function siteAiPrompt(object $site, string $overallStatus, ?array $currentStage, ?array $rootIssue, ?array $primarySymptom, string $flowExplanation, ?string $owner, string $nextAction, ?array $latestNote): string
+    {
+        $lines = [
+            "Jelaskan kenapa site ini belum selesai dan apa masalah utamanya: {$site->site_code} / {$site->location_name}.",
+            "Gunakan tool contextual_page_summary untuk site_id {$site->site_id}, lalu jawab berdasarkan konteks dashboard site evaluator berikut.",
+            "Status site: {$overallStatus}",
+            'Current stage: '.($currentStage['label'] ?? '-'),
+            'Root blocker: '.($rootIssue['type'] ?? '-').' - '.($rootIssue['problem'] ?? '-'),
+            'Operational symptom: '.($primarySymptom['type'] ?? '-').' - '.($primarySymptom['problem'] ?? '-'),
+            "Flow explanation: {$flowExplanation}",
+            'Owner: '.($owner ?? '-'),
+            "Next action: {$nextAction}",
+            'Latest note: '.Str::limit((string) ($latestNote['body'] ?? '-'), 240),
+            'Format jawaban ringkas: akar masalah, bukti, dampak ke workflow, dan tindakan berikutnya.',
+        ];
+
+        return Str::limit(implode("\n", $lines), 1900, '');
     }
 
     /**
