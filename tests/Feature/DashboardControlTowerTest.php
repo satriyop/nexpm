@@ -202,6 +202,37 @@ test('site operations root blocker wins over operational symptom', function () {
         ->and($payload['symptom_breakdown'])->toHaveKey('revision_pending');
 });
 
+test('site operations blocked status follows blocker category', function () {
+    $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
+    $project = Project::factory()->create(['name' => 'EVCS Jakarta']);
+    $site = Site::factory()->create([
+        'project_id' => $project->id,
+        'site_code' => 'NOTE-BLOCKED',
+        'power_kva' => 50,
+    ]);
+    $survey = Assignment::factory()->survey()->create([
+        'site_id' => $site->id,
+        'status' => AssignmentStatus::Pending,
+    ]);
+    AssignmentSurveyData::factory()->complete()->create([
+        'assignment_id' => $survey->id,
+    ]);
+    AssignmentComment::factory()->create([
+        'assignment_id' => $survey->id,
+        'user_id' => $superAdmin->id,
+        'body' => 'Access blocked by location owner.',
+    ]);
+
+    $payload = app(SiteOperationsDashboardService::class)->build($superAdmin);
+    $row = $payload['site_rows'][0];
+
+    expect($row['issue_type'])->toBe('note_blocker_signal')
+        ->and($row['root_blocker_type'])->toBe('note_blocker_signal')
+        ->and($row['overall_status'])->toBe('blocked')
+        ->and($payload['root_blocker_breakdown'])->toHaveKey('note_blocker_signal')
+        ->and($payload['metrics']['blocked_sites'])->toBe(1);
+});
+
 test('site operations dashboard exposes construction WO for filtering', function () {
     $superAdmin = User::factory()->create(['role' => Role::SuperAdmin]);
     $project = Project::factory()->create(['name' => 'EVCS Bandung']);

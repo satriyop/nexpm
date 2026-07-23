@@ -416,19 +416,12 @@ class SiteFlowEvaluator
             return 'done';
         }
 
+        if ($primaryIssue !== null && $this->blocksSiteProgress($primaryIssue)) {
+            return 'blocked';
+        }
+
         return match ($primaryIssue['type'] ?? null) {
-            'construction_missing_wo',
-            'site_missing_power',
-            'survey_schedule_missing',
-            'survey_evidence_missing',
-            'pln_registration_incomplete',
-            'pln_billing_incomplete',
-            'pln_kwh_incomplete',
-            'construction_data_incomplete',
-            'construction_photos_missing',
-            'bast_sim_missing',
-            'bast_evidence_missing' => 'blocked',
-            'stalled_assignment' => 'stalled',
+            'stalled_assignment',
             'revision_pending' => 'stalled',
             'ready_for_verification' => 'needs_review',
             'verified_not_reported' => 'ready_for_report',
@@ -440,6 +433,20 @@ class SiteFlowEvaluator
      * @param  array<string, mixed>  $issue
      */
     private function isRootIssue(array $issue): bool
+    {
+        return in_array($issue['category'] ?? null, [
+            'assignment_absence',
+            'data_gap',
+            'evidence_gap',
+            'field_note',
+            'workflow_gap',
+        ], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $issue
+     */
+    private function blocksSiteProgress(array $issue): bool
     {
         return in_array($issue['category'] ?? null, [
             'assignment_absence',
