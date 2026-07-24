@@ -1771,17 +1771,17 @@ function timeAgo(isoString: string): string {
                 </div>
 
                 <div
-                    class="grid gap-2 border-b border-sidebar-border/70 p-4 md:grid-cols-2 xl:grid-cols-6 dark:border-sidebar-border"
+                    class="flex flex-wrap items-center gap-2 border-b border-sidebar-border/70 p-4 dark:border-sidebar-border"
                 >
                     <input
                         v-model="siteSearch"
                         type="search"
                         placeholder="Search site, project, issue, owner"
-                        class="h-9 rounded-md border border-border bg-background px-3 text-sm transition outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 md:col-span-2 xl:col-span-1"
+                        class="h-9 w-64 rounded-md border border-border bg-background px-3 text-sm transition outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
                         @keyup.enter="reloadSiteOperations()"
                     />
                     <Select v-model="siteStatusFilter">
-                        <SelectTrigger class="h-9">
+                        <SelectTrigger class="h-9 w-40">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1797,7 +1797,7 @@ function timeAgo(isoString: string): string {
                         </SelectContent>
                     </Select>
                     <Select v-model="siteIssueFilter">
-                        <SelectTrigger class="h-9">
+                        <SelectTrigger class="h-9 w-40">
                             <SelectValue placeholder="Issue" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1813,7 +1813,7 @@ function timeAgo(isoString: string): string {
                         </SelectContent>
                     </Select>
                     <Select v-model="siteMachineFilter">
-                        <SelectTrigger class="h-9">
+                        <SelectTrigger class="h-9 w-40">
                             <SelectValue placeholder="Machine" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1829,7 +1829,7 @@ function timeAgo(isoString: string): string {
                         </SelectContent>
                     </Select>
                     <Select v-model="siteWoFilter">
-                        <SelectTrigger class="h-9">
+                        <SelectTrigger class="h-9 w-40">
                             <SelectValue placeholder="WO" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1844,23 +1844,25 @@ function timeAgo(isoString: string): string {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <div class="flex gap-2">
-                        <Select v-model="siteOwnerFilter">
-                            <SelectTrigger class="h-9 min-w-0 flex-1">
-                                <SelectValue placeholder="Owner" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem :value="ALL">All owners</SelectItem>
-                                <SelectItem
-                                    v-for="owner in siteOperations
-                                        .filter_options.owners"
-                                    :key="owner"
-                                    :value="owner"
-                                >
-                                    {{ owner }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <Select v-model="siteOwnerFilter">
+                        <SelectTrigger class="h-9 w-40">
+                            <SelectValue placeholder="Owner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="ALL">All owners</SelectItem>
+                            <SelectItem
+                                v-for="owner in siteOperations.filter_options
+                                    .owners"
+                                :key="owner"
+                                :value="owner"
+                            >
+                                {{ owner }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <div
+                        class="flex flex-wrap items-center gap-2 md:ml-auto"
+                    >
                         <Select v-model="sitePerPage">
                             <SelectTrigger class="h-9 w-20">
                                 <SelectValue placeholder="Rows" />
@@ -1892,9 +1894,7 @@ function timeAgo(isoString: string): string {
                             Clear
                         </button>
                     </div>
-                    <div
-                        class="text-xs text-muted-foreground md:col-span-2 xl:col-span-6"
-                    >
+                    <div class="w-full text-xs text-muted-foreground">
                         Showing {{ siteOperations.pagination.from }}-{{
                             siteOperations.pagination.to
                         }}
