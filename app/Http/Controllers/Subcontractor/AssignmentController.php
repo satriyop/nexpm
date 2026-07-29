@@ -153,10 +153,17 @@ class AssignmentController extends Controller
             ->all();
 
         $pln = AssignmentPlnData::query()->firstOrNew(['assignment_id' => $assignment->id]);
+        $replacedPaths = [];
 
         foreach ($validated as $key => $value) {
             if ($request->hasFile($key)) {
-                $pln->{$key} = $request->file($key)->store('pln', 'public');
+                $newPath = $request->file($key)->store('pln', 'public');
+                $oldPath = $pln->exists ? ($pln->getRawOriginal($key) ?: null) : null;
+                $pln->{$key} = $newPath;
+
+                if (is_string($oldPath) && $oldPath !== '' && $oldPath !== $newPath) {
+                    $replacedPaths[] = $oldPath;
+                }
             } elseif (! in_array($key, $fileFields)) {
                 $pln->{$key} = $value;
             }
@@ -165,6 +172,10 @@ class AssignmentController extends Controller
 
         $pln->assignment_id = $assignment->id;
         $pln->save();
+
+        foreach ($replacedPaths as $oldPath) {
+            Storage::disk('public')->delete($oldPath);
+        }
 
         return back()->with('success', 'PLN data saved.');
     }

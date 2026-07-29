@@ -43,6 +43,13 @@ class PlnFields
                 'section' => 'general', 'reportable' => false, 'report_order' => 60,
                 'reports' => [],
             ],
+            // ── Photos ────────────────────────────────────────────────────────
+            [
+                'key' => 'foto_kwh', 'label' => 'Foto kWh',
+                'type' => 'image', 'required' => false, 'max' => 10240,
+                'section' => 'photos', 'reportable' => false, 'report_order' => 90,
+                'reports' => [],
+            ],
             // ── Documents ─────────────────────────────────────────────────────
             [
                 'key' => 'file_slo', 'label' => 'File SLO',

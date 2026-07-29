@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import * as SubActions from '@/actions/App/Http/Controllers/Subcontractor/AssignmentController';
 import FileUpload from '@/components/FileUpload.vue';
 import InputError from '@/components/InputError.vue';
+import PhotoUpload from '@/components/PhotoUpload.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -34,12 +35,15 @@ const plnForm = useForm({
     file_pk: null as File | null,
     kwh_meter_installation_date:
         props.assignment.pln_data?.kwh_meter_installation_date ?? '',
+    foto_kwh: null as File | null,
     id_pelanggan: props.assignment.pln_data?.id_pelanggan ?? '',
     catatan_progres: props.assignment.pln_data?.catatan_progres ?? '',
 });
 
 const page = usePage();
-const isSubcontractor = computed(() => (page.props.auth as any)?.user?.role === 'subcontractor');
+const isSubcontractor = computed(
+    () => (page.props.auth as any)?.user?.role === 'subcontractor',
+);
 
 const plnStatusOptions = [
     'NOT YET REGISTER',
@@ -54,7 +58,13 @@ function submitPln() {
     plnForm.patch(SubActions.updatePlnData(props.assignment).url, {
         forceFormData: true,
         onSuccess: () =>
-            plnForm.reset('file_slo', 'file_nidi', 'file_reg', 'file_pk'),
+            plnForm.reset(
+                'file_slo',
+                'file_nidi',
+                'file_reg',
+                'file_pk',
+                'foto_kwh',
+            ),
     });
 }
 
@@ -87,6 +97,12 @@ function currentDocumentUrl(key: PlnFileKey): string | null {
 
     return path ? storageUrl(path) : null;
 }
+
+const currentFotoKwhUrl = computed(() => {
+    const path = props.assignment.pln_data?.foto_kwh;
+
+    return path ? storageUrl(path) : null;
+});
 </script>
 
 <template>
@@ -162,6 +178,16 @@ function currentDocumentUrl(key: PlnFileKey): string | null {
                             placeholder="ID Pelanggan"
                         />
                         <InputError :message="plnForm.errors.id_pelanggan" />
+                    </div>
+                    <div class="grid gap-1.5 sm:col-span-2">
+                        <Label>Foto kWh (KWH Meter Photo)</Label>
+                        <PhotoUpload
+                            :model-value="plnForm.foto_kwh"
+                            :current-url="currentFotoKwhUrl"
+                            :readonly="isReadOnly"
+                            @update:model-value="plnForm.foto_kwh = $event"
+                        />
+                        <InputError :message="plnForm.errors.foto_kwh" />
                     </div>
                 </div>
 
