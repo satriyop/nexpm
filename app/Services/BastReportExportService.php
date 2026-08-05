@@ -6,6 +6,7 @@ use App\Enums\ActivityType;
 use App\Models\Assignment;
 use App\Models\AssignmentBastData;
 use App\Models\AssignmentConstructionData;
+use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Drawing as SharedDrawing;
@@ -271,6 +272,23 @@ class BastReportExportService
             $absolutePath = storage_path('app/public/'.$photo->photo_path);
 
             if (! file_exists($absolutePath)) {
+                continue;
+            }
+
+            // PhpSpreadsheet's Drawing writer only supports GIF/JPEG/PNG/BMP
+            // (see Worksheet\Drawing::IMAGE_TYPES_CONVERTION_MAP). Anything
+            // else (e.g. WebP) would throw when the workbook is saved, so
+            // skip it here rather than break the whole export.
+            $imageType = exif_imagetype($absolutePath);
+
+            if (! in_array($imageType, [IMAGETYPE_GIF, IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_BMP], true)) {
+                Log::warning('Skipped BAST photo with unsupported image type for Excel embedding.', [
+                    'photo_id' => $photo->id,
+                    'photo_path' => $photo->photo_path,
+                    'checkpoint_key' => $checkpointKey,
+                    'detected_type' => $imageType,
+                ]);
+
                 continue;
             }
 

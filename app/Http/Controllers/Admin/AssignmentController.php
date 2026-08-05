@@ -22,6 +22,7 @@ use App\Models\Report;
 use App\Models\Site;
 use App\Models\Subcontractor;
 use App\Services\BastReportExportService;
+use App\Services\PhotoUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -587,7 +588,7 @@ class AssignmentController extends Controller
         return back()->with('success', 'Photo removed.');
     }
 
-    public function storeBastPhoto(Request $request, Assignment $assignment): RedirectResponse
+    public function storeBastPhoto(Request $request, Assignment $assignment, PhotoUploadService $photoUploadService): RedirectResponse
     {
         $this->ensureCanAccessAssignment($assignment);
         abort_unless($assignment->activity_type === ActivityType::Bast, 422, 'Activity type mismatch.');
@@ -611,7 +612,7 @@ class AssignmentController extends Controller
             $existing->delete();
         }
 
-        $path = $request->file('photo')->store('bast', 'public');
+        $path = $photoUploadService->store($request->file('photo'), 'bast');
 
         AssignmentBastPhoto::query()->create([
             'assignment_bast_data_id' => $bastData->id,

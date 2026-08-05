@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteType;
 use App\Services\BastReportExportService;
 use PhpOffice\PhpSpreadsheet\Shared\Drawing as SharedDrawing;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 test('bast report photos are fitted inside their intended template area', function () {
     $photoPath = 'bast/export-placement-test.png';
@@ -60,6 +61,54 @@ test('bast report photos are fitted inside their intended template area', functi
             ->and($drawing->getOffsetY())->toBeGreaterThanOrEqual(4)
             ->and($drawing->getOffsetX() + $drawing->getWidth())->toBeLessThanOrEqual($areaWidth - 4)
             ->and($drawing->getOffsetY() + $drawing->getHeight())->toBeLessThanOrEqual($areaHeight - 4);
+    } finally {
+        if (file_exists($absolutePhotoPath)) {
+            unlink($absolutePhotoPath);
+        }
+    }
+});
+
+test('bast report skips photos with image types unsupported by phpspreadsheet instead of failing', function () {
+    $photoPath = 'bast/export-webp-test.webp';
+    $absolutePhotoPath = storage_path('app/public/'.$photoPath);
+
+    if (! is_dir(dirname($absolutePhotoPath))) {
+        mkdir(dirname($absolutePhotoPath), 0755, true);
+    }
+
+    $image = imagecreatetruecolor(400, 300);
+    imagefilledrectangle($image, 0, 0, 399, 299, imagecolorallocate($image, 30, 120, 220));
+    imagewebp($image, $absolutePhotoPath);
+    imagedestroy($image);
+
+    try {
+        $assignment = Assignment::factory()
+            ->bast()
+            ->for(Site::factory()->state([
+                'site_type_id' => SiteType::factory()->create(['name' => 'EVCS'])->id,
+            ]))
+            ->create();
+
+        $bastData = AssignmentBastData::factory()->create(['assignment_id' => $assignment->id]);
+
+        AssignmentBastPhoto::query()->create([
+            'assignment_bast_data_id' => $bastData->id,
+            'section' => 'required',
+            'checkpoint_key' => 'kwh_kwh_meter',
+            'photo_path' => $photoPath,
+        ]);
+
+        $spreadsheet = app(BastReportExportService::class)->generate($assignment);
+        $sheet = $spreadsheet->getSheetByName('KWH,AC Panel, Cable');
+
+        expect($sheet?->getDrawingCollection())->toHaveCount(0);
+
+        $outputPath = tempnam(sys_get_temp_dir(), 'bast-export-test').'.xlsx';
+        (new Xlsx($spreadsheet))->save($outputPath);
+
+        expect(file_exists($outputPath))->toBeTrue();
+
+        unlink($outputPath);
     } finally {
         if (file_exists($absolutePhotoPath)) {
             unlink($absolutePhotoPath);

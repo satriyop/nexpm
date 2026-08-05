@@ -19,6 +19,7 @@ use App\Models\AssignmentPlnData;
 use App\Models\AssignmentSurveyData;
 use App\Models\MachineType;
 use App\Models\Project;
+use App\Services\PhotoUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -259,7 +260,7 @@ class AssignmentController extends Controller
         return back()->with('success', 'BAST data saved.');
     }
 
-    public function storeBastPhoto(Request $request, Assignment $assignment): RedirectResponse
+    public function storeBastPhoto(Request $request, Assignment $assignment, PhotoUploadService $photoUploadService): RedirectResponse
     {
         $this->ensureBelongsToCurrentSubcontractor($assignment);
         $this->ensureEditable($assignment);
@@ -275,7 +276,7 @@ class AssignmentController extends Controller
             ['assignment_id' => $assignment->id]
         );
 
-        $path = $request->file('photo')->store('bast', 'public');
+        $path = $photoUploadService->store($request->file('photo'), 'bast');
 
         // Replace existing photo for this checkpoint if it exists.
         $existing = $bast->bastPhotos()
