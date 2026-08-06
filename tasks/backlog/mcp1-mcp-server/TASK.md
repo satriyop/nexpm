@@ -32,7 +32,7 @@ Entities: Project → Site (SPKLU) → Assignment (survey → construction → P
 
 ## Scope (proposed "lebih complete" vs lsptdi)
 
-1. **Tools** — wrap domain logic nex-pm (read-only, `#[IsReadOnly]`). Daftar tool: TBD — perlu eksplorasi model bisnis nex-pm
+1. **Tools** — bungkus **SEMUA 15 tool** `AiAssistantService` (read-only, `#[IsReadOnly]`): list_users, contextual_page_summary, detect_workflow_gaps, project_health_briefing, workflow_knowledge, resolve_entity_context, query_entity_stats, summarize_assignment_operations, generate_subcontractor_reminder, summarize_priority_actions, summarize_project_risks, summarize_subcontractor_blockers, check_report_readiness, summarize_dashboard, general_help.
 2. **Auth lebih kuat** — multiple tokens per agent (nama agent, scope), revoke/rotate, config `ai.mcp.*` / `AI_MCP_*`
 3. **Audit log** — tabel `mcp_audit_logs`: tool, token/agent, status, latency, timestamp
 4. **Metrik** — hit count + latency per tool (queryable via resource atau endpoint internal)
