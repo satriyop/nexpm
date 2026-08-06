@@ -99,7 +99,7 @@ trait ExecutesNexpmAiTool
             try {
                 McpAuditLog::create([
                     'tool_name' => $this->domainToolName(),
-                    'token_prefix' => $this->tokenPrefix($request),
+                    'token_prefix' => null,
                     'acting_user_id' => $user?->id,
                     'status' => $status,
                     'latency_ms' => $elapsed,
