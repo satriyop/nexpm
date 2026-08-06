@@ -6,6 +6,7 @@ use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -19,26 +20,43 @@ class AuthenticateAiMcp
     public function handle(Request $request, Closure $next): Response
     {
         if (! filter_var(config('ai.mcp.enabled'), FILTER_VALIDATE_BOOLEAN)) {
-            abort(404);
+            return $this->error('MCP endpoint is disabled.', Response::HTTP_NOT_FOUND);
         }
 
         $expected = (string) config('ai.mcp.token', '');
         $provided = (string) $request->bearerToken();
 
         if ($expected === '' || $provided === '' || ! hash_equals($expected, $provided)) {
-            abort(401, 'Invalid or missing MCP bearer token.');
+            return $this->error('Invalid or missing MCP bearer token.', Response::HTTP_UNAUTHORIZED, true);
         }
 
         $userId = config('ai.mcp.acting_as_user_id');
         $user = $userId ? User::query()->find($userId) : null;
 
         if (! $user instanceof User || ! $user->isAdmin()) {
-            abort(403, 'MCP acting user must be a valid admin (set AI_MCP_ACTING_AS_USER_ID).');
+            return $this->error('MCP acting user is not authorized.', Response::HTTP_FORBIDDEN);
         }
 
         Auth::setUser($user);
         $request->setUserResolver(fn () => $user);
 
         return $next($request);
+    }
+
+    private function error(string $message, int $status, bool $challenge = false): JsonResponse
+    {
+        $response = response()->json([
+            'jsonrpc' => '2.0',
+            'error' => [
+                'code' => $status === Response::HTTP_UNAUTHORIZED ? -32001 : -32000,
+                'message' => $message,
+            ],
+        ], $status);
+
+        if ($challenge) {
+            $response->headers->set('WWW-Authenticate', 'Bearer');
+        }
+
+        return $response;
     }
 }

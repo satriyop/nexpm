@@ -2,6 +2,8 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Prompts\DashboardPrompt;
+use App\Mcp\Prompts\ProjectHealthPrompt;
 use App\Mcp\Resources\NexpmStatusResource;
 use App\Mcp\Tools\CheckReportReadinessMcpTool;
 use App\Mcp\Tools\ContextualPageSummaryMcpTool;
@@ -83,7 +85,7 @@ class NexpmOpsServer extends Server
      * @var array<int, class-string<Prompt>>
      */
     protected array $prompts = [
-        'dashboard' => 'Summarize NexPM dashboard: assignment status counts, top projects, and recent activity.',
-        'project_health' => 'Check project health: risks, workflow gaps, and report-ready assignments.',
+        DashboardPrompt::class,
+        ProjectHealthPrompt::class,
     ];
 }

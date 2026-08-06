@@ -48,9 +48,18 @@ Entities: Project → Site (SPKLU) → Assignment (survey → construction → P
 ## Acceptance
 
 - [ ] External agent (Hermes) invoke ≥1 tool nex-pm sukses di dev
-- [ ] Auth bearer: valid token OK, invalid/revoked denied
-- [ ] Audit log tercatat per pemanggilan
-- [ ] Metrik per tool tersedia
-- [ ] ≥1 resource/prompt jalan
-- [ ] Tests hijau
-- [ ] Docs + contoh config agent
+- [x] Auth bearer: valid token OK, invalid/revoked denied
+- [x] Audit log tercatat per pemanggilan
+- [x] Metrik per tool tersedia
+- [x] ≥1 resource/prompt jalan
+- [x] Tests hijau
+- [x] Docs + contoh config agent
+
+## Review fixes (2026-08-06)
+
+- Defined `mcp` rate limiter (60 requests/minute per bearer token/IP).
+- Replaced string prompts with Laravel MCP `Prompt` classes.
+- Added shared contextual JSON schemas to all 15 tools.
+- Standardized JSON auth errors with `WWW-Authenticate: Bearer`.
+- Removed exception details from client responses; log server-side.
+- Added `JSON_THROW_ON_ERROR` and restricted audit summaries to safe fields.

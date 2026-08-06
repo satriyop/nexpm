@@ -29,6 +29,6 @@ class SummarizeSubcontractorBlockersMcpTool extends Tool
     /** @return array<string, \Illuminate\JsonSchema\Types\Type> */
     public function schema(JsonSchema $schema): array
     {
-        return [];
+        return $this->contextSchema($schema);
     }
 }

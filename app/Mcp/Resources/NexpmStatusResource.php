@@ -44,6 +44,6 @@ class NexpmStatusResource extends Resource
             'generated_at' => now()->toIso8601String(),
             'assignments_total' => (int) array_sum($stats),
             'assignments_by_status' => $stats,
-        ], JSON_PRETTY_PRINT);
+        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
     }
 }

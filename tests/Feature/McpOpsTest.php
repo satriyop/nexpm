@@ -16,7 +16,7 @@ it('blocks unauthenticated requests', function (): void {
     $response = test()->postJson('/mcp/nexpm-ops', []);
 
     $response->assertStatus(401);
-    expect($response->json('error') ?? $response->content())->toContain('bearer');
+    expect($response->json('error.message'))->toContain('bearer');
 });
 
 it('blocks invalid token', function (): void {

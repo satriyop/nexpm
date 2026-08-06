@@ -4,7 +4,10 @@ namespace App\Mcp\Tools\Concerns;
 
 use App\Models\McpAuditLog;
 use App\Services\Ai\AiAssistantService;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Throwable;
@@ -24,6 +27,24 @@ trait ExecutesNexpmAiTool
         unset($context['_meta']);
 
         return $context;
+    }
+
+    /**
+     * @return array<string, Type>
+     */
+    protected function contextSchema(JsonSchema $schema): array
+    {
+        return [
+            'query' => $schema->string()->description('Optional natural-language filter or entity name.')->nullable(),
+            'type' => $schema->string()->description('Optional context type: page, project, site, or assignment.')->nullable(),
+            'id' => $schema->integer()->description('Optional context entity ID.')->nullable(),
+            'project_id' => $schema->integer()->description('Optional project ID filter.')->nullable(),
+            'site_id' => $schema->integer()->description('Optional site ID filter.')->nullable(),
+            'assignment_id' => $schema->integer()->description('Optional assignment ID filter.')->nullable(),
+            'label' => $schema->string()->description('Optional display label for contextual summaries.')->nullable(),
+            'url' => $schema->string()->description('Optional internal page URL for contextual summaries.')->nullable(),
+            'site_operations_context' => $schema->object()->description('Optional site operations context for contextual summaries.')->nullable(),
+        ];
     }
 
     protected function executeDomainTool(Request $request): Response
@@ -49,13 +70,20 @@ trait ExecutesNexpmAiTool
             );
 
             return Response::text(
-                (string) json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                json_encode(
+                    $result,
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+                )
             );
         } catch (Throwable $e) {
             $status = 'error';
             $errorMessage = $e->getMessage();
+            Log::error('NexPM MCP tool failed.', [
+                'tool' => $this->domainToolName(),
+                'exception' => $e,
+            ]);
 
-            return Response::error('Tool execution failed: '.$errorMessage);
+            return Response::error('Tool execution failed. Contact the administrator with the request ID.');
         } finally {
             $elapsed = max(0, (int) (microtime(true) * 1000) - $startMs);
 
@@ -87,12 +115,13 @@ trait ExecutesNexpmAiTool
      */
     protected function summarizeRequest(Request $request): ?array
     {
-        $summary = $request->all();
-        unset($summary['_meta']);
-        $summary = array_filter($summary, fn ($v) => ! is_resource($v));
+        $allowed = ['query', 'type', 'id', 'project_id', 'site_id', 'assignment_id'];
+        $summary = array_intersect_key($request->all(), array_flip($allowed));
 
         return array_map(
-            fn ($v) => is_string($v) && mb_strlen($v) > 100 ? mb_substr($v, 0, 97).'...' : $v,
+            fn ($value): int|string|null => is_string($value) && mb_strlen($value) > 100
+                ? mb_substr($value, 0, 97).'...'
+                : (is_scalar($value) || $value === null ? $value : null),
             $summary
         );
     }
