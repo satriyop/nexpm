@@ -1,6 +1,6 @@
 # MCP1 — MCP server for nex-pm
 
-**Status:** pending
+**Status:** in progress
 **Phase:** 1 — Design
 **Created:** 2026-08-06
 **Depends on:** —

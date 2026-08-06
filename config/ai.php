@@ -140,4 +140,23 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | MCP (Model Context Protocol) — External Agent Access
+    |--------------------------------------------------------------------------
+    |
+    | Web endpoint: /mcp/nexpm-ops
+    | Auth: Authorization: Bearer <token>
+    | Token maps to acting_as_user_id (must be an admin/global admin).
+    | local_acting_as: only for local stdio MCP in trusted dev environments.
+    |
+    */
+
+    'mcp' => [
+        'enabled' => filter_var(env('AI_MCP_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'token' => env('AI_MCP_TOKEN'),
+        'acting_as_user_id' => env('AI_MCP_ACTING_AS_USER_ID'),
+        'local_acting_as' => filter_var(env('AI_MCP_LOCAL_ACTING_AS', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
 ];
