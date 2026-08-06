@@ -17,6 +17,19 @@ Build an MCP server for **nex-pm data** that external agents (Hermes, opencode, 
 - **Auth:** bearer token (Sanctum-style) → acting user, via middleware (pola `AuthenticateAiMcp` lsptdi) — diperkuat: multi-token per agent + revocation
 - **Referensi:** `~/dev/laravel-project/lsptdi/tasks/done/ai6-mcp-tool-plane/` (TASK.md + `app/Mcp/`, `app/Http/Middleware/AuthenticateAiMcp.php`, `docs/mcp-ops.md`)
 
+## Exploration findings (2026-08-06, zero code)
+
+**Domain:** app manajemen proyek infrastruktur SPKLU/kelistrikan (charging station) PLN.
+Entities: Project → Site (SPKLU) → Assignment (survey → construction → PLN → BAST), Client, MainContractor, Subcontractor, Report, SiteType, MachineType.
+
+**Status pipeline (16):** PENDING, DROP, VERIFIED, REPORTED (shared); SURVEY, DOCUMENT; CONSTRUCTION, MACHINE_ONSITE, DONE, LIVE; REGISTRATION, BILLING, CONNECTION, KWH_DONE; SUBMITTED, REVISION — enum `App\Enums\AssignmentStatus` (label(), color(), verifiableStatuses(), adminLocked()).
+
+**Roles:** super_admin, admin, subcontractor, drafter, project_manager.
+
+**Domain AI layer siap dibungkus:** `App\Services\Ai\AiAssistantService` (tools: list_users, contextual_page_summary, detect_workflow_gaps, project_health_briefing, workflow_knowledge, resolve_entity_context, query_entity_stats, summarize_assignment_operations, generate_subcontractor_reminder, summarize_priority_actions, summarize_project_risks, summarize_subcontractor_blockers, check_report_readiness, summarize_dashboard, general_help) + `AiQueryPlanner` + `DbSchemaService` (ALLOWED_TABLES 18 tabel + join paths).
+
+**Stack terpasang:** laravel/mcp v0.7.0 (sudah di vendor/lock, belum di require composer.json), laravel/ai ^0.6.8, PHP 8.3+. config/ai.php ada tapi belum ada bagian mcp.
+
 ## Scope (proposed "lebih complete" vs lsptdi)
 
 1. **Tools** — wrap domain logic nex-pm (read-only, `#[IsReadOnly]`). Daftar tool: TBD — perlu eksplorasi model bisnis nex-pm
