@@ -5,6 +5,8 @@ use App\Models\User;
 use App\Services\Ai\AiAssistantService;
 
 beforeEach(function (): void {
+    $this->artisan('migrate', ['--force' => true]);
+
     config([
         'ai.mcp.enabled' => true,
         'ai.mcp.token' => 'test-token',
