@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Resources\NexpmStatusResource;
 use App\Mcp\Tools\CheckReportReadinessMcpTool;
 use App\Mcp\Tools\ContextualPageSummaryMcpTool;
 use App\Mcp\Tools\DetectWorkflowGapsMcpTool;
@@ -74,10 +75,15 @@ class NexpmOpsServer extends Server
     /**
      * @var array<int, class-string<Server\Resource>>
      */
-    protected array $resources = [];
+    protected array $resources = [
+        NexpmStatusResource::class,
+    ];
 
     /**
      * @var array<int, class-string<Prompt>>
      */
-    protected array $prompts = [];
+    protected array $prompts = [
+        'dashboard' => 'Summarize NexPM dashboard: assignment status counts, top projects, and recent activity.',
+        'project_health' => 'Check project health: risks, workflow gaps, and report-ready assignments.',
+    ];
 }
