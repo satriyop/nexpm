@@ -5,8 +5,8 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -33,7 +33,7 @@ class AuthenticateAiMcp
         $userId = config('ai.mcp.acting_as_user_id');
         $user = $userId ? User::query()->find($userId) : null;
 
-        if (! $user instanceof User || ! $user->isAdmin()) {
+        if (! $user instanceof User || (! $user->isAdmin() && ! $user->isGlobalAdmin())) {
             return $this->error('MCP acting user is not authorized.', Response::HTTP_FORBIDDEN);
         }
 

@@ -14,7 +14,7 @@ Build an MCP server for **nex-pm data** that external agents (Hermes, opencode, 
 - **Domain:** nex-pm data (read-only ops tools, same pattern as lsptdi)
 - **Stack:** Laravel + `laravel/mcp` (^0.9, align with lsptdi) — PHP 8.4, Inertia app
 - **Hosting:** bareng dengan app (`routes` + middleware, deployed with nex-pm), endpoint `https://{app}/mcp/nexpm-ops`
-- **Auth:** bearer token (Sanctum-style) → acting user, via middleware (pola `AuthenticateAiMcp` lsptdi) — diperkuat: multi-token per agent + revocation
+- **Auth:** single bearer token (Sanctum-style) → acting user, via middleware (pola `AuthenticateAiMcp` lsptdi); multi-token/revocation deferred to a follow-up task
 - **Referensi:** `~/dev/laravel-project/lsptdi/tasks/done/ai6-mcp-tool-plane/` (TASK.md + `app/Mcp/`, `app/Http/Middleware/AuthenticateAiMcp.php`, `docs/mcp-ops.md`)
 
 ## Exploration findings (2026-08-06, zero code)
@@ -33,7 +33,7 @@ Entities: Project → Site (SPKLU) → Assignment (survey → construction → P
 ## Scope (proposed "lebih complete" vs lsptdi)
 
 1. **Tools** — bungkus **SEMUA 15 tool** `AiAssistantService` (read-only, `#[IsReadOnly]`): list_users, contextual_page_summary, detect_workflow_gaps, project_health_briefing, workflow_knowledge, resolve_entity_context, query_entity_stats, summarize_assignment_operations, generate_subcontractor_reminder, summarize_priority_actions, summarize_project_risks, summarize_subcontractor_blockers, check_report_readiness, summarize_dashboard, general_help.
-2. **Auth lebih kuat** — multiple tokens per agent (nama agent, scope), revoke/rotate, config `ai.mcp.*` / `AI_MCP_*`
+2. **Auth** — single bearer token mapped to an authorized acting user; multi-token per-agent scopes/revoke/rotate deferred
 3. **Audit log** — tabel `mcp_audit_logs`: tool, token/agent, status, latency, timestamp
 4. **Metrik** — hit count + latency per tool (queryable via resource atau endpoint internal)
 5. **Resources + Prompts** — MCP resources (statis) + prompts (query umum) — yang di lsptdi belum ada
@@ -48,7 +48,7 @@ Entities: Project → Site (SPKLU) → Assignment (survey → construction → P
 ## Acceptance
 
 - [ ] External agent (Hermes) invoke ≥1 tool nex-pm sukses di dev
-- [x] Auth bearer: valid token OK, invalid/revoked denied
+- [x] Auth bearer: valid token OK, invalid token denied; multi-token/revocation deferred
 - [x] Audit log tercatat per pemanggilan
 - [x] Metrik per tool tersedia
 - [x] ≥1 resource/prompt jalan

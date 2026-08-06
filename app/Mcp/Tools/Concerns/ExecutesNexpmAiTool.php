@@ -3,11 +3,13 @@
 namespace App\Mcp\Tools\Concerns;
 
 use App\Models\McpAuditLog;
+use App\Models\User;
 use App\Services\Ai\AiAssistantService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Throwable;
@@ -49,13 +51,19 @@ trait ExecutesNexpmAiTool
 
     protected function executeDomainTool(Request $request): Response
     {
-        /** @var \App\Models\User|null $user */
+        /** @var User|null $user */
         $user = $request->user() ?? Auth::user();
 
-        if (! $user) {
+        if (! $user && filter_var(config('ai.mcp.local_acting_as', false), FILTER_VALIDATE_BOOLEAN)) {
+            $actingUserId = config('ai.mcp.acting_as_user_id');
+            $user = $actingUserId ? User::query()->find($actingUserId) : null;
+        }
+
+        if (! $user || (! $user->isAdmin() && ! $user->isGlobalAdmin())) {
             return Response::error('Unauthorized. Please authenticate.');
         }
 
+        $requestId = (string) Str::uuid();
         $startMs = (int) (microtime(true) * 1000);
         $errorMessage = null;
         $status = 'success';
@@ -79,11 +87,12 @@ trait ExecutesNexpmAiTool
             $status = 'error';
             $errorMessage = $e->getMessage();
             Log::error('NexPM MCP tool failed.', [
+                'request_id' => $requestId,
                 'tool' => $this->domainToolName(),
                 'exception' => $e,
             ]);
 
-            return Response::error('Tool execution failed. Contact the administrator with the request ID.');
+            return Response::error('Tool execution failed. Request ID: '.$requestId);
         } finally {
             $elapsed = max(0, (int) (microtime(true) * 1000) - $startMs);
 
@@ -97,8 +106,11 @@ trait ExecutesNexpmAiTool
                     'request_summary' => $this->summarizeRequest($request),
                     'error_message' => $errorMessage,
                 ]);
-            } catch (Throwable) {
-                // Swallow audit-log failures; never block the tool response.
+            } catch (Throwable $auditException) {
+                Log::error('NexPM MCP audit logging failed.', [
+                    'tool' => $this->domainToolName(),
+                    'exception' => $auditException,
+                ]);
             }
         }
     }

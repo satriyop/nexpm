@@ -7,9 +7,11 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[Name('general_help')]
 #[Description('Tool discovery and query guidance — helps agents discover available tools.')]
 #[IsReadOnly]
 class GeneralHelpMcpTool extends Tool

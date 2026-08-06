@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
     private function configureRateLimiting(): void
     {
         RateLimiter::for('mcp', function (Request $request): Limit {
-            return Limit::perMinute(60)->by($request->bearerToken() ?: $request->ip());
+            return Limit::perMinute(60)->by(hash('sha256', $request->bearerToken() ?: $request->ip()));
         });
     }
 
